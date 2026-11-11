@@ -30,10 +30,12 @@ Run `uv run ruff check .`, `uv run ruff format --check .` and `uv run pytest` be
 src/songs/        importable, tested code
 tests/            tests and small fixtures (tests/fixtures/)
 docs/decisions/   one file per decision, numbered
+docs/status/      generated pages; never edit by hand
+countries/        one folder per country (ISO3 code) with its run records
 .github/          CI, code owners, issue and pull request templates
 ```
 
-These folders are planned and arrive with the code that needs them: `countries/` (one folder per country, named by ISO3 code, with its plan and run records), `resources/` (dataset catalog, figure registry, hand corrections), `prompts/` (scoring prompts and agent roles), `docs/standards/` (figure and topic standards).
+These folders are planned and arrive with the code that needs them: `resources/` (dataset catalog, figure registry, hand corrections), `prompts/` (scoring prompts and agent roles), `docs/standards/` (figure and topic standards).
 
 Local only, never in Git: `data/`, `outputs/`, `reports/`, `scratch/`, `overleaf/`, `.local/`.
 
@@ -60,7 +62,8 @@ Local only, never in Git: `data/`, `outputs/`, `reports/`, `scratch/`, `overleaf
 
 - Collection work is organized by country. Each country has one folder, `countries/<ISO3>/`.
 - Never run the same job twice. Before a collection run, read the run records of that country. If the same route and source already ran, reuse the result or state why a new run is needed.
-- Every collection run writes one run record: country, date, route, source, the path of any bulk file used, request delay, artist and song limits, code commit, rows added, and known gaps. The command writes the record; nobody writes one by hand.
+- Every collection run writes one run record: country, date, route, source, the path of any bulk file used, request delay, artist and song limits, code commit, rows added, and known gaps. The command writes the record through `songs.common.run_records.record_run`; nobody writes one by hand.
+- Before a run, read the history: `uv run songs lyrics history <ISO3>`.
 - One country and route runs in one place at a time.
 
 ### Code

@@ -50,8 +50,8 @@ flowchart LR
 | Area | State |
 | --- | --- |
 | Repository rules, CI, templates | Working |
-| Shared library (configuration, paths, storage) | Planned |
-| Country folders and run records | Planned |
+| Shared library (configuration, paths) | Working; storage helpers arrive with the code that needs them |
+| Country folders and run records | Working: `songs lyrics history`, and [coverage by country](docs/status/coverage.md) |
 | Lyric collection and matching | Planned |
 | Topic scoring | Planned |
 | Analysis, figure standards, figure registry | Planned |
@@ -63,12 +63,14 @@ flowchart LR
 src/songs/        importable, tested code
 tests/            tests and small fixtures
 docs/decisions/   why the project works the way it does
+docs/status/      generated status pages
+countries/        one folder per country (ISO3 code) with its run records
 .github/          CI, code owners, issue and pull request templates
 AGENTS.md         rules for agents and people
 CONTRIBUTING.md   how to make a change
 ```
 
-Folders that arrive with their code: `countries/`, `resources/`, `prompts/`, `docs/standards/`.
+Folders that arrive with their code: `resources/`, `prompts/`, `docs/standards/`.
 
 ## Setup
 
