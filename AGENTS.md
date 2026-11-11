@@ -17,7 +17,7 @@ Out of scope for agents, always: `.github/`, `.claude/`, `AGENTS.md`, `CLAUDE.md
 ## Commands
 
 ```bash
-uv sync                                  # install dependencies
+uv sync --all-groups                     # install dependencies
 uv run ruff check . && uv run ruff format .
 uv run pytest                            # never touches the network, cloud storage or a model
 ```

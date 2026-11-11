@@ -77,7 +77,7 @@ You need [uv](https://docs.astral.sh/uv/) and Git. uv installs Python 3.14 for y
 ```bash
 git clone https://github.com/gabrielsgaspar/research-songs.git
 cd research-songs
-uv sync
+uv sync --all-groups
 uv run pytest
 ```
 

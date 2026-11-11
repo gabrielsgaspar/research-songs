@@ -4,13 +4,18 @@ version = "0.1.0"
 description = "A research dataset of song lyrics by country, scored on topics, for one economics paper."
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "typer>=0.29.1",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
+analysis = [
+    "matplotlib>=3.11.2",
+]
 dev = [
     "pytest>=9.2.0",
     "ruff>=0.17.3",
