@@ -1,0 +1,23 @@
+estimator: "dcdh"
+data_path: "data/clean/panel.parquet"
+file_format: "parquet"
+outcome: "y"
+unit_id: "id"
+time_id: "year"
+group_id: "g"
+treatment_var: "treat"
+controls:
+  - "x1"
+  - "x2"
+cluster_var: "id"
+weights_var: null
+event_time_var: null
+lead: 5
+lag: 5
+effects: 5
+placebo: 5
+dcdh_mode: "dyn"
+trends_nonparam: null
+trends_lin: false
+output_dir: "resources/did/dcdh_example"
+notes: "Example de Chaisemartin-D'Haultfoeuille run."

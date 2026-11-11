@@ -1,0 +1,21 @@
+estimator: "callaway_santanna"
+data_path: "data/clean/panel.parquet"
+file_format: "parquet"
+outcome: "y"
+unit_id: "id"
+time_id: "year"
+group_id: "g"
+treatment_var: null
+controls:
+  - "x1"
+  - "x2"
+cluster_var: "id"
+weights_var: null
+event_time_var: null
+lead: 5
+lag: 5
+anticipation: 0
+control_group: "nevertreated"
+balanced_panel_required: false
+output_dir: "resources/did/callaway_santanna_example"
+notes: "Example Callaway-Sant'Anna run."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vector autoregressions"
+  short_description: "Run VAR models and impulse responses in R"
+  default_prompt: "Use $reg-var to estimate a VAR and report impulse responses."
