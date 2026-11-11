@@ -31,11 +31,12 @@ src/songs/        importable, tested code
 tests/            tests and small fixtures (tests/fixtures/)
 docs/decisions/   one file per decision, numbered
 docs/status/      generated pages; never edit by hand
+docs/standards/   figure and topic standards
 countries/        one folder per country (ISO3 code) with its run records
 .github/          CI, code owners, issue and pull request templates
 ```
 
-These folders are planned and arrive with the code that needs them: `resources/` (dataset catalog, figure registry, hand corrections), `prompts/` (scoring prompts and agent roles), `docs/standards/` (figure and topic standards).
+These folders are planned and arrive with the code that needs them: `resources/` (dataset catalog, figure registry, hand corrections), `prompts/` (scoring prompts and agent roles).
 
 Local only, never in Git: `data/`, `outputs/`, `reports/`, `scratch/`, `overleaf/`, `.local/`.
 
@@ -76,7 +77,8 @@ Local only, never in Git: `data/`, `outputs/`, `reports/`, `scratch/`, `overleaf
 
 ### Figures
 
-- Figures are PNG, 300 dpi or more, drawn with the shared style module and saved through its save function. `docs/standards/` holds the rules once the style module is in the repository.
+- Figures are PNG at 300 dpi. A figure calls `apply_paper_matplotlib` and saves with `save_png`, both in `songs.common.plot_style`. The rules are in `docs/standards/figures.md`.
+- Topic ids, topic labels and families come only from `songs.stage_30_topics.topic_ids`. Never type a copy. `docs/standards/topics.md` is generated from it.
 - Numbers in the paper come from generated files, never typed by hand.
 
 ### Git
