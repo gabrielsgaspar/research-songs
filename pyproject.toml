@@ -1,0 +1,31 @@
+[project]
+name = "songs"
+version = "0.1.0"
+description = "A research dataset of song lyrics by country, scored on topics, for one economics paper."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "needs_data: reads the local data folder; skipped when SONGS_DATA_ROOT is not set",
+    "network: calls an outside service; never runs in CI",
+]
