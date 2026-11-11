@@ -1,0 +1,11 @@
+# Paths only Gabriel changes. The rule on main asks for a code owner's
+# review on any pull request that touches them.
+
+/.github/ @gabrielsgaspar
+/.claude/ @gabrielsgaspar
+/AGENTS.md @gabrielsgaspar
+/CLAUDE.md @gabrielsgaspar
+/pyproject.toml @gabrielsgaspar
+/uv.lock @gabrielsgaspar
+/docs/decisions/ @gabrielsgaspar
+/tests/test_repo_rules.py @gabrielsgaspar
