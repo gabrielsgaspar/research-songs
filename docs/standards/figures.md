@@ -19,8 +19,6 @@ Sizes are in inches, width then height. Pick one of the four names. Do not type 
 | `SIZE_WIDE` | 12.0 x 5.0 | Several panels side by side, or a long time series. |
 | `SIZE_TALL` | 7.0 x 8.0 | Many rows, such as one row per topic or per country. |
 
-The old analysis code used 8.5 x 6.0 in 11 figures, 8.0 x 5.0 in 11, 7 x 8 in 8, and 12 x 5 in 4. Of 197 `dpi=` arguments that named a number, 115 said 300, 72 said 160, 7 said 320, and 3 said 200. The standard is 300.
-
 ## Typography
 
 The font is Latin Modern Roman. Math uses Computer Modern. All text is black.
