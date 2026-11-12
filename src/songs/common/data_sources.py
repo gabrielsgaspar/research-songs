@@ -65,7 +65,8 @@ def load_sources(root: Path | None = None) -> list[DataSource]:
             problems.append(f"{name}: status must be one of {STATUSES}")
         if not all(str(block[key]).strip() for key in ("concept", "source", "version")):
             problems.append(f"{name}: concept, source and version must not be empty")
-        if Path(block["raw_path"]).is_absolute() or "://" in block["raw_path"]:
+        # A drive letter or a leading slash is absolute on every system, not only this one.
+        if re.match(r"[A-Za-z]:|[/\\]", block["raw_path"]) or "://" in block["raw_path"]:
             problems.append(f"{name}: raw_path is a path under the data folder")
         sources.append(DataSource(**{**block, "columns": tuple(block["columns"])}))
     ids = [source.id for source in sources]
