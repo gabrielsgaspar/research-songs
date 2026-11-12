@@ -35,7 +35,7 @@ def test_the_request_names_the_fixed_model_and_no_sampling_settings():
         ("model.toml", 'reasoning_effort = "medium"', 'reasoning_effort = "high"'),
         ("model.toml", 'model = "gpt-5.6-luna"', 'model = "another-model"'),
         ("topics/instructions.txt", "Use the full integer scale.", "Use the scale."),
-        ("topics/definitions.json", "Mutual, fulfilling", "Fulfilling"),
+        ("topics/text_kind.txt", "or uncertain", "or not sure"),
         ("topics/template.jinja2", "Return datapoints only.", "Return data only."),
     ],
 )
@@ -49,3 +49,10 @@ def test_a_changed_file_is_refused(tmp_path, file, old, new):
     path.write_text(text.replace(old, new), encoding="utf-8")
     with pytest.raises(ValueError, match="changed"):
         s.load_scoring_prompt(tmp_path)
+
+
+@pytest.mark.parametrize("name", ["TOPIC_LABELS", "TOPIC_DEFINITIONS"])
+def test_a_changed_label_or_definition_is_refused(monkeypatch, name):
+    monkeypatch.setitem(getattr(s.topic_ids, name), "T01", "Another text")
+    with pytest.raises(ValueError, match="changed"):
+        s.load_scoring_prompt()

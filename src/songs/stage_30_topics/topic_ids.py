@@ -1,4 +1,6 @@
-"""The single source for topic ids, short labels, families and display order.
+"""The single source for topic ids, labels, definitions, families and display order.
+
+Labels and definitions are read from `resources/topics.toml`.
 
 Run `python -m songs.stage_30_topics.topic_ids --write` to rebuild docs/standards/topics.md.
 """
@@ -6,53 +8,22 @@ Run `python -m songs.stage_30_topics.topic_ids --write` to rebuild docs/standard
 from __future__ import annotations
 
 import sys
+import tomllib
 from pathlib import Path
 
-TOPICS_VERSION = "topics-v3.0"
+ROOT = Path(__file__).resolve().parents[3]
+TOPICS_FILE = ROOT / "resources" / "topics.toml"
+_FILE = tomllib.loads(TOPICS_FILE.read_text(encoding="utf-8"))
+
+TOPICS_VERSION: str = _FILE["version"]
 FAMILIES_VERSION = "topic-families-2026-09-15"
 
 TOPIC_IDS: tuple[str, ...] = tuple(f"T{index:02d}" for index in range(1, 39))
+if tuple(topic["id"] for topic in _FILE["topic"]) != TOPIC_IDS:
+    raise ValueError("resources/topics.toml must hold T01 to T38, each one time, in order")
 
-TOPIC_LABELS: dict[str, str] = {
-    "T01": "Romantic love & devotion",
-    "T02": "Romantic longing & separation",
-    "T03": "Heartbreak & separation",
-    "T04": "Unrequited & hidden love",
-    "T05": "Desire & casual relationships",
-    "T06": "Betrayal, conflict & dysfunction",
-    "T07": "Nostalgia & memory",
-    "T08": "Loneliness & isolation",
-    "T09": "Personal struggle & emotional pain",
-    "T10": "Existential reflection & uncertainty",
-    "T11": "Death & mortality",
-    "T12": "Grief & mourning",
-    "T13": "Religious faith & spirituality",
-    "T14": "Resilience & hope",
-    "T15": "Personal identity & self-discovery",
-    "T16": "Personal freedom & empowerment",
-    "T17": "Ambition, dreams & aspiration",
-    "T18": "Self-confidence & bravado",
-    "T19": "Artistic expression & creativity",
-    "T20": "Rebellion & defiance",
-    "T21": "Social injustice & inequality",
-    "T22": "Political dissent & resistance",
-    "T23": "Social criticism & corruption",
-    "T24": "War, violence & conflict",
-    "T25": "Poverty & hardship",
-    "T26": "Urban street life & crime",
-    "T27": "Wealth, status & fame",
-    "T28": "Family bonds",
-    "T29": "Friendship & companionship",
-    "T30": "Community, peace & solidarity",
-    "T31": "Cultural & national identity",
-    "T32": "Migration, exile & homesickness",
-    "T33": "Nature & landscape",
-    "T34": "Everyday life & simple living",
-    "T35": "Environmental concern",
-    "T36": "Partying & celebration",
-    "T37": "Escapism & fantasy",
-    "T38": "Substance use & addiction",
-}
+TOPIC_LABELS: dict[str, str] = {topic["id"]: topic["label"] for topic in _FILE["topic"]}
+TOPIC_DEFINITIONS: dict[str, str] = {topic["id"]: topic["definition"] for topic in _FILE["topic"]}
 
 FAMILY_LABELS: dict[str, str] = {
     "A": "Romantic love, desire & conflict",
@@ -81,7 +52,7 @@ TOPIC_DISPLAY_IDS: tuple[str, ...] = tuple(
     topic_id for topics in FAMILY_TOPIC_IDS.values() for topic_id in topics
 )
 
-TOPICS_PAGE = Path(__file__).resolve().parents[3] / "docs" / "standards" / "topics.md"
+TOPICS_PAGE = ROOT / "docs" / "standards" / "topics.md"
 
 
 def render_topics_markdown() -> str:
@@ -89,8 +60,8 @@ def render_topics_markdown() -> str:
     lines = [
         "# Topics",
         "",
-        "This page is generated from `src/songs/stage_30_topics/topic_ids.py`. "
-        "Do not edit it by hand.",
+        "This page is generated from `resources/topics.toml` (labels and definitions) and "
+        "`src/songs/stage_30_topics/topic_ids.py` (families). Do not edit it by hand.",
         "",
         "To rebuild it, run `python -m songs.stage_30_topics.topic_ids --write`.",
         "",
@@ -101,9 +72,16 @@ def render_topics_markdown() -> str:
         "Topic ids keep their numeric order in the data. The tables show the display order.",
     ]
     for family, label in FAMILY_LABELS.items():
-        lines += ["", f"## Family {family}: {label}", "", "| Id | Topic |", "| --- | --- |"]
         lines += [
-            f"| {topic_id} | {TOPIC_LABELS[topic_id]} |" for topic_id in FAMILY_TOPIC_IDS[family]
+            "",
+            f"## Family {family}: {label}",
+            "",
+            "| Id | Topic | Definition |",
+            "| --- | --- | --- |",
+        ]
+        lines += [
+            f"| {topic_id} | {TOPIC_LABELS[topic_id]} | {TOPIC_DEFINITIONS[topic_id]} |"
+            for topic_id in FAMILY_TOPIC_IDS[family]
         ]
     return "\n".join(lines) + "\n"
 

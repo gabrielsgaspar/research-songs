@@ -1,0 +1,1 @@
+Eligibility of the lyrics field: song_lyrics for actual song lyrics, non_song for clearly non-song material, or uncertain.

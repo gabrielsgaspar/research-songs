@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from songs.common.paths import resolve_project_root
-from songs.stage_30_topics.topic_ids import TOPIC_IDS, TOPIC_LABELS
+from songs.stage_30_topics import topic_ids
+from songs.stage_30_topics.topic_ids import TOPIC_IDS
 
 SCORING_DIR = Path("prompts") / "scoring"
 PROMPT_VERSION = "lyrics-topics-v1"
@@ -107,11 +108,11 @@ def load_scoring_prompt(root: Path | None = None) -> ScoringPrompt:
     folder = resolve_project_root(root) / SCORING_DIR
     settings = tomllib.loads((folder / "model.toml").read_text(encoding="utf-8"))
     topics = folder / "topics"
-    definitions = json.loads((topics / "definitions.json").read_text(encoding="utf-8"))
-    if tuple(definitions) != FIELD_ORDER:
-        raise ValueError("definitions.json must hold text_kind and then every topic id, in order")
-    attributes = {"text_kind": definitions["text_kind"]} | {
-        topic: f"{TOPIC_LABELS[topic]}: {definitions[topic]}" for topic in TOPIC_IDS
+    # Read at call time, so a test can change a label or a definition.
+    labels, definitions = topic_ids.TOPIC_LABELS, topic_ids.TOPIC_DEFINITIONS
+    text_kind = (topics / "text_kind.txt").read_text(encoding="utf-8").removesuffix("\n")
+    attributes = {"text_kind": text_kind} | {
+        topic: f"{labels[topic]}: {definitions[topic]}" for topic in TOPIC_IDS
     }
     instructions = (topics / "instructions.txt").read_text(encoding="utf-8").removesuffix("\n")
     template = (topics / "template.jinja2").read_text(encoding="utf-8").removesuffix("\n")
@@ -131,7 +132,7 @@ def load_scoring_prompt(root: Path | None = None) -> ScoringPrompt:
     if sha256 != PROMPT_SHA256:
         raise ValueError(
             f"The scoring prompt or model changed: its hash is {sha256}, not {PROMPT_SHA256}. "
-            "The cause is an edit in prompts/scoring/ or to a topic label. "
+            "The cause is an edit in prompts/scoring/ or in resources/topics.toml. "
             "A change needs a new decision (see decision 0005)."
         )
     return ScoringPrompt(settings, attributes, instructions, template, schema, sha256)
