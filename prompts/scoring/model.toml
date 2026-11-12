@@ -1,0 +1,24 @@
+# The one model configuration for topic scoring (decision 0005).
+#
+# `model` and `reasoning_effort` are part of the pinned prompt identity: a change
+# to either one makes `songs.stage_30_topics.scoring_prompt` refuse to load.
+# Do not change any value here without a new decision.
+#
+# No temperature and no seed are set.
+
+provider = "openai"
+model = "gpt-5.6-luna"
+reasoning_effort = "medium"
+
+# How requests are sent.
+api_base_url = "https://api.openai.com/v1"
+endpoint = "/v1/responses"
+transport = "batch"            # the Batch API; direct calls are for small tests only
+service_tier = "default"
+timeout_seconds = 120
+max_retries = 3
+
+# Fields of each request body.
+answer_format_name = "lyrics_topics_v1"
+truncation = "auto"
+store = false
