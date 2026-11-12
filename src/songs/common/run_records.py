@@ -6,14 +6,13 @@ limits, and when (decision 0003). Collection commands write records through
 """
 
 import json
-import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, fields
 from datetime import UTC, datetime
 from pathlib import Path
 
-from songs.common.paths import project_paths, resolve_project_root
+from songs.common.paths import ISO3, RUN_ID, SOURCE, project_paths, resolve_project_root
 from songs.common.repo import git_sha
 
 SCHEMA_VERSION = 1
@@ -29,9 +28,6 @@ ROUTES = (
     "manual_review",
 )
 STATES = ("complete", "partial", "failed")
-ISO3 = re.compile(r"[A-Z]{3}")
-RUN_ID = re.compile(r"\d{8}T\d{6}Z")
-SOURCE = re.compile(r"[a-z0-9][a-z0-9_]*")
 COVERAGE_PAGE = Path("docs") / "status" / "coverage.md"
 COVERAGE_COMMAND = "uv run songs lyrics coverage --write"
 

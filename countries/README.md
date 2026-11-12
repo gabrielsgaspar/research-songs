@@ -10,6 +10,16 @@ countries/<ISO3>/
 
 A folder appears with the first run of its country.
 
+## Where the data of a country is
+
+This folder holds only the history. The songs of a country are in the data folder, never in Git:
+
+```
+lyrics/<ISO3>/songs/<run id>/     artists.parquet, songs.parquet, links.parquet, _MANIFEST.json
+```
+
+Each run writes the full tables of the country to a new folder, and the name of the folder is the `run_id` of its run record. The newest folder that has a manifest is the current state of the country. [`docs/standards/data_layout.md`](../docs/standards/data_layout.md) gives the columns of each table and the fields of the manifest.
+
 ## Before a run
 
 Read what already ran, so the same job does not run twice:

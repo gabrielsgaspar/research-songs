@@ -15,6 +15,7 @@ uv run pytest
 1. Read [`README.md`](README.md) for the project map.
 2. Read [`AGENTS.md`](AGENTS.md) for the rules. They apply to people too.
 3. Read [`docs/decisions/README.md`](docs/decisions/README.md) when you want to know why a rule exists.
+4. Read [`docs/standards/data_layout.md`](docs/standards/data_layout.md) before you write code that reads or writes data. It says where each data file goes and which columns each table has.
 
 ## Make a change
 
