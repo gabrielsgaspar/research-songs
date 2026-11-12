@@ -54,6 +54,7 @@ An empty value means "not recorded". It never means zero.
 | `archive` | Import from a whole-site archive collected earlier |
 | `dump_name` | Match by artist and title against a bulk file |
 | `local_source` | Import from a dataset that someone gave to the project |
+| `manual_review` | Import of the songs that a person added to a country review workbook |
 
 ## Coverage page
 
