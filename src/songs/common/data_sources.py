@@ -50,8 +50,7 @@ class DataSource:
 def load_sources(root: Path | None = None) -> list[DataSource]:
     """Return every source in the file, in file order. Raise ValueError on a bad file."""
     path = resolve_project_root(root) / SOURCES_FILE
-    with path.open("rb") as handle:
-        blocks = tomllib.load(handle).get("source", [])
+    blocks = tomllib.loads(path.read_text(encoding="utf-8")).get("source", [])
     problems, sources = [], []
     for block in blocks:
         name = block.get("id", "(no id)")
