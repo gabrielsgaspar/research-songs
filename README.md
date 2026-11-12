@@ -67,13 +67,16 @@ docs/decisions/   why the project works the way it does
 docs/status/      generated status pages
 docs/standards/   figure and topic standards
 countries/        one folder per country (ISO3 code) with its run records
+resources/        small tracked files that code reads, such as the list of data sources
+exhibits/         figures and tables for the paper and the presentation
 prompts/roles/    instructions for the planner, builder and reviewer agents
+prompts/scoring/  the model configuration and prompt for topic scoring
 .github/          CI, agent workflows, code owners, issue and pull request templates
 AGENTS.md         rules for agents and people
 CONTRIBUTING.md   how to make a change
 ```
 
-Folders that arrive with their code: `resources/`, and scoring prompts in `prompts/`.
+Every external variable (income, democracy, fertility and others) has its source in [`docs/standards/data_sources.md`](docs/standards/data_sources.md).
 
 ## Setup
 
