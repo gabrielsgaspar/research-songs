@@ -1,0 +1,367 @@
+# External data sources: where every variable that is not lyrics comes from.
+#
+# One [[source]] block per source of a concept. This file is the only place
+# that says which source the project uses. `docs/standards/data_sources.md` is
+# generated from it; a test fails when that page is out of date.
+#
+# Fields:
+#   id        unique key, lower case with underscores
+#   concept   what the variable measures; sources of the same thing share it
+#   status    canonical      the source every analysis uses (one per concept)
+#             robustness     a second source, used only for robustness checks
+#             supplementary  used by one analysis only; `notes` says which
+#             retired        was used before; no analysis may read it
+#   columns   names of the variables in the country-year panel
+#   source    who publishes the data
+#   version   edition or vintage; "not stated" when the download does not say
+#   unit      unit of the values, when there is one
+#   url       where the data comes from; empty when the exact page is not confirmed
+#   raw_path  folder or file under the data folder (SONGS_DATA_ROOT); empty when
+#             the raw file is not in the data folder yet
+#   checked   true when source and version were confirmed from the download
+#             itself; false when they come from notes only
+#   notes     anything a reader must know
+#
+# To change a source: change `status` here, record the reason in
+# docs/decisions/, and rebuild the page with
+#   python -m songs.common.data_sources --write
+
+# --- Income -----------------------------------------------------------------
+
+[[source]]
+id = "gdp_maddison"
+concept = "GDP per capita"
+status = "canonical"
+columns = ["gdp_per_capita"]
+source = "Maddison Project Database, through Our World in Data"
+version = "2023"
+unit = "2011 international dollars"
+url = "https://ourworldindata.org/grapher/gdp-per-capita-maddison-project-database"
+raw_path = "raw/owid_maddison_gdp/20261013/"
+checked = true
+notes = "This is the GDP series in the country-year panel."
+
+[[source]]
+id = "gdp_pwt"
+concept = "GDP per capita"
+status = "robustness"
+columns = ["gdp_per_capita_pwt"]
+source = "Penn World Table"
+version = "11.0"
+unit = "expenditure-side real GDP (rgdpe) divided by population"
+url = "https://www.rug.nl/ggdc/productivity/pwt/"
+raw_path = ""
+checked = false
+notes = "The raw file was not found on the workstation when this entry was written."
+
+[[source]]
+id = "gdp_wdi_current_usd"
+concept = "GDP per capita"
+status = "retired"
+columns = []
+source = "World Bank, World Development Indicators, NY.GDP.PCAP.CD"
+version = "not stated"
+unit = "current US dollars"
+url = "https://data.worldbank.org/indicator/NY.GDP.PCAP.CD"
+raw_path = ""
+checked = false
+notes = "Current dollars are not comparable over long periods."
+
+[[source]]
+id = "gini_wdi"
+concept = "Income inequality (Gini)"
+status = "canonical"
+columns = ["gini"]
+source = "World Bank, World Development Indicators, SI.POV.GINI"
+version = "downloaded 2026-11-10"
+unit = "index, 0 to 100"
+url = "https://data.worldbank.org/indicator/SI.POV.GINI"
+raw_path = "raw/crisis_review_20261110/"
+checked = true
+notes = "Coverage is thin before 1980 and for low-income countries."
+
+[[source]]
+id = "gini_swiid"
+concept = "Income inequality (Gini)"
+status = "retired"
+columns = []
+source = "Standardized World Income Inequality Database (SWIID)"
+version = "not stated"
+unit = "index, 0 to 100, disposable income"
+url = "https://fsolt.org/swiid/"
+raw_path = ""
+checked = false
+notes = "Replaced by the World Bank series."
+
+[[source]]
+id = "income_group_world_bank"
+concept = "Income group"
+status = "canonical"
+columns = ["world_bank_income_group"]
+source = "World Bank country classification by income"
+version = "fiscal year 2027"
+url = "https://datahelpdesk.worldbank.org/knowledgebase/articles/906519"
+raw_path = "raw/world_bank_income/20260907/"
+checked = true
+notes = ""
+
+# --- Population and family ----------------------------------------------------
+
+[[source]]
+id = "population_un_wpp"
+concept = "Population"
+status = "canonical"
+columns = ["population_total", "population_is_projected", "log_population"]
+source = "United Nations, World Population Prospects"
+version = "2024, medium variant"
+unit = "persons"
+url = "https://population.un.org/wpp/"
+raw_path = "raw/un_wpp/2024/"
+checked = true
+notes = "Years after the last estimate are projections; `population_is_projected` marks them."
+
+[[source]]
+id = "fertility_hfd"
+concept = "Fertility"
+status = "canonical"
+columns = ["hfd_*"]
+source = "Human Fertility Database"
+version = "downloaded 2026-09-21"
+unit = "children per woman, and related rates"
+url = "https://www.humanfertility.org/"
+raw_path = "raw/hfd/20260921/"
+checked = true
+notes = "14 columns with the prefix `hfd_`. The database covers a limited set of countries, mostly high-income."
+
+[[source]]
+id = "fertility_owid"
+concept = "Fertility"
+status = "retired"
+columns = []
+source = "Our World in Data, children born per woman (from UN World Population Prospects)"
+version = "downloaded 2026-09-21"
+unit = "children per woman"
+url = "https://ourworldindata.org/grapher/children-born-per-woman"
+raw_path = "raw/owid_fertility/20260921/"
+checked = true
+notes = "Covers more countries than the Human Fertility Database. Retired so that every analysis uses one fertility source."
+
+[[source]]
+id = "divorce_unsd"
+concept = "Divorce rate"
+status = "canonical"
+columns = ["divorce_rate_per_1000"]
+source = "United Nations Statistics Division, Demographic Yearbook, table 16"
+version = "not stated"
+unit = "divorces per 1,000 persons"
+url = "https://unstats.un.org/unsd/demographic-social/products/dyb/"
+raw_path = "raw/unsd_divorces/undata_pop_table16/"
+checked = true
+notes = "Divorce counts divided by the population from `population_un_wpp`."
+
+[[source]]
+id = "female_labor_force_wdi"
+concept = "Female labor force participation"
+status = "canonical"
+columns = ["female_labor_force_participation_rate"]
+source = "World Bank, World Development Indicators, SL.TLF.CACT.FE.ZS (ILO modeled estimate)"
+version = "downloaded 2026-09-21"
+unit = "percent of women aged 15 and over"
+url = "https://data.worldbank.org/indicator/SL.TLF.CACT.FE.ZS"
+raw_path = "raw/world_bank_wdi/20260921/"
+checked = true
+notes = ""
+
+# --- Politics -----------------------------------------------------------------
+
+[[source]]
+id = "democracy_anrr"
+concept = "Democracy"
+status = "canonical"
+columns = ["anrr_democracy"]
+source = "Acemoglu, Naidu, Restrepo and Robinson (2019), Democracy Does Cause Growth, replication data"
+version = "Journal of Political Economy 2019"
+unit = "0 or 1"
+url = "https://www.journals.uchicago.edu/doi/10.1086/700936"
+raw_path = ""
+checked = false
+notes = "The series as published, 1960 to 2010, with no extension. The raw file was not found on the workstation when this entry was written."
+
+[[source]]
+id = "democracy_anrr_augmented"
+concept = "Democracy"
+status = "retired"
+columns = []
+source = "The published democracy series, extended by the project"
+version = "not stated"
+unit = "0 or 1"
+url = ""
+raw_path = ""
+checked = false
+notes = "The source of the extension is not documented. Use `democracy_anrr`."
+
+[[source]]
+id = "democracy_vdem"
+concept = "Democracy"
+status = "supplementary"
+columns = ["democracy", "expression"]
+source = "V-Dem electoral democracy and freedom of expression indices, through Our World in Data"
+version = "not stated"
+unit = "index, 0 to 1"
+url = "https://ourworldindata.org/grapher/electoral-democracy-index"
+raw_path = "raw/crisis_review_20261110/"
+checked = false
+notes = "Used only in the review of crisis events, as context."
+
+[[source]]
+id = "populism_fst"
+concept = "Populist leaders"
+status = "canonical"
+columns = ["populist", "populism_start", "independent"]
+source = "Funke, Schularick and Trebesch, Populist Leaders and the Economy"
+version = "not stated"
+url = "https://www.aeaweb.org/articles?id=10.1257/aer.20202045"
+raw_path = ""
+checked = false
+notes = "The raw file and the code that cleans it were not found when this entry was written."
+
+# --- Crises -------------------------------------------------------------------
+
+[[source]]
+id = "banking_crises_laeven_valencia"
+concept = "Banking crises"
+status = "canonical"
+columns = ["banking_crisis_*"]
+source = "Laeven and Valencia, Systemic Banking Crises Database"
+version = "2026 edition, 1970 to 2025"
+url = ""
+raw_path = ""
+checked = false
+notes = "The raw file was not found on the workstation when this entry was written."
+
+[[source]]
+id = "sovereign_default_boc_boe"
+concept = "Sovereign defaults"
+status = "canonical"
+columns = ["sovereign_default_*"]
+source = "Bank of Canada and Bank of England, Sovereign Default Database"
+version = "2024"
+url = ""
+raw_path = "raw/crisis_review_20261109/"
+checked = true
+notes = ""
+
+[[source]]
+id = "hyperinflation_hanke_krus"
+concept = "Hyperinflations"
+status = "canonical"
+columns = ["hyperinflation_*"]
+source = "Hanke and Krus, World Hyperinflations, table of episodes"
+version = "May 2013"
+url = ""
+raw_path = ""
+checked = false
+notes = "The raw file was not found on the workstation when this entry was written."
+
+[[source]]
+id = "currency_crises_culiuc_park"
+concept = "Currency crises"
+status = "canonical"
+columns = ["currency_crisis_*"]
+source = "Culiuc and Park, Large Depreciations, IMF Working Paper 25/221"
+version = "November 2025"
+url = ""
+raw_path = "raw/crisis_review_20261109/"
+checked = true
+notes = ""
+
+[[source]]
+id = "us_recessions_nber"
+concept = "United States recessions"
+status = "supplementary"
+columns = []
+source = "National Bureau of Economic Research, business cycle dates"
+version = "not stated"
+url = "https://www.nber.org/research/business-cycle-dating"
+raw_path = "raw/crisis_review_20261110/"
+checked = true
+notes = "Used only for shading in time-series figures."
+
+[[source]]
+id = "inflation_wdi"
+concept = "Inflation"
+status = "supplementary"
+columns = ["inflation"]
+source = "World Bank, World Development Indicators, FP.CPI.TOTL.ZG"
+version = "downloaded 2026-11-10"
+unit = "percent per year"
+url = "https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG"
+raw_path = "raw/crisis_review_20261110/"
+checked = true
+notes = "Used only in the review of crisis events."
+
+[[source]]
+id = "youth_unemployment_wdi"
+concept = "Youth unemployment"
+status = "supplementary"
+columns = ["youth_unemployment"]
+source = "World Bank, World Development Indicators, SL.UEM.1524.ZS"
+version = "downloaded 2026-11-10"
+unit = "percent of the labor force aged 15 to 24"
+url = "https://data.worldbank.org/indicator/SL.UEM.1524.ZS"
+raw_path = "raw/crisis_review_20261110/"
+checked = true
+notes = "Used only in the review of crisis events."
+
+# --- Geography ----------------------------------------------------------------
+
+[[source]]
+id = "region_world_bank"
+concept = "World region"
+status = "canonical"
+columns = ["region_name"]
+source = "World Bank regions, with a short list of project overrides"
+version = "not stated"
+url = "https://datahelpdesk.worldbank.org/knowledgebase/articles/906519"
+raw_path = ""
+checked = false
+notes = "The overrides must move to a tracked file with the code that applies them."
+
+[[source]]
+id = "land_area_wdi"
+concept = "Land area"
+status = "supplementary"
+columns = []
+source = "World Bank, World Development Indicators, AG.LND.TOTL.K2"
+version = "downloaded 2026-08-28"
+unit = "square kilometers"
+url = "https://data.worldbank.org/indicator/AG.LND.TOTL.K2"
+raw_path = ""
+checked = false
+notes = "The raw file was not found on the workstation when this entry was written."
+
+# --- Music catalogs -------------------------------------------------------------
+
+[[source]]
+id = "catalog_discogs"
+concept = "Artist and release catalog"
+status = "canonical"
+columns = []
+source = "Discogs monthly data dumps"
+version = "2026-06-01"
+url = "https://data.discogs.com/"
+raw_path = "raw/discogs/"
+checked = false
+notes = "Artists, releases, release countries and years. The version is read from a folder name."
+
+[[source]]
+id = "catalog_musicbrainz"
+concept = "Artist aliases and rosters"
+status = "canonical"
+columns = []
+source = "MusicBrainz JSON data dumps"
+version = "2026-06-24"
+url = "https://metabrainz.org/datasets"
+raw_path = "musicbrainz/clean/20260624-001001/"
+checked = false
+notes = "Used for artist names in other scripts and for country rosters. The version is read from a folder name."
