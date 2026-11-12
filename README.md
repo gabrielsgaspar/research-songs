@@ -43,7 +43,7 @@ flowchart LR
   I --> B --> P --> C --> M
 ```
 
-`main` accepts only pull requests with passing checks. People and coding agents follow the same path and the same rules, which are in [`AGENTS.md`](AGENTS.md).
+`main` accepts only pull requests with passing checks. People and coding agents follow the same path and the same rules, which are in [`AGENTS.md`](AGENTS.md). Three agents can work on an issue: one plans, one builds, one reviews. A person starts each stage with a label, and a person merges. [`prompts/roles/`](prompts/roles/README.md) describes the flow.
 
 ## What exists
 
@@ -67,12 +67,13 @@ docs/decisions/   why the project works the way it does
 docs/status/      generated status pages
 docs/standards/   figure and topic standards
 countries/        one folder per country (ISO3 code) with its run records
-.github/          CI, code owners, issue and pull request templates
+prompts/roles/    instructions for the planner, builder and reviewer agents
+.github/          CI, agent workflows, code owners, issue and pull request templates
 AGENTS.md         rules for agents and people
 CONTRIBUTING.md   how to make a change
 ```
 
-Folders that arrive with their code: `resources/`, `prompts/`.
+Folders that arrive with their code: `resources/`, and scoring prompts in `prompts/`.
 
 ## Setup
 

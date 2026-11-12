@@ -1,0 +1,1060 @@
+name: Agent build
+
+# Second stage of the agent flow: plan, build, review. Only
+# trigger: the `agent-build` label is added to an issue that already has a plan
+# comment from the agent-plan workflow. No comment, @claude or pull_request
+# triggers, on purpose. GitHub runs `issues` workflows from the default branch,
+# so this file does nothing until it is merged to main.
+#
+# Four jobs, so that code Claude writes never runs next to a write token:
+#   build    Claude implements the plan on agent/issue-<n>, read-only token.
+#   verify   Plain code checks the commits: paths, secrets, ruff, pytest.
+#   publish  Pushes the verified commits and opens a PR with our GitHub App.
+#            Runs no repository code.
+#   report   On any failure after the guard passed: one comment and the
+#            needs-human label.
+# Nothing here merges, force-pushes or uses id-token. No step that runs git
+# (or anything else) in a checkout Claude's code has touched holds a secret,
+# and git there always runs with fsmonitor and hooks off and never recurses
+# into submodules. Caching is off in every job, so no step here saves the uv
+# cache that CI reads.
+#
+# Fix rounds: when agent-review asks for changes on an agent PR, it dispatches
+# this workflow (workflow_dispatch, inputs issue and review_comment) at most
+# three times per PR. A fix round checks out the existing agent/issue-<n>
+# branch instead of creating it, gives the builder the review's Must fix list
+# as data next to the original plan, and pushes the new commits on top. Every
+# check below (guard, plan, verify's paths and secrets, ruff, pytest) runs
+# exactly as for a first build, over all the branch's commits.
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Issue number of the agent task (its branch is agent/issue-<n>)"
+        type: string
+        required: true
+      review_comment:
+        description: "ID of the agent-review comment that asked for changes"
+        type: string
+        required: true
+
+# One agent-build run per issue at a time; a second one waits instead of
+# racing. Other labels on the same issue go to their own group, so they never
+# queue behind (or cancel) a build.
+concurrency:
+  group: agent-build-${{ github.event.issue.number || inputs.issue }}-${{ github.event.label.name == 'agent-build' || github.event_name == 'workflow_dispatch' }}
+  cancel-in-progress: false
+
+env:
+  BRANCH: agent/issue-${{ github.event.issue.number || inputs.issue }}
+  # verify's uv cache (setup-uv would otherwise pick a temp dir). build
+  # overrides this and puts Python and the cache under /opt; see its env.
+  UV_CACHE_DIR: /home/runner/.cache/uv
+
+jobs:
+  build:
+    if: github.event.label.name == 'agent-build' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    # Python and the uv cache live outside every path the Build step's Read
+    # deny rules hide, since Claude Code applies those rules to the sandbox
+    # too (https://code.claude.com/docs/en/sandboxing). See step 4.
+    env:
+      UV_PYTHON_INSTALL_DIR: /opt/uv-python
+      UV_CACHE_DIR: /opt/uv-cache
+    # This job runs Claude and the tests Claude writes, so its token must stay
+    # read-only. Metadata read (always granted) is enough for the guard.
+    permissions:
+      contents: read # check out the repo and its history
+      issues: read # read the plan comment and when the issue was last edited
+    outputs:
+      reason: ${{ steps.context.outputs.reason || steps.guard.outputs.reason || steps.plan.outputs.reason || steps.branch.outputs.reason || steps.result.outputs.reason || steps.commits.outputs.reason }}
+      guard_ok: ${{ steps.guard.outputs.guard_ok }}
+      base_sha: ${{ steps.branch.outputs.base_sha }}
+      plan_url: ${{ steps.plan.outputs.plan_url }}
+      issue: ${{ steps.context.outputs.issue }}
+      fix_round: ${{ steps.context.outputs.fix_round }}
+      dispatched: ${{ steps.context.outputs.dispatched }}
+    steps:
+      # 0. Context. Which issue, who asked, and (for a fix round) the review.
+      #    Reads only, through the API; the guard below still decides.
+      #    For a fix round the review comment must be agent-review's own
+      #    "Changes needed" comment on this issue's open agent PR, written
+      #    for the branch's current head, and at most the third such comment.
+      #    Its Must fix section goes to a file, read by the builder as data.
+      - name: Resolve the issue and, for a fix round, the review
+        id: context
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          EVENT_ISSUE: ${{ github.event.issue.number }}
+          INPUT_ISSUE: ${{ inputs.issue }}
+          INPUT_COMMENT: ${{ inputs.review_comment }}
+        run: |
+          set -euo pipefail
+          fail() { printf 'reason=%s\n' "$1" >> "${GITHUB_OUTPUT}"; echo "::error::$1"; exit 1; }
+          mkdir -p "${RUNNER_TEMP}/agent-out"
+          if [ "${EVENT}" = workflow_dispatch ]; then
+            [[ "${INPUT_ISSUE}" =~ ^[0-9]{1,7}$ ]] || fail "issue must be a number."
+            [[ "${INPUT_COMMENT}" =~ ^[0-9]{1,15}$ ]] || fail "review_comment must be a number."
+            issue="${INPUT_ISSUE}"
+            # Only users with write access (or our own workflows) can
+            # dispatch, so a failed fix round is reported on the issue even
+            # if it stops before the guard.
+            echo "dispatched=true" >> "${GITHUB_OUTPUT}"
+          else
+            issue="${EVENT_ISSUE}"
+          fi
+          echo "issue=${issue}" >> "${GITHUB_OUTPUT}"
+          gh api "repos/${REPO}/issues/${issue}" > "${RUNNER_TEMP}/issue.json" || fail "Could not read issue #${issue}."
+          [ "$(jq -r '.pull_request == null' "${RUNNER_TEMP}/issue.json")" = true ] || fail "#${issue} is a pull request, not an issue."
+          jq -r .title "${RUNNER_TEMP}/issue.json" > "${RUNNER_TEMP}/agent-out/issue-title.txt"
+          jq -r '.body // ""' "${RUNNER_TEMP}/issue.json" > "${RUNNER_TEMP}/agent-out/issue-body.md"
+          echo "author=$(jq -r .user.login "${RUNNER_TEMP}/issue.json")" >> "${GITHUB_OUTPUT}"
+          if [ "${EVENT}" != workflow_dispatch ]; then
+            echo "fix_round=" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          branch="agent/issue-${issue}"
+          gh api "repos/${REPO}/issues/comments/${INPUT_COMMENT}" > "${RUNNER_TEMP}/review.json" \
+            || fail "Could not read review comment ${INPUT_COMMENT}."
+          pr="$(jq -r '.issue_url | split("/") | last' "${RUNNER_TEMP}/review.json")"
+          gh api "repos/${REPO}/pulls/${pr}" > "${RUNNER_TEMP}/pr.json" || fail "Comment ${INPUT_COMMENT} is not on a pull request."
+          REVIEW="${RUNNER_TEMP}/review.json" PRJSON="${RUNNER_TEMP}/pr.json" BRANCH_NAME="${branch}" \
+          OUT="${RUNNER_TEMP}/agent-out/review.md" python3 -I - <<'PY'
+          import json, os, re, sys
+
+          review = json.load(open(os.environ["REVIEW"], encoding="utf-8"))
+          pr = json.load(open(os.environ["PRJSON"], encoding="utf-8"))
+          problems = []
+          if review["user"]["login"] != "github-actions[bot]":
+              problems.append("the review comment is not from github-actions[bot]")
+          body = review.get("body") or ""
+          if not body.startswith("## Agent review: Changes needed"):
+              problems.append("the comment is not an agent-review 'Changes needed' verdict")
+          if pr["state"] != "open" or pr["head"]["ref"] != os.environ["BRANCH_NAME"]:
+              problems.append("the comment is not on the open pull request of " + os.environ["BRANCH_NAME"])
+          if pr["head"]["repo"]["full_name"] != pr["base"]["repo"]["full_name"]:
+              problems.append("the pull request comes from a fork")
+          match = re.search(r"Reviewed commit `?([0-9a-f]{7,40})", body)
+          if not match or not pr["head"]["sha"].startswith(match.group(1)):
+              problems.append("the review is not for the branch's current head commit")
+          lines, inside = [], False
+          for line in body.splitlines():
+              heading = re.match(r"^(?:#{1,6}\s+|\*\*)(.+?)(?:\*\*)?\s*:?\s*$", line.strip())
+              if heading:
+                  inside = heading.group(1).strip().lower() == "must fix"
+                  continue
+              if line.strip() == "---":
+                  inside = False
+              if inside:
+                  lines.append(line)
+          must_fix = "\n".join(lines).strip()
+          if not must_fix or must_fix.lower() in ("none", "none."):
+              problems.append("the review has no Must fix items")
+          if problems:
+              print("; ".join(problems))
+              sys.exit(1)
+          with open(os.environ["OUT"], "w", encoding="utf-8") as out:
+              out.write("# Must fix (from agent-review)\n\n" + must_fix + "\n")
+          PY
+          # Fix rounds so far: agent-review's "Changes needed" comments on this PR.
+          rounds="$(gh api --paginate "repos/${REPO}/issues/${pr}/comments?per_page=100" \
+            --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("## Agent review: Changes needed")))] | length' \
+            | awk '{ s += $1 } END { print s + 0 }')"
+          [ "${rounds}" -le 3 ] || fail "This PR has had ${rounds} review rounds; the limit is 3. A person must decide."
+          {
+            echo "fix_round=${rounds}"
+            echo "pr=${pr}"
+            echo "pr_head=$(jq -r .head.sha "${RUNNER_TEMP}/pr.json")"
+          } >> "${GITHUB_OUTPUT}"
+          echo "Fix round ${rounds} of 3 for #${pr} (${branch})."
+
+      # 1. Guard. Runs before anything else; if it fails, no later step runs.
+      #    Same rule as agent-plan: the labelling user and the issue author both
+      #    need admin or write (maintain counts as write, triage as read).
+      - name: Guard - labelling user and issue author need admin or write
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.event_name == 'workflow_dispatch' && github.actor || github.event.sender.login }}
+          AUTHOR: ${{ steps.context.outputs.author }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          fail() { printf 'reason=%s\n' "$1" >> "${GITHUB_OUTPUT}"; echo "::error::$1"; exit 1; }
+          users=("${ACTOR}" "${AUTHOR}")
+          # agent-review dispatches fix rounds with the job token, so the actor
+          # is github-actions[bot], which has no collaborator permission to
+          # look up. Only a workflow_dispatch may come from it; the issue
+          # author is still checked.
+          if [ "${EVENT}" = workflow_dispatch ] && [ "${ACTOR}" = "github-actions[bot]" ]; then
+            users=("${AUTHOR}")
+          fi
+          for user in "${users[@]}"; do
+            if ! permission="$(gh api "repos/${REPO}/collaborators/${user}/permission" --jq .permission 2>/dev/null)"; then
+              fail "Could not look up the repository permission of ${user}."
+            fi
+            echo "User ${user} has permission: ${permission}"
+            case "${permission}" in
+              admin | write) ;;
+              *) fail "${user} needs admin or write access to run the builder." ;;
+            esac
+          done
+          # report runs only if this is set, so a failed guard posts nothing.
+          echo "guard_ok=true" >> "${GITHUB_OUTPUT}"
+
+      # 2. The plan. The newest comment by github-actions[bot] that starts with
+      #    "## Agent plan: " must be a Plan (not "Needs clarification", "Out of
+      #    scope" or "no result"), and the issue must not have been edited
+      #    after it. The plan goes to a file outside the checkout, where
+      #    sandboxed commands cannot write, so later jobs check against exactly
+      #    what Claude was given.
+      - name: Find the plan comment
+        id: plan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          NAME: ${{ github.event.repository.name }}
+          ISSUE: ${{ steps.context.outputs.issue }}
+        run: |
+          set -euo pipefail
+          fail() { printf 'reason=%s\n' "$1" >> "${GITHUB_OUTPUT}"; echo "::error::$1"; exit 1; }
+          latest="$(gh api --paginate "repos/${REPO}/issues/${ISSUE}/comments?per_page=100" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("## Agent plan: "))) | [.id, .created_at, .html_url, (.body | test("^## Agent plan: Plan\\r?\\n"))] | @tsv' \
+            | tail -n 1)"
+          if [ -z "${latest}" ]; then
+            fail "No plan comment from the agent-plan workflow. Add the agent-plan label first."
+          fi
+          IFS=$'\t' read -r id created url is_plan <<< "${latest}"
+          if [ "${is_plan}" != "true" ]; then
+            fail "The latest agent-plan comment is not a plan (${url}). Fix the issue and run agent-plan again."
+          fi
+          # The single quotes are deliberate: $o, $r and $n are GraphQL variables for gh, not shell variables.
+          # shellcheck disable=SC2016
+          edited="$(gh api graphql \
+            -f query='query($o: String!, $r: String!, $n: Int!) { repository(owner: $o, name: $r) { issue(number: $n) { lastEditedAt } } }' \
+            -f o="${OWNER}" -f r="${NAME}" -F n="${ISSUE}" \
+            --jq '.data.repository.issue.lastEditedAt // ""')"
+          if [ -n "${edited}" ] && [[ "${edited}" > "${created}" ]]; then
+            fail "The issue was edited after the plan was written. Run agent-plan again."
+          fi
+          mkdir -p "${RUNNER_TEMP}/agent-out"
+          gh api "repos/${REPO}/issues/comments/${id}" --jq .body > "${RUNNER_TEMP}/agent-out/plan.md"
+          echo "plan_url=${url}" >> "${GITHUB_OUTPUT}"
+          echo "Using the plan at ${url}"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # 3. Sandbox dependencies. After the guard, so only authorized users
+      #    reach its `sudo` calls.
+      - uses: ./.github/actions/claude-sandbox
+
+      # The builder's instructions, model and turn limit live in
+      # prompts/roles/builder.md; src/songs/common/roles.py checks and loads them.
+      # Loaded here, right after the checkout of main: a fix round's step 5
+      # switches the tree to the agent branch before the Build step.
+      - name: Load the builder's instructions
+        id: role
+        run: python3 -I src/songs/common/roles.py builder
+
+      # 4. Dependencies before Claude starts, outside the sandbox. Inside it,
+      #    uv cannot download Python (the download hosts are not on the
+      #    network allowlist). After this, Claude's `uv sync --all-groups` is
+      #    a no-op and `uv run` needs no network. No GitHub cache, here or in
+      #    verify: issue-triggered jobs share main's cache scope, so a cache
+      #    saved here could poison CI. With enable-cache false, setup-uv's
+      #    post step does nothing.
+      #    Where uv keeps things: Claude Code applies the Build step's Read
+      #    deny rules to the sandbox, so with setup-uv's defaults uv inside it
+      #    could see neither Python (work/_temp/uv-python-dir) nor its cache
+      #    (~/.cache/uv). The job env puts both under /opt instead, created
+      #    here for the runner user before setup-uv reads the variables (it
+      #    keeps values already set). uv needs to write its cache even for
+      #    `uv run` (a lock file), so the Build step adds /opt/uv-cache to the
+      #    sandbox's allowWrite. --managed-python makes the interpreter the
+      #    one in /opt on every runner image.
+      - name: uv folders outside the paths the sandbox hides
+        run: sudo install -d -o "$(id -u)" -g "$(id -g)" "${UV_PYTHON_INSTALL_DIR}" "${UV_CACHE_DIR}"
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: false
+          cache-local-path: /opt/uv-cache
+      - run: uv sync --locked --all-groups --managed-python
+
+      # 5. The branch, and the issue and plan as files that Claude reads as
+      #    data. Text goes through env vars, never inline in the script.
+      #    .agent-build/ is excluded locally so it cannot be committed.
+      - name: Create the branch and write the issue and plan to files
+        id: branch
+        env:
+          FIX_ROUND: ${{ steps.context.outputs.fix_round }}
+          PR_HEAD: ${{ steps.context.outputs.pr_head }}
+        run: |
+          set -euo pipefail
+          fail() { printf 'reason=%s\n' "$1" >> "${GITHUB_OUTPUT}"; echo "::error::$1"; exit 1; }
+          g() { git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c submodule.recurse=false "$@"; }
+          status=0
+          git ls-remote --exit-code --heads origin "refs/heads/${BRANCH}" > /dev/null || status=$?
+          if [ -z "${FIX_ROUND}" ]; then
+            case "${status}" in
+              0) fail "Branch ${BRANCH} already exists. Delete it or close its PR first." ;;
+              2) ;;
+              *) fail "Could not check whether ${BRANCH} exists." ;;
+            esac
+            echo "base_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+            git switch -c "${BRANCH}"
+          else
+            [ "${status}" = 0 ] || fail "Fix round: branch ${BRANCH} does not exist."
+            g fetch --no-recurse-submodules origin "refs/heads/${BRANCH}:refs/heads/${BRANCH}"
+            [ "$(g rev-parse "refs/heads/${BRANCH}")" = "${PR_HEAD}" ] || fail "Fix round: ${BRANCH} moved since the review."
+            # The base stays the branch's fork point from main, so verify
+            # checks every commit on the branch, earlier rounds included.
+            echo "base_sha=$(g merge-base HEAD "refs/heads/${BRANCH}")" >> "${GITHUB_OUTPUT}"
+            g switch --no-recurse-submodules "${BRANCH}"
+          fi
+          echo ".agent-build/" >> .git/info/exclude
+          mkdir -p .agent-build
+          {
+            printf '# %s\n\n' "$(< "${RUNNER_TEMP}/agent-out/issue-title.txt")"
+            cat "${RUNNER_TEMP}/agent-out/issue-body.md"
+          } > .agent-build/issue.md
+          cp "${RUNNER_TEMP}/agent-out/plan.md" .agent-build/plan.md
+          if [ -n "${FIX_ROUND}" ]; then
+            cp "${RUNNER_TEMP}/agent-out/review.md" .agent-build/review.md
+          fi
+
+      # 6. Claude builds. The real boundary is the sandbox and the
+      #    tokens, not the Bash rules: `uv run pytest` runs whatever code
+      #    Claude writes. https://code.claude.com/docs/en/permissions
+      #    - github_token is the job token (contents: read, issues: read). The
+      #      action writes it into the origin URL in .git/config, where Claude
+      #      can read it, so it must stay read-only. No OIDC, no id-token.
+      #    - CLAUDE_CODE_SUBPROCESS_ENV_SCRUB strips credentials (the OAuth
+      #      token included) from Bash subprocess environments and runs them in
+      #      their own PID namespace, so /proc does not show the Claude process.
+      #      https://code.claude.com/docs/en/env-vars
+      #    - `settings` turns the Bash sandbox on and makes Claude Code
+      #      refuse to start without it. autoAllowBashIfSandboxed is false,
+      #      so the Bash allowlist below is enforced. github.com and
+      #      api.github.com are denied for Bash (uv only needs PyPI), the
+      #      listed variables and files are hidden from sandboxed commands,
+      #      and /opt/uv-cache is writable (uv's cache; step 4).
+      #      Read, Grep and Glob refuse paths outside the checkout.
+      #    - UV_PYTHON_DOWNLOADS=never and UV_OFFLINE=1: everything uv needs
+      #      is installed in step 4, so a missing interpreter or package fails
+      #      with a clear error instead of a download the sandbox denies.
+      #    - Edit is allowed inside the checkout only, never in .git/ or in
+      #      .agent-build/. Bash is limited to the commands below.
+      #    - `git commit` is allowed only as `git commit -m ...`. A Bash rule
+      #      matches its text literally up to the first `*`, and `*` is any
+      #      text, so no rule can forbid options after the message
+      #      (`-m x -aF f`, `-tf`, `--fil f`). Denying every spelling would
+      #      also deny ordinary messages. The denies below catch the usual
+      #      spellings only. This is not a boundary: `uv run pytest` runs any
+      #      code in the same sandbox and can read whatever `git commit -F`
+      #      could. What limits the damage: the sandbox hides the credential
+      #      files and token variables and blocks github.com; verify scans
+      #      every commit's message and diff before publish pushes anything;
+      #      and a person reviews the PR.
+      #    - `git rm` lets a plan delete files. It is not a new risk: Edit can already empty any
+      #      file, and verify rejects a deleted path the plan does not list
+      #      or that is protected, exactly as it does for an edited one.
+      #    - The same Read deny rules as agent-plan, plus .git/config.
+      #    - classify_inline_comments is off, so the action's post-Claude
+      #      step (bun, run in the checkout, with GITHUB_TOKEN) does not run.
+      #      In agent mode the action runs no git after Claude exits (checked
+      #      in src/entrypoints/run.ts at this pin: the git cleanup is tag mode
+      #      only).
+      #    - allowed_bots: the action refuses bot actors, and a fix round is
+      #      dispatched by agent-review with its job token, so its actor is
+      #      github-actions[bot]. A job token can start no other event here
+      #      (GitHub does not trigger workflows from its `labeled` events).
+      #      Only this bot, never `*`.
+      - name: Build
+        id: claude
+        uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d # v1.0.266
+        env:
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
+          UV_PYTHON_DOWNLOADS: never
+          UV_OFFLINE: "1"
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          allowed_bots: github-actions[bot]
+          classify_inline_comments: "false"
+          settings: >-
+            {"permissions":{"blockReadsOutsideWorkingDirectories":true},
+            "sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,"autoAllowBashIfSandboxed":false,"filesystem":{"allowWrite":["/opt/uv-cache"]},
+            "network":{"allowedDomains":["pypi.org","files.pythonhosted.org"],"deniedDomains":["github.com","api.github.com"]},
+            "credentials":{
+            "envVars":[{"name":"CLAUDE_CODE_OAUTH_TOKEN","mode":"deny"},{"name":"ANTHROPIC_API_KEY","mode":"deny"},{"name":"GITHUB_TOKEN","mode":"deny"},{"name":"GH_TOKEN","mode":"deny"},{"name":"ACTIONS_RUNTIME_TOKEN","mode":"deny"},{"name":"ACTIONS_ID_TOKEN_REQUEST_TOKEN","mode":"deny"}],
+            "files":[{"path":"~/.claude/.credentials.json","mode":"deny"},{"path":"~/.claude.json","mode":"deny"}]}}}
+          claude_args: |
+            --model ${{ steps.role.outputs.model }}
+            --max-turns ${{ steps.role.outputs.max_turns }}
+            --tools "Read,Grep,Glob,Edit,Write,Bash"
+            --allowedTools "Read" "Grep" "Glob" "Edit(./**)" "Bash(uv sync --all-groups)" "Bash(uv run ruff *)" "Bash(uv run pytest *)" "Bash(git status)" "Bash(git diff)" "Bash(git add *)" "Bash(git rm *)" "Bash(git commit -m *)"
+            --disallowedTools "mcp__*" "NotebookEdit" "WebFetch" "WebSearch" "Edit(./.git/**)" "Edit(./.agent-build/**)" "Bash(git commit *-F *)" "Bash(git commit *--file*)" "Bash(git commit *--template*)" "Bash(git commit *-t *)" "Bash(git * --pathspec-from-file*)" "Read(./.git/config)" "Read(//proc/**)" "Read(//etc/**)" "Read(//root/**)" "Read(//tmp/**)" "Read(//home/runner/.*)" "Read(//home/runner/.*/**)" "Read(//home/runner/work/_temp/**)" "Read(//home/runner/work/_actions/**)" "Read(//home/runner/work/_tool/**)" "Read(//home/runner/runners/**)"
+            --json-schema '{"type":"object","properties":{"status":{"type":"string","enum":["done","blocked"]},"summary":{"type":"string"}},"required":["status","summary"]}'
+          prompt: ${{ steps.role.outputs.prompt }}
+
+      # 7. Claude's result, checked by plain code, in two steps so that no
+      #    secret is ever in a step that runs git in Claude's tree.
+      #    a. The structured result. This step holds the two token values, so
+      #       it runs no git and nothing from the checkout, and runs from
+      #       RUNNER_TEMP. The summary is only passed on (to the failure
+      #       comment) after a check for the token values and common token
+      #       prefixes; the values are compared inside bash, never printed.
+      - name: Check Claude's result
+        id: result
+        if: ${{ !cancelled() && steps.claude.conclusion != 'skipped' }}
+        working-directory: ${{ runner.temp }}
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          JOB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STRUCTURED: ${{ steps.claude.outputs.structured_output }}
+        run: |
+          set -euo pipefail
+          fail() { printf 'reason=%s\n' "$1" >> "${GITHUB_OUTPUT}"; echo "::error::$1"; exit 1; }
+          status="$(jq -r '.status // empty' <<< "${STRUCTURED:-}" 2>/dev/null || true)"
+          summary="$(jq -r '.summary // empty' <<< "${STRUCTURED:-}" 2>/dev/null || true)"
+          if [ "${status}" = "done" ]; then
+            echo "The builder returned done."
+            exit 0
+          fi
+          if [ "${status}" = "blocked" ] && [ -n "${summary}" ]; then
+            clean=1
+            for secret in "${CLAUDE_CODE_OAUTH_TOKEN:-}" "${JOB_TOKEN:-}"; do
+              if [ -n "${secret}" ] && [[ "${summary}" == *"${secret}"* ]]; then clean=0; fi
+            done
+            if grep -qE 'sk-ant-|gh[pousr]_|github_pat_|-----BEGIN|ya29\.' <<< "${summary}"; then clean=0; fi
+            if [ "${clean}" = "1" ]; then
+              delimiter="EOF_$(openssl rand -hex 16)"
+              {
+                echo "reason<<${delimiter}"
+                printf 'The builder stopped:\n\n%s\n' "${summary:0:2000}"
+                echo "${delimiter}"
+              } >> "${GITHUB_OUTPUT}"
+              echo "::error::The builder returned blocked."
+              exit 1
+            fi
+            fail "The builder stopped, and its reason looked like it contained a token, so it is not shown."
+          fi
+          fail "The builder did not return a usable result."
+
+      #    b. The commits. No secrets in env (the job-level env holds none).
+      #       Nested repositories are refused before git runs at all, gitlinks
+      #       and .gitmodules after. Every git call has fsmonitor and hooks
+      #       off and never recurses into submodules. The commits go to the
+      #       next job as a git bundle, with the plan, so verify checks
+      #       exactly what Claude was given.
+      - name: Check the commits and bundle them
+        id: commits
+        if: ${{ !cancelled() && steps.result.outcome == 'success' }}
+        env:
+          BASE_SHA: ${{ steps.branch.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          fail() { printf 'reason=%s\n' "$1" >> "${GITHUB_OUTPUT}"; echo "::error::$1"; exit 1; }
+          g() { git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c submodule.recurse=false "$@"; }
+          # Any .git below the top level (directory, file or link) is a nested repo.
+          nested="$(find . -mindepth 1 -path ./.git -prune -o -name .git -print -quit)" \
+            || fail "Could not scan the checkout for nested repositories."
+          [ -z "${nested}" ] || fail "The checkout contains a nested .git. Nested repositories are not allowed."
+          [ "$(g symbolic-ref --short HEAD)" = "${BRANCH}" ] || fail "The builder left ${BRANCH}."
+          staged="$(g ls-files --stage)"
+          if awk '$1 == "160000" { found = 1 } END { exit !found }' <<< "${staged}"; then
+            fail "The index holds a gitlink (submodule). Submodules are not allowed."
+          fi
+          shas="$(g rev-list --reverse "${BASE_SHA}..HEAD")"
+          for sha in ${shas}; do
+            tree="$(g ls-tree -r --full-tree "${sha}")"
+            if awk '$1 == "160000" { found = 1 } END { exit !found }' <<< "${tree}"; then
+              fail "Commit ${sha:0:12} holds a gitlink (submodule). Submodules are not allowed."
+            fi
+            # First-parent diff: plain diff-tree (and git log) list nothing for a merge.
+            if [ -n "$(g diff-tree -r --root --no-commit-id --name-only --no-renames --diff-merges=first-parent "${sha}" -- .gitmodules)" ]; then
+              fail "Commit ${sha:0:12} changes .gitmodules. Submodules are not allowed."
+            fi
+          done
+          [ -z "$(g status --porcelain --ignore-submodules=all)" ] || fail "The builder left uncommitted changes."
+          count="$(g rev-list --count "${BASE_SHA}..HEAD")"
+          [ "${count}" -gt 0 ] || fail "The builder made no commits."
+          g bundle create "${RUNNER_TEMP}/agent-out/agent.bundle" "${BASE_SHA}..${BRANCH}"
+          echo "Bundled ${count} commit(s)."
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: agent-build
+          path: |
+            ${{ runner.temp }}/agent-out/agent.bundle
+            ${{ runner.temp }}/agent-out/plan.md
+          if-no-files-found: error
+          retention-days: 7
+
+      # 8. actions/checkout's post-job step runs git (`git config`,
+      #    `git submodule foreach`) in the checkout, with the job token among
+      #    its inputs. It stops before running git if .git/config is gone, so
+      #    the checkout Claude modified is deleted here, whatever happened
+      #    after the guard. (If the guard failed, nothing was checked out.)
+      - name: Remove the checkout
+        if: ${{ always() && steps.guard.outputs.guard_ok == 'true' }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          chmod -R u+rwX "${GITHUB_WORKSPACE}" 2> /dev/null || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -delete
+          if [ -e "${GITHUB_WORKSPACE}/.git" ]; then
+            echo "::error::Could not delete the checkout."
+            exit 1
+          fi
+
+  verify:
+    needs: build
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    # Runs Claude's code (pytest) again, from a fresh checkout. No secrets.
+    permissions:
+      contents: read # check out the repo
+    outputs:
+      reason: ${{ steps.load.outputs.reason || steps.secrets.outputs.reason || steps.paths.outputs.reason || steps.checks.outputs.reason }}
+      head_sha: ${{ steps.load.outputs.head_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: agent-build
+          path: ${{ runner.temp }}/agent-in
+
+      # A bundle carries commits and one ref, nothing else: no hooks, no config.
+      # From here on this checkout holds Claude's commits, so every git call
+      # in verify has fsmonitor and hooks off and never recurses into
+      # submodules, as in build.
+      - name: Load the commits from the bundle
+        id: load
+        env:
+          BASE_SHA: ${{ needs.build.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          fail() { printf 'reason=%s\n' "$1" >> "${GITHUB_OUTPUT}"; echo "::error::$1"; exit 1; }
+          g() { git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c submodule.recurse=false "$@"; }
+          bundle="${RUNNER_TEMP}/agent-in/agent.bundle"
+          g bundle verify "${bundle}" || fail "The commit bundle is not valid."
+          g fetch --no-recurse-submodules "${bundle}" "refs/heads/${BRANCH}:refs/heads/${BRANCH}"
+          g switch --no-recurse-submodules "${BRANCH}"
+          g merge-base --is-ancestor "${BASE_SHA}" HEAD || fail "The branch does not start from main."
+          echo "head_sha=$(g rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+      # Every check here runs on every commit from main to the branch head,
+      # one at a time, never only on the net diff: publish pushes all the
+      # commits, so a change made in one commit and undone in a later one
+      # still reaches GitHub. A merge commit is read against its first
+      # parent (plain diff-tree lists nothing for a merge).
+      #
+      # The secret scan runs first, so that no later step prints a file name
+      # that holds a token. Per commit it scans:
+      # - the raw commit object: author, committer, any other header and the
+      #   message. A commit with an `encoding` header or a NUL byte is
+      #   refused, since either could hide a match (a UTF-16 message, say);
+      # - every changed file name;
+      # - every added line of the commit's patch, made with `--text`, so a
+      #   binary file or a `-diff` attribute in .gitattributes cannot hide
+      #   content.
+      # `sk-ant-` covers Anthropic API keys and Claude Code OAuth tokens
+      # (sk-ant-oat...). The patch parser tracks hunks: `+++ ` is a file
+      # header only before a file's first `@@`, so an added line that starts
+      # with `++` is still scanned. Output is read as bytes and split on \n
+      # only, so a \r in a line cannot fake a header. Reports the commit, the
+      # file (unless its name matches) and the kind of match, never the
+      # match. No token values are in this job, so this is a pattern scan
+      # only; build compared the values.
+      - name: Scan every commit's metadata, file names and added lines for secrets
+        id: secrets
+        env:
+          BASE_SHA: ${{ needs.build.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          python3 -I - <<'EOF'
+          import json, os, re, subprocess, sys
+
+          PATTERNS = [
+              ("Anthropic key or OAuth token prefix", re.compile(r"sk-ant-")),
+              ("GitHub token prefix", re.compile(r"gh[pousr]_")),
+              ("GitHub fine-grained token prefix", re.compile(r"github_pat_")),
+              ("PEM block", re.compile(r"-----BEGIN")),
+              ("Google service-account key file", re.compile(r"\"type\"\s*:\s*\"service_account\"")),
+              ("Google OAuth access token prefix", re.compile(r"ya29\.")),
+              # A long value made of token characters, with at least one digit and one letter,
+              # assigned to a KEY/TOKEN/SECRET/PASSWORD name. Code that assigns
+              # one name to another does not match.
+              ("KEY/TOKEN/SECRET/PASSWORD assignment with a secret-like value", re.compile(
+                  r"""(?i)(?:KEY|TOKEN|SECRET|PASSWORD)\s*[:=]\s*['"]?(?=[A-Za-z0-9_\-+/.=]*\d)(?=[A-Za-z0-9_\-+/.=]*[A-Za-z])[A-Za-z0-9_\-+/.=]{20,}['"]?\s*(?:[,;)#]|$)""",
+                  re.M,
+              )),
+          ]
+
+
+          def git_bytes(*args):
+              cmd = ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "submodule.recurse=false", *args]
+              return subprocess.run(cmd, check=True, capture_output=True).stdout
+
+
+          def git(*args):
+              return git_bytes(*args).decode("utf-8", "replace")
+
+
+          def added_lines(patch):
+              path, in_hunk = "?", False
+              for line in patch.split("\n"):
+                  if line.startswith("diff --git "):
+                      path, in_hunk = "?", False
+                  elif not in_hunk:
+                      if line.startswith("+++ "):
+                          path = line[4:].removeprefix("b/")
+                      elif line.startswith("@@"):
+                          in_hunk = True
+                  elif line.startswith("+"):
+                      yield path, line[1:]
+
+
+          def matches(text):
+              return [label for label, pattern in PATTERNS if pattern.search(text)]
+
+
+          def shown(path):
+              return "a file whose name matches a pattern" if matches(path) else json.dumps(path)
+
+
+          base = os.environ["BASE_SHA"]
+          problems = []
+          for sha in git("rev-list", "--reverse", f"{base}..HEAD").split():
+              short = sha[:12]
+              raw = git_bytes("cat-file", "commit", sha)
+              headers, _, message = raw.decode("utf-8", "replace").partition("\n\n")
+              # An encoding header (UTF-16, UTF-7, ...) or a NUL byte would let
+              # a message hide a match from this byte scan.
+              if b"\0" in raw or any(h.startswith("encoding ") for h in headers.split("\n")):
+                  problems.append(f"commit {short} has an encoding header or a NUL byte, so it cannot be scanned")
+              for label in matches(headers):
+                  problems.append(f"commit {short} header (author, committer or other) matches {label}")
+              for label in matches(message):
+                  problems.append(f"commit {short} message matches {label}")
+              names = git(
+                  "diff-tree", "-r", "--root", "--no-commit-id", "--name-only", "-z",
+                  "--no-renames", "--diff-merges=first-parent", sha,
+              )
+              for name in names.split("\0"):
+                  for label in matches(name):
+                      problems.append(f"commit {short}: a changed file name matches {label}")
+              patch = git(
+                  "show", "--format=", "--patch", "--text", "--diff-merges=first-parent", "--no-color",
+                  "--no-renames", "--no-ext-diff", "--no-textconv", "--ignore-submodules=all",
+                  "--unified=0", sha,
+              )
+              for path, line in added_lines(patch):
+                  for label in matches(line):
+                      problems.append(f"commit {short} {shown(path)}: added line matches {label}")
+          problems = list(dict.fromkeys(problems))
+          if problems:
+              for problem in problems:
+                  print(f"::error::{problem}")
+              reason = "The secret scan found possible secrets: " + "; ".join(problems)
+              with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+                  out.write("reason=" + reason[:1500] + "\n")
+              sys.exit(1)
+          print("No secret patterns in any commit's metadata, file names or added lines.")
+          EOF
+
+      # Every path any commit changes must be listed under the plan's "Files
+      # to change": an exact path, or a directory ending in `/`. Globs do not
+      # count. The protected paths below (the ones AGENTS.md puts out of scope
+      # for agents) and any .gitattributes (it can change how git shows a
+      # file) need their exact file path; a directory entry never unlocks
+      # them, and agent-plan withholds a plan that names one. No file whose
+      # name starts with `.env` is allowed, except `.env.example` (which
+      # follows the normal rule). Gitlinks (mode 160000) in any commit and
+      # changes to .gitmodules are refused. Renames count on both sides.
+      # Binary changes in any commit are refused, since the scan reads them
+      # only as text. Each problem names the first commit that has it. Paths
+      # are printed JSON-quoted, so no path can inject a workflow command or
+      # an output line.
+      - name: Check every commit's paths against the plan
+        id: paths
+        env:
+          BASE_SHA: ${{ needs.build.outputs.base_sha }}
+          PLAN: ${{ runner.temp }}/agent-in/plan.md
+        run: |
+          set -euo pipefail
+          python3 -I - <<'EOF'
+          import json, os, re, subprocess, sys
+
+          HEADER = re.compile(r"^(?:\*\*(.+?)\*\*:?|#{1,6}\s+(.+?))\s*$")
+          ENTRY = re.compile(r"^\s*[-*+]\s+`([^`]+)`")
+          # Keep this list the same as in agent-plan.yml and agent-review.yml.
+          PROTECTED_DIRS = (".github/", ".claude/", "docs/decisions/", "prompts/roles/", "countries/", "overleaf/")
+          PROTECTED_FILES = ("pyproject.toml", "uv.lock", "AGENTS.md", "CLAUDE.md", "tests/test_repo_rules.py", "src/songs/common/roles.py")
+
+
+          def section(text, name):
+              lines, inside = [], False
+              for line in text.splitlines():
+                  match = HEADER.match(line.strip())
+                  if match:
+                      title = (match.group(1) or match.group(2)).strip().rstrip(":")
+                      inside = title.strip().lower() == name.lower()
+                  elif line.strip() == "---":
+                      inside = False
+                  elif inside:
+                      lines.append(line)
+              return lines
+
+
+          def named(path, entries):
+              for entry in entries:
+                  if any(c in entry for c in "*?["):
+                      continue
+                  if entry == path or (entry.endswith("/") and path.startswith(entry)):
+                      return True
+              return False
+
+
+          def fail(problems):
+              for problem in problems:
+                  print(f"::error::{problem}")
+              reason = "The change touches files the plan does not allow: " + "; ".join(problems)
+              with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+                  out.write("reason=" + reason[:1500] + "\n")
+              sys.exit(1)
+
+
+          def git(*args):
+              # No text mode: it would turn a lone \r into a line break.
+              cmd = ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "submodule.recurse=false", *args]
+              return subprocess.run(cmd, check=True, capture_output=True).stdout.decode("utf-8", "replace")
+
+
+          def commit_records(sha, mode):
+              # One commit against its first parent (or nothing, for a root commit).
+              out = git(
+                  "diff-tree", "-r", "--root", "--no-commit-id", mode, "-z", "--no-renames",
+                  "--diff-merges=first-parent", "--ignore-submodules=all", sha,
+              )
+              return [record for record in out.split("\0") if record]
+
+
+          plan = open(os.environ["PLAN"], encoding="utf-8").read()
+          entries = []
+          # Plans carry their file list as JSON in a hidden comment, written by
+          # the agent-plan workflow after checking every path. Older plans fall
+          # back to the Markdown "Files to change" section.
+          listed = re.search(r"<!-- agent-files: (\[.*?\]) -->", plan, re.S)
+          if listed:
+              entries = [item["path"] for item in json.loads(listed.group(1))]
+          else:
+              for line in section(plan, "Files to change"):
+                  match = ENTRY.match(line)
+                  if match:
+                      entries.append(match.group(1).strip().removeprefix("./"))
+          if not entries:
+              fail(["the plan has no backticked paths under Files to change"])
+          print("Plan allows:", json.dumps(entries))
+
+          base = os.environ["BASE_SHA"]
+          shas = git("rev-list", "--reverse", f"{base}..HEAD").split()
+          # Path -> the first commit that changes it, over every commit.
+          changed, binary, gitlinks = {}, {}, {}
+
+          def gitlink_entries(rev):
+              # (path, object) for every gitlink in rev's tree.
+              found = set()
+              for record in git("ls-tree", "-r", "-z", "--full-tree", rev).split("\0"):
+                  meta, _, path = record.partition("\t")
+                  parts = meta.split(" ")
+                  if parts[0] == "160000":
+                      found.add((path, parts[2]))
+              return found
+
+          # Only a gitlink that a commit adds or moves is refused.
+          base_gitlinks = gitlink_entries(base)
+          for sha in shas:
+              short = sha[:12]
+              for path in commit_records(sha, "--name-only"):
+                  changed.setdefault(path, short)
+              for record in commit_records(sha, "--numstat"):
+                  if record.startswith("-\t-\t"):
+                      binary.setdefault(record[4:], short)
+              # Gitlinks, read from the commit's tree (a diff with
+              # --ignore-submodules would hide them). Only new or changed ones.
+              for path, _obj in gitlink_entries(sha) - base_gitlinks:
+                  gitlinks.setdefault(path, short)
+
+          problems = []
+          for path, short in changed.items():
+              where = f"{json.dumps(path)} (commit {short})"
+              name = path.rsplit("/", 1)[-1]
+              if name.startswith(".env") and name != ".env.example":
+                  problems.append(f"{where} is a .env file")
+              elif path == ".gitmodules":
+                  problems.append(f"{where} changes submodules, which are not allowed")
+              elif name == ".gitattributes":
+                  if path not in entries:
+                      problems.append(f"{where} changes git attributes and its exact path is not named in the plan")
+              elif path in PROTECTED_FILES or path.startswith(PROTECTED_DIRS):
+                  if path not in entries:
+                      problems.append(f"{where} is protected and its exact path is not named in the plan")
+              elif not named(path, entries):
+                  problems.append(f"{where} is not listed in the plan")
+          for path, short in gitlinks.items():
+              problems.append(f"{json.dumps(path)} (commit {short}) is a gitlink (submodule), which is not allowed")
+          for path, short in binary.items():
+              problems.append(f"{json.dumps(path)} (commit {short}) is a binary change")
+          net = git("diff", "--name-only", "--no-renames", "--ignore-submodules=all", "-z", base, "HEAD")
+          if not net.strip("\0"):
+              problems.append("the commits change no files overall")
+          if problems:
+              fail(problems)
+          print("Every commit's paths are allowed:", json.dumps(sorted(changed)))
+          EOF
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: false
+          cache-local-path: /home/runner/.cache/uv
+
+      - name: ruff check, ruff format --check, pytest
+        id: checks
+        run: |
+          set -euo pipefail
+          fail() { printf 'reason=%s\n' "$1" >> "${GITHUB_OUTPUT}"; echo "::error::$1"; exit 1; }
+          uv sync --locked --all-groups || fail "uv sync --locked failed: pyproject.toml and uv.lock do not match."
+          uv run ruff check . || fail "ruff check failed."
+          uv run ruff format --check . || fail "ruff format --check failed."
+          uv run pytest || fail "pytest failed."
+
+      # pytest ran Claude's code in this checkout, so it is deleted before
+      # actions/checkout's post-job step can run git in it with the job
+      # token (see the same step in build).
+      - name: Remove the checkout
+        if: ${{ always() }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          chmod -R u+rwX "${GITHUB_WORKSPACE}" 2> /dev/null || true
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -delete
+          if [ -e "${GITHUB_WORKSPACE}/.git" ]; then
+            echo "::error::Could not delete the checkout."
+            exit 1
+          fi
+
+  publish:
+    needs: [build, verify]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    env:
+      FIX_ROUND: ${{ needs.build.outputs.fix_round }}
+    # GITHUB_TOKEN only checks out. The push and the PR use a token from our
+    # own GitHub App, so that CI runs on the PR without an approval click
+    # (GITHUB_TOKEN pushes start no workflows). That token is minted after the
+    # checkout, limited to this repo with contents and pull-requests write,
+    # lasts at most an hour and is revoked when the job ends. The app has no
+    # Workflows permission, so GitHub refuses any push that changes
+    # .github/workflows/. This job runs no repository code.
+    permissions:
+      contents: read # check out the repo
+    outputs:
+      reason: ${{ steps.load.outputs.reason || steps.push.outputs.reason || steps.pr.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: agent-build
+          path: ${{ runner.temp }}/agent-in
+
+      - name: Load the verified commits
+        id: load
+        env:
+          HEAD_SHA: ${{ needs.verify.outputs.head_sha }}
+          APP_CLIENT_ID: ${{ vars.AGENT_APP_CLIENT_ID }}
+          HAS_APP_KEY: ${{ secrets.AGENT_APP_PRIVATE_KEY != '' }}
+        run: |
+          set -euo pipefail
+          fail() { printf 'reason=%s\n' "$1" >> "${GITHUB_OUTPUT}"; echo "::error::$1"; exit 1; }
+          if [ -z "${APP_CLIENT_ID}" ] || [ "${HAS_APP_KEY}" != "true" ]; then
+            fail "The AGENT_APP_CLIENT_ID variable or the AGENT_APP_PRIVATE_KEY secret is not set, so the branch cannot be pushed."
+          fi
+          bundle="${RUNNER_TEMP}/agent-in/agent.bundle"
+          git bundle verify "${bundle}" || fail "The commit bundle is not valid."
+          git fetch "${bundle}" "refs/heads/${BRANCH}:refs/heads/${BRANCH}"
+          [ "$(git rev-parse "refs/heads/${BRANCH}")" = "${HEAD_SHA}" ] || fail "The bundle does not match the commits verify checked."
+
+      - name: Get a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.AGENT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # No force push: if the branch appeared meanwhile, the push fails. The
+      # token reaches git through a credential helper that reads an env var,
+      # so it is never on a command line or in .git/config. Hooks are off.
+      # A failed push is retried up to 3 times, 60 s apart, because GitHub
+      # sometimes refuses one for a moment. The needs-human reason quotes
+      # git's own refusal line, since the same "failed to push" covers a 403,
+      # an existing branch and a workflow change. A workflow refusal is final,
+      # so it is not retried, and the reason says whose workflow change it is.
+      # The App has no Workflows permission, and GitHub checks a new branch
+      # against main, not against the commit it started from. So if a merge
+      # changes .github/workflows/ on main while the build runs, the branch
+      # carries the older workflow files and the push is refused, though the
+      # builder changed none. verify has already proved the builder's commits
+      # stay inside the plan, which never lists a workflow.
+      - name: Push the branch
+        id: push
+        env:
+          PUSH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          BASE_SHA: ${{ needs.build.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          fail() { printf 'reason=%s\n' "$1" >> "${GITHUB_OUTPUT}"; echo "::error::$1"; exit 1; }
+          # The single quotes are deliberate: git's helper reads PUSH_TOKEN when it runs.
+          # shellcheck disable=SC2016
+          helper='!f() { echo username=x-access-token; echo "password=${PUSH_TOKEN}"; }; f'
+          log="${RUNNER_TEMP}/push.log"
+          refused='refusing to allow a GitHub App to create or update workflow'
+          for attempt in 1 2 3 4; do
+            if git -c core.hooksPath=/dev/null -c credential.helper= -c "credential.helper=${helper}" \
+              push "https://github.com/${REPO}.git" "refs/heads/${BRANCH}:refs/heads/${BRANCH}" > "${log}" 2>&1; then
+              cat "${log}"
+              exit 0
+            fi
+            cat "${log}"
+            if grep -qF "${refused}" "${log}"; then
+              break
+            fi
+            if [ "${attempt}" -lt 4 ]; then
+              echo "::warning::Push attempt ${attempt} failed; retrying in 60 s."
+              sleep 60
+            fi
+          done
+          if grep -qF "${refused}" "${log}"; then
+            own="$(git diff --name-only --no-renames "${BASE_SHA}" "refs/heads/${BRANCH}" -- .github/workflows/ | tr '\n' ' ' | cut -c 1-300)" \
+              || fail "GitHub refused to push ${BRANCH} as a workflow change, and the branch could not be compared with ${BASE_SHA}."
+            if [ -n "${own}" ]; then
+              fail "GitHub refused to push ${BRANCH}: the builder's commits change ${own}under .github/workflows/, and the app cannot push a workflow change."
+            fi
+            if [ -n "${FIX_ROUND}" ]; then
+              fail "GitHub refused to push fix round commits to ${BRANCH} as a workflow change, but the builder's commits change nothing under .github/workflows/. A person has to look at the branch."
+            fi
+            fail "GitHub refused to push ${BRANCH} as a workflow change, but the builder's commits change nothing under .github/workflows/. The build started from main at ${BASE_SHA:0:7}, and a merge changed main's workflow files while it ran. GitHub compares a new branch with the current main, so the branch's older workflow files look like a change. The build itself is fine. Start it again: remove needs-human and agent-build from the issue, then add agent-build."
+          fi
+          said="$(grep -E '^( ! \[|(fatal|error|remote): )' "${log}" | grep -vE '^error: failed to push' | tail -n 1 | tr -d '\r' | cut -c 1-300 || true)"
+          fail "Pushing ${BRANCH} failed after 1 try and 3 retries, 60 s apart. Git said: ${said:-nothing}. Possible causes: a branch of that name already exists, or GitHub refused the push for a moment on every try."
+
+      - name: Open the pull request
+        id: pr
+        # A fix round's push updates the existing PR; CI and agent-review
+        # then run again on the new head.
+        if: ${{ needs.build.outputs.fix_round == '' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          ISSUE: ${{ needs.build.outputs.issue }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          PLAN: ${{ runner.temp }}/agent-in/plan.md
+          PLAN_URL: ${{ needs.build.outputs.plan_url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          fail() { printf 'reason=%s\n' "$1" >> "${GITHUB_OUTPUT}"; echo "::error::$1"; exit 1; }
+          python3 -I - > "${RUNNER_TEMP}/pr-body.md" <<'EOF'
+          import os, re
+
+          HEADER = re.compile(r"^(?:\*\*(.+?)\*\*:?|#{1,6}\s+(.+?))\s*$")
+
+
+          def section(text, name):
+              lines, inside = [], False
+              for line in text.splitlines():
+                  match = HEADER.match(line.strip())
+                  if match:
+                      title = (match.group(1) or match.group(2)).strip().rstrip(":")
+                      inside = title.strip().lower() == name.lower()
+                  elif line.strip() == "---":
+                      inside = False
+                  elif inside:
+                      lines.append(line)
+              return lines
+
+
+          plan = open(os.environ["PLAN"], encoding="utf-8").read()
+          done_when = "\n".join(section(plan, "Done when")).strip() or "_The plan has no Done when list._"
+          print(f"Closes #{os.environ['ISSUE']}\n")
+          print(f"Built by the `agent-build` workflow from [the plan]({os.environ['PLAN_URL']}). ", end="")
+          print("A person reviews and merges; the workflow never merges.\n")
+          print("## Done when (from the plan)\n")
+          print(done_when + "\n")
+          print("---")
+          print(f"_[Run]({os.environ['RUN_URL']}). verify passed: paths against the plan, secret scan, ruff check, ruff format --check, pytest._")
+          EOF
+          gh pr create --repo "${REPO}" --base "${BASE_BRANCH}" --head "${BRANCH}" \
+            --title "${ISSUE_TITLE}" --body-file "${RUNNER_TEMP}/pr-body.md" \
+            || fail "The branch was pushed, but opening the pull request failed."
+
+  report:
+    needs: [build, verify, publish]
+    # Never after a failed guard: then nothing else in any job runs, the same
+    # as agent-plan.
+    if: ${{ always() && (needs.build.outputs.guard_ok == 'true' || needs.build.outputs.dispatched == 'true') && needs.build.outputs.issue != '' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      issues: write # one comment and the needs-human label; nothing else
+    steps:
+      # The reason comes from our own fixed messages, or from Claude's
+      # summary after build checked it. It is checked for token prefixes again
+      # here, and sent through a file, never through the shell.
+      - name: Comment on the issue and add needs-human
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ needs.build.outputs.issue }}
+          REASON: ${{ needs.build.outputs.reason || needs.verify.outputs.reason || needs.publish.outputs.reason }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          reason="${REASON:-The run failed before it recorded a reason.}"
+          if grep -qE 'sk-ant-|gh[pousr]_|github_pat_|-----BEGIN|ya29\.' <<< "${reason}"; then
+            reason="The run failed, and its reason looked like it contained a token, so it is not shown."
+          fi
+          {
+            printf '## Agent build: stopped\n\n'
+            printf '%s\n\n' "${reason:0:3000}"
+            printf -- '---\n'
+            # The backticks are literal Markdown for the comment, not a command substitution.
+            # shellcheck disable=SC2016
+            printf '_Written by the `agent-build` workflow. Nothing was merged. Added `needs-human`. [Run](%s)._\n' "${RUN_URL}"
+          } > "${RUNNER_TEMP}/comment.md"
+          gh issue comment "${ISSUE}" --body-file "${RUNNER_TEMP}/comment.md"
+          gh issue edit "${ISSUE}" --add-label needs-human
