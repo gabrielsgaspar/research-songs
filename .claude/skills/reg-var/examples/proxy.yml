@@ -1,0 +1,17 @@
+data:
+  path: series.csv
+  time: month
+  frequency: monthly
+model:
+  variables: [rate, output]
+  lags: 12
+  method: proxy
+  instrument: policy_surprise
+  proxy_residualization: augmented_var
+  normalization_variable: rate
+  impact_target: 0.25
+inference:
+  bootstrap_draws: 0
+seed: 20261102
+output:
+  dir: results/proxy

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Local projections"
+  short_description: "Run calendar-based LP regressions in R"
+  default_prompt: "Use $reg-lp to estimate local projection responses from my data."

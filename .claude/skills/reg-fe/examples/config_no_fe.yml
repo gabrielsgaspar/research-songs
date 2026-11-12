@@ -1,0 +1,13 @@
+data:
+  path: data/example.csv
+
+regression:
+  outcome: y
+  regressors:
+    - x_main
+  controls:
+    - x1
+    - x2
+
+output:
+  dir: resources/regressions/example_no_fe

@@ -1,0 +1,19 @@
+data:
+  path: series.csv
+  time: year
+  frequency: annual
+model:
+  variables: [rate, output]
+  lags: 2
+  method: recursive
+  order: [output, rate]
+  covariance: df_adjusted
+  normalization_variable: rate
+  normalization_shock: output
+  impact_target: 0.25
+inference:
+  level: 0.95
+  bootstrap_draws: 1999
+seed: 20261102
+output:
+  dir: results/recursive

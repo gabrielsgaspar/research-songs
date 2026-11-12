@@ -1,0 +1,19 @@
+data:
+  path: panel.parquet
+  time: year
+  frequency: annual
+  unit: country
+model:
+  outcome: y
+  shock: x
+  controls: [control]
+  method: ordinary
+  fixed_effects: [country, year]
+  lags: 1
+  horizons: [0, 1, 2, 3, 4, 5]
+inference:
+  covariance: cluster
+  cluster: [country, year]
+  level: 0.95
+output:
+  dir: results/panel

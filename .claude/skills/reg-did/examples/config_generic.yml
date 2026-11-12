@@ -1,0 +1,59 @@
+estimator: "callaway_santanna"
+data_path: "data/clean/panel.parquet"
+file_format: "parquet"
+outcome: "y"
+unit_id: "unit_id"
+time_id: "year"
+group_id: "first_treat_year"
+treatment_var: null
+controls:
+  - "x1"
+  - "x2"
+cluster_var:
+  - "state"
+weights_var: null
+event_time_var: null
+lead: 5
+lag: 5
+anticipation: 0
+control_group: "nevertreated"
+balanced_panel_required: false
+output_dir: "outputs/did/example_run"
+notes: "Example generic run"
+plot_reference_event_time: -1
+extra_fixed_effects: []
+output:
+  save_csv: true
+  save_parquet: true
+  save_json: true
+  save_yaml_metadata: true
+  save_model_summary: true
+plot:
+  width: 8
+  height: 5
+  dpi: 320
+  color: "#2C5A8A"
+  show_grid: true
+  show_border: true
+  show_points: true
+  show_line: true
+  show_ci: true
+  ci_geom: "linerange"
+  ci_level: 0.95
+  zero_line: true
+  zero_line_width: 1.2
+  reference_line: true
+  reference_line_type: "dashed"
+  box: true
+  x_label: "Distance to treatment"
+  y_label: null
+  title: null
+  subtitle: null
+  omit_title: true
+  x_breaks: null
+  y_breaks: null
+  x_limits: null
+  y_limits: null
+  tick_format: "%.2f"
+  latex_figure_format: "pdf"
+  save_tight_png: true

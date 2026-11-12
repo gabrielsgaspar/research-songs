@@ -1,0 +1,18 @@
+data:
+  path: data/example.parquet
+
+regression:
+  outcome: outcome_var
+  regressors:
+    - treatment
+  controls:
+    - control_1
+    - control_2
+  fixed_effects:
+    - unit_id
+    - year
+  cluster:
+    - unit_id
+
+output:
+  dir: resources/regressions/example_reg_fe
