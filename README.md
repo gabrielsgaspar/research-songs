@@ -51,6 +51,7 @@ flowchart LR
 | --- | --- |
 | Repository rules, CI, templates | Working |
 | Shared library (configuration, paths) | Working; storage helpers arrive with the code that needs them |
+| Data layout (paths, table schemas, manifests) | Working: [data layout](docs/standards/data_layout.md). Old data is not converted yet |
 | Country folders and run records | Working: `songs lyrics history`, and [coverage by country](docs/status/coverage.md) |
 | Lyric collection and matching | Planned |
 | Country-year panel | Working in part: `songs panel countries`. Democracy, populism, banking crises and the corpus counts wait for their inputs |
@@ -66,7 +67,7 @@ src/songs/        importable, tested code
 tests/            tests and small fixtures
 docs/decisions/   why the project works the way it does
 docs/status/      generated status pages
-docs/standards/   figure and topic standards
+docs/standards/   figure, topic, data source and data layout standards
 countries/        one folder per country (ISO3 code) with its run records
 resources/        small tracked files that code reads, such as the list of data sources
 exhibits/         figures and tables for the paper and the presentation
@@ -79,6 +80,8 @@ CONTRIBUTING.md   how to make a change
 
 Every external variable (income, democracy, fertility and others) has its source in [`docs/standards/data_sources.md`](docs/standards/data_sources.md).
 
+Every data file has its place, and every table has its columns, in [`docs/standards/data_layout.md`](docs/standards/data_layout.md). Read it before you write code that reads or writes data.
+
 ## Setup
 
 You need [uv](https://docs.astral.sh/uv/) and Git. uv installs Python 3.14 for you.
@@ -90,7 +93,7 @@ uv sync --all-groups
 uv run pytest
 ```
 
-The tests need no data and no credentials. To work with real data, copy `.env.example` to `.env` and set `SONGS_DATA_ROOT` to your local data folder. Ask Gabriel which data you need.
+The tests need no data and no credentials. To work with real data, copy `.env.example` to `.env` and set `SONGS_DATA_ROOT` to your local data folder. Ask Gabriel which data you need. [`docs/standards/data_layout.md`](docs/standards/data_layout.md) describes the folders inside the data folder.
 
 To make a change, read [`CONTRIBUTING.md`](CONTRIBUTING.md).
 

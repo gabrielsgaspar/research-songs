@@ -47,7 +47,11 @@ def lyrics_history(
 def lyrics_import_review(
     iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
 ) -> None:
-    """Import the songs that a person added to the reviewed workbook of a country."""
+    """Add the songs of the reviewed workbook of a country to the songs of the country.
+
+    The command writes a new folder lyrics/<ISO3>/songs/<run id>/ in the data folder, with
+    the full tables of the country and a manifest. It never changes an earlier folder.
+    """
     code = iso3.upper()
     if not run_records.ISO3.fullmatch(code):
         raise typer.BadParameter(f"not a three-letter country code: {iso3}")
@@ -56,7 +60,10 @@ def lyrics_import_review(
     from songs.stage_00_ingest import review_workbooks
 
     result = review_workbooks.import_workbook(data_root(), code)
-    typer.echo(f"wrote {result['path']} ({result['rows']} songs)")
+    typer.echo(
+        f"wrote {result['path']} ({result['songs_added']} songs added, "
+        f"{result['songs_replaced']} replaced, {result['songs']} songs in the country)"
+    )
     for gap in result["gaps"]:
         typer.echo(f"note: {gap}")
 
@@ -81,13 +88,18 @@ def panel_countries(
         ),
     ] = False,
 ) -> None:
-    """Build the country-year panel and write it to a new dated folder in the data folder."""
+    """Build the country-year panel and write it to a new dated folder in the data folder.
+
+    The folder is clean/countries/<YYYYMMDD>/. It holds countries.parquet and a manifest
+    that names every input file.
+    """
     # Imported here so that the lyrics commands do not load the data libraries.
     from songs.common.paths import data_root
     from songs.stage_50_analysis import countries_panel
 
     result = countries_panel.build(data_root(), allow_missing=allow_missing)
     typer.echo(f"wrote {result['path']} ({result['rows']} rows)")
+    typer.echo(f"wrote {result['manifest']}")
     if result["absent_inputs"]:
         typer.echo(f"absent inputs, their columns are empty: {result['absent_inputs']}")
     for table, codes in result["codes_outside_registry"].items():
