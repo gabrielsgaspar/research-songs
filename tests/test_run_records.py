@@ -146,3 +146,21 @@ def test_commands(tmp_path, monkeypatch):
     assert runner.invoke(app, ["lyrics", "history", "BRA", "--route", "scrape"]).exit_code != 0
     table = runner.invoke(app, ["lyrics", "coverage"])
     assert table.exit_code == 0 and "[BRA]" in table.output
+
+
+def test_history_refuses_a_bad_country_code(tmp_path, monkeypatch):
+    monkeypatch.setattr(run_records, "countries_dir", lambda: tmp_path)
+    result = CliRunner().invoke(app, ["lyrics", "history", "BRAZIL"], env={"COLUMNS": "200"})
+    assert result.exit_code != 0
+    assert "three-letter country code" in result.output
+    assert "BRAZIL" in result.output
+
+
+def test_history_refuses_an_unknown_route(tmp_path, monkeypatch):
+    monkeypatch.setattr(run_records, "countries_dir", lambda: tmp_path)
+    result = CliRunner().invoke(
+        app, ["lyrics", "history", "BRA", "--route", "scrape"], env={"COLUMNS": "200"}
+    )
+    assert result.exit_code != 0
+    assert "route must be one of" in result.output
+    assert run_records.ROUTES[0] in result.output
