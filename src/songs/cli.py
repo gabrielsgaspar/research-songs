@@ -11,6 +11,10 @@ lyrics_app = typer.Typer(no_args_is_help=True, help="Lyric collection by country
 app.add_typer(lyrics_app, name="lyrics")
 
 
+panel_app = typer.Typer(no_args_is_help=True, help="Country-year panels.")
+app.add_typer(panel_app, name="panel")
+
+
 @app.callback()
 def main() -> None:
     """Song lyrics research dataset."""
@@ -44,3 +48,25 @@ def lyrics_coverage(
         typer.echo(f"wrote {run_records.write_coverage()}")
     else:
         typer.echo(run_records.render_coverage(run_records.read_run_records()))
+
+
+@panel_app.command("countries")
+def panel_countries(
+    allow_missing: Annotated[
+        bool,
+        typer.Option(
+            "--allow-missing", help="Build with empty columns for inputs that are absent."
+        ),
+    ] = False,
+) -> None:
+    """Build the country-year panel and write it to a new dated folder in the data folder."""
+    # Imported here so that the lyrics commands do not load the data libraries.
+    from songs.common.paths import data_root
+    from songs.stage_50_analysis import countries_panel
+
+    result = countries_panel.build(data_root(), allow_missing=allow_missing)
+    typer.echo(f"wrote {result['path']} ({result['rows']} rows)")
+    if result["absent_inputs"]:
+        typer.echo(f"absent inputs, their columns are empty: {result['absent_inputs']}")
+    for table, codes in result["codes_outside_registry"].items():
+        typer.echo(f"{table}: codes outside the registry, left out: {codes}")
