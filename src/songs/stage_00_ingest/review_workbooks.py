@@ -25,8 +25,11 @@ from songs.common.years import is_admissible_year
 
 ROUTE = "manual_review"
 SOURCE = "review_workbook"
-ADDED = "Added by review"
-ACCEPTED_STATUS = ("Checked", "Done")
+# The workbook marks a song that was already in the data with this text. Reviewers mark
+# the songs they add in their own words, so every other row counts as added.
+ALREADY_IN_DATA = "Link in our files"
+# A review status that says the reviewer did not finish the row.
+OPEN_STATUS = ("", "not checked", "needs gabriel", "not sure")
 SONG_COLUMNS = (
     "Artist",
     "Song title",
@@ -85,7 +88,7 @@ def read_added_songs(book: Path, iso3: str) -> tuple[pd.DataFrame, list[str]]:
     """Return the added songs of a workbook and one line for each thing left out or missing."""
     songs = _sheet(book, "Songs", SONG_COLUMNS)
     artists = _sheet(book, "Artists", ARTIST_COLUMNS).drop_duplicates("Artist name")
-    added = songs[songs["Source link check"] == ADDED]
+    added = songs[songs["Source link check"] != ALREADY_IN_DATA]
     gaps = []
 
     def leave_out(mask: pd.Series, reason: str) -> None:
@@ -94,7 +97,7 @@ def read_added_songs(book: Path, iso3: str) -> tuple[pd.DataFrame, list[str]]:
             gaps.append(f"{int(mask.sum())} added songs left out: {reason}")
             added = added[~mask]
 
-    leave_out(~added["Review status"].isin(ACCEPTED_STATUS), "review status is not Checked or Done")
+    leave_out(added["Review status"].str.lower().isin(OPEN_STATUS), "the review is not finished")
     leave_out(added["Lyrics currently in file"] == "", "no lyrics")
     leave_out(~added["Lyric source URL"].str.startswith(("http://", "https://")), "no source link")
     leave_out(added.duplicated("Lyric source URL"), "source link appears twice")
