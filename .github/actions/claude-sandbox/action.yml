@@ -1,0 +1,95 @@
+name: Claude sandbox
+description: >-
+  Install what the Claude Code Bash sandbox needs on a GitHub runner
+  (bubblewrap and socat) and prove that it can start.
+
+# The agent workflows turn the Bash sandbox on with failIfUnavailable, so
+# Claude Code refuses to start when bubblewrap or socat is missing or
+# bubblewrap cannot create a user namespace. The runner image lists neither
+# package. https://code.claude.com/docs/en/sandboxing
+#
+# Two checks, both needed:
+# - outer: bwrap creates the user namespace each sandboxed command runs in;
+# - nested: inside it, the sandbox's seccomp helper makes a second user
+#   namespace and needs CAP_SYS_ADMIN there to create new PID and mount
+#   namespaces. https://github.com/anthropic-experimental/sandbox-runtime
+#
+# What the runner images need:
+# - ubuntu-22.04: kernel.apparmor_restrict_unprivileged_userns is 0; nothing.
+# - ubuntu-24.04: it is 1 and no bwrap profile ships, so bwrap itself fails.
+# - ubuntu-26.04: it is 1 and bwrap-userns-restrict ships. That profile moves
+#   every command bwrap starts into a profile without capabilities, so the
+#   nested check fails. Setting the sysctl to 0 does not change that.
+# So, when the restriction is on: unload and disable bwrap-userns-restrict if
+# present, and load the documented bwrap profile. The restriction stays on for
+# every other program. This is acceptable because the runner is thrown away
+# after the job and its user already has passwordless sudo. Inside the
+# sandbox, commands still cannot make user namespaces or use sudo.
+#
+# Call this only after the guard of the workflow passed, so that only
+# authorized users reach the `sudo` calls.
+runs:
+  using: composite
+  steps:
+    - name: Install bubblewrap and socat, and check the sandbox
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends bubblewrap socat
+
+        sandbox_err="${RUNNER_TEMP}/sandbox.err"
+        failed=""
+        # Outer: the user namespace bwrap makes for every sandboxed command.
+        bwrap_ok() {
+          bwrap --ro-bind / / --proc /proc --dev /dev --unshare-user --unshare-pid true 2> "${sandbox_err}"
+        }
+        # Nested: what the seccomp helper does inside that sandbox. unshare with
+        # --map-current-user writes setgroups "deny" and an identity uid/gid
+        # map (needs CAP_SYS_ADMIN in the new namespace), then makes new PID
+        # and mount namespaces, as the helper does.
+        nested_ok() {
+          bwrap --ro-bind / / --proc /proc --dev /dev --unshare-user --unshare-pid --unshare-net --cap-drop ALL \
+            unshare --user --map-current-user --pid --mount --fork true 2> "${sandbox_err}"
+        }
+        sandbox_ok() {
+          failed="outer"
+          bwrap_ok || return 1
+          failed="nested"
+          nested_ok || return 1
+          failed=""
+        }
+
+        restrict="$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo absent)"
+        echo "kernel.apparmor_restrict_unprivileged_userns: ${restrict}"
+        if [ "${restrict}" = "1" ]; then
+          if [ -f /etc/apparmor.d/bwrap-userns-restrict ]; then
+            echo "Removing bwrap-userns-restrict (it moves bwrap's commands into a profile without capabilities)."
+            sudo apparmor_parser -R /etc/apparmor.d/bwrap-userns-restrict
+            sudo ln -sf /etc/apparmor.d/bwrap-userns-restrict /etc/apparmor.d/disable/
+          fi
+          echo "Loading the documented AppArmor profile for /usr/bin/bwrap."
+          sudo tee /etc/apparmor.d/bwrap > /dev/null <<'EOF'
+        abi <abi/4.0>,
+        include <tunables/global>
+
+        profile bwrap /usr/bin/bwrap flags=(unconfined) {
+          userns,
+          include if exists <local/bwrap>
+        }
+        EOF
+          sudo apparmor_parser -r /etc/apparmor.d/bwrap
+        fi
+
+        if ! sandbox_ok; then
+          echo "AppArmor label of a command bwrap starts: $(bwrap --ro-bind / / --proc /proc --dev /dev --unshare-user --unshare-pid cat /proc/self/attr/current 2>/dev/null || echo unknown)"
+          echo "Loaded AppArmor profiles with bwrap in the name:"
+          sudo grep -i bwrap /sys/kernel/security/apparmor/profiles || echo "  none"
+          if [ "${failed}" = "outer" ]; then
+            echo "::error::bubblewrap cannot create its user namespace, so the Claude Code sandbox cannot start. bwrap said: $(< "${sandbox_err}")"
+          else
+            echo "::error::The sandbox's nested user namespace gets no capabilities, so every sandboxed Bash command would fail. unshare said: $(< "${sandbox_err}")"
+          fi
+          exit 1
+        fi
+        echo "bubblewrap and the nested user namespace work."
