@@ -10,7 +10,15 @@ from typer.testing import CliRunner
 
 from songs.cli import app
 from songs.common.paths import data_root
-from songs.stage_10_clean import crises, fertility, gdp, labor, population, world_bank_countries
+from songs.stage_10_clean import (
+    crises,
+    democracy,
+    fertility,
+    gdp,
+    labor,
+    population,
+    world_bank_countries,
+)
 from songs.stage_50_analysis import countries_panel as panel
 
 FIXTURES = Path(__file__).parent / "fixtures" / "panel"
@@ -56,6 +64,19 @@ def test_population_is_in_persons_and_marks_projections():
 def test_female_labor_force_becomes_one_row_per_country_and_year():
     clean = labor.load_female_labor_force(FIXTURES / "wdi_female_labor.csv")
     assert clean.values.tolist() == [["BRA", 1990, 44.5], ["BRA", 1991, 45.0], ["PRT", 1991, 50.25]]
+
+
+def test_democracy_keeps_rows_with_a_value_and_refuses_other_values(tmp_path):
+    source = pd.DataFrame(
+        {"wbcode": ["ROM", "ROM", "BRA"], "year": [1960.0, 1961.0, 1960.0], "dem": [0.0, None, 1.0]}
+    )
+    source.to_stata(tmp_path / democracy.FILE_NAME, write_index=False)
+    clean = democracy.load_democracy(tmp_path / democracy.FILE_NAME)
+    assert clean.values.tolist() == [["BRA", 1960, 1.0], ["ROM", 1960, 0.0]]
+    with pytest.raises(ValueError, match="not 0 or 1"):
+        democracy.clean_democracy(source.assign(dem=0.5))
+    with pytest.raises(ValueError, match="outside 1960 to 2010"):
+        democracy.clean_democracy(source.assign(year=2011.0))
 
 
 def write_fertility_files(folder: Path, total_fertility: str = "1.5") -> None:

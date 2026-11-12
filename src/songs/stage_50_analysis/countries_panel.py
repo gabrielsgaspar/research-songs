@@ -6,8 +6,8 @@ folder under `clean/countries/`. It never writes over a panel that exists.
 Sources that are not lyrics are read from their raw files, at the paths in
 `resources/data_sources.toml`. Four inputs come from the lyrics corpus and are
 read as clean files that another stage writes: the country registry, the analysis
-sample, the song counts and the artist counts. The democracy and populism series
-are also read as clean files, because their raw files are not in the data folder yet.
+sample, the song counts and the artist counts. The populism series is also read
+as a clean file, because its raw file is not in the data folder yet.
 """
 
 from collections.abc import Callable
@@ -19,7 +19,15 @@ import pandas as pd
 
 from songs.common.data_sources import canonical
 from songs.common.years import MAX_SONG_YEAR, MIN_SONG_YEAR
-from songs.stage_10_clean import crises, fertility, gdp, labor, population, world_bank_countries
+from songs.stage_10_clean import (
+    crises,
+    democracy,
+    fertility,
+    gdp,
+    labor,
+    population,
+    world_bank_countries,
+)
 
 FAMILIES = ("banking_crisis", "currency_crisis", "hyperinflation", "sovereign_default")
 CRISIS_MEASURES = {
@@ -102,7 +110,6 @@ CLEAN_FILES = {
     "sample": "clean/analysis_sample.parquet",
     "songs": "clean/country_year_song_counts.parquet",
     "artists": "clean/country_year_artist_counts.parquet",
-    "democracy": "clean/country_year_anrr_democracy.parquet",
     "populism": "clean/populism.parquet",
 }
 # Raw files: (input name, concept in the data source file, file name in its raw folder).
@@ -111,6 +118,7 @@ RAW_FILES = {
     "population": (population.CONCEPT, population.FILE_NAME),
     "labor": (labor.CONCEPT, labor.FILE_NAME),
     "fertility": (fertility.CONCEPT, ""),
+    "democracy": (democracy.CONCEPT, democracy.FILE_NAME),
     "income_groups": (world_bank_countries.INCOME_CONCEPT, world_bank_countries.INCOME_FILE_NAME),
     "regions": (world_bank_countries.REGION_CONCEPT, world_bank_countries.REGION_FILE_NAME),
     "banking": (crises.BANKING_CONCEPT, crises.BANKING_FILE_NAME),
@@ -127,7 +135,6 @@ CLEAN_SELECT = {
     },
     "songs": {},
     "artists": {"num_artists": "scraped_artists", "artist_count_method": "count_method"},
-    "democracy": {},
     "populism": {"country_iso3": "iso3", "populism_start": "pop_start"},
 }
 
@@ -191,6 +198,7 @@ def read_tables(
         "population": lambda: population.load_population(inputs["population"]),
         "labor": lambda: labor.load_female_labor_force(inputs["labor"]),
         "fertility": lambda: fertility.load_fertility(inputs["fertility"]),
+        "democracy": lambda: democracy.load_democracy(inputs["democracy"]),
         **{name: lambda name=name: _read_clean(name, inputs[name]) for name in CLEAN_SELECT},
     }
     tables = {"registry": registry}
