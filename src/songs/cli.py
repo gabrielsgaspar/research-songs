@@ -5,6 +5,8 @@ from typing import Annotated
 import typer
 
 from songs.common import run_records
+from songs.common.config import load_env_file
+from songs.common.paths import resolve_project_root
 
 app = typer.Typer(no_args_is_help=True, help="Song lyrics research dataset.")
 lyrics_app = typer.Typer(no_args_is_help=True, help="Lyric collection by country.")
@@ -18,6 +20,8 @@ app.add_typer(panel_app, name="panel")
 @app.callback()
 def main() -> None:
     """Song lyrics research dataset."""
+    # Settings such as SONGS_DATA_ROOT may live in `.env`; a set variable keeps its value.
+    load_env_file(resolve_project_root() / ".env")
 
 
 @lyrics_app.command("history")

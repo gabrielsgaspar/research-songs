@@ -10,14 +10,30 @@ from songs.common import run_records
 from songs.common.paths import DATA_ROOT_ENV
 from songs.stage_00_ingest import review_workbooks as r
 
-ADDED, OLD = r.ADDED, "Link in our files"
+ADDED, OLD = "Added by review", r.ALREADY_IN_DATA
 # Artist, title, year, lyrics, link, link check, review status. All text is invented.
 SONGS = [
     ("Band One", "Already here", "1990", "la la", "https://a.example/1", OLD, "Checked"),
     ("Band One", "New song", "2001", "invented line", "https://www.a.example/2", ADDED, "Checked"),
-    ("Two Lands", "Far away", "", "invented line", "https://b.example/3", ADDED, "Done"),
+    (
+        "Two Lands",
+        "Far away",
+        "",
+        "invented line",
+        "https://b.example/3",
+        "Verified online",
+        "Added",
+    ),
     ("Nobody", "Unknown act", "3001", "invented line", "https://b.example/4", ADDED, "Checked"),
-    ("Band One", "Not checked", "2002", "invented line", "https://a.example/5", ADDED, ""),
+    (
+        "Band One",
+        "Not checked",
+        "2002",
+        "invented line",
+        "https://a.example/5",
+        ADDED,
+        "Not checked",
+    ),
     ("Band One", "No words", "2003", "", "https://a.example/6", ADDED, "Checked"),
     ("Band One", "No link", "2004", "invented line", "not sure", ADDED, "Checked"),
     ("Band One", "Twice", "2005", "invented line", "https://www.a.example/2", ADDED, "Checked"),
@@ -43,7 +59,7 @@ def make_workbook(data, name="TGO_Togo_reviewed.xlsx", day="20261101"):
     return folder / name
 
 
-def test_only_added_and_checked_songs_are_imported(tmp_path):
+def test_only_added_and_finished_songs_are_imported(tmp_path):
     songs, gaps = r.read_added_songs(make_workbook(tmp_path), "TGO")
     assert list(songs.columns) == list(r.OUTPUT_COLUMNS)
     assert list(songs["song_name"]) == ["New song", "Far away", "Unknown act"]
@@ -53,7 +69,7 @@ def test_only_added_and_checked_songs_are_imported(tmp_path):
     assert set(songs["origin"]) == {"manual_review"}
     assert songs["song_id"].is_unique
     assert gaps == [
-        "1 added songs left out: review status is not Checked or Done",
+        "1 added songs left out: the review is not finished",
         "1 added songs left out: no lyrics",
         "1 added songs left out: no source link",
         "1 added songs left out: source link appears twice",
