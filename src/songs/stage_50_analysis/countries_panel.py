@@ -1,7 +1,9 @@
 """The country-year panel: one row per country of the registry and year, 1900 to 2026.
 
-`build` reads every input, joins them, and writes `countries.parquet` to a new dated
-folder under `clean/countries/`. It never writes over a panel that exists.
+`build` reads every input, joins them, and writes `countries.parquet` and its manifest
+to a new dated folder, `clean/countries/<YYYYMMDD>/`. It never writes over a panel that
+exists. The manifest names every input file that the build read
+(`docs/standards/data_layout.md`).
 
 Sources that are not lyrics are read from their raw files, at the paths in
 `resources/data_sources.toml`. Four inputs come from the lyrics corpus and are
@@ -17,6 +19,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
+from songs.common import manifests, paths
 from songs.common.data_sources import canonical
 from songs.common.years import MAX_SONG_YEAR, MIN_SONG_YEAR
 from songs.stage_10_clean import (
@@ -126,6 +129,8 @@ RAW_FILES = {
     "currency_episodes": (crises.CURRENCY_CONCEPT, crises.CURRENCY_EPISODES_FILE_NAME),
     "currency_monthly": (crises.CURRENCY_CONCEPT, crises.CURRENCY_MONTHLY_FILE_NAME),
 }
+# The currency table is read only when both of its files are present.
+CURRENCY_INPUTS = {"currency_episodes", "currency_monthly"}
 # How each clean file names the columns of its table: panel name -> expression on the file.
 CLEAN_SELECT = {
     "sample": {
@@ -208,7 +213,7 @@ def read_tables(
         parts.append(crises.load_banking(inputs["banking"], countries, lookup))
     if "sovereign_default" not in absent:
         parts.append(crises.load_sovereign_default(inputs["sovereign_default"], lookup))
-    if not {"currency_episodes", "currency_monthly"} & set(absent):
+    if not CURRENCY_INPUTS & set(absent):
         parts.append(
             crises.load_currency(inputs["currency_episodes"], inputs["currency_monthly"], countries)
         )
@@ -298,17 +303,58 @@ def codes_outside_registry(tables: dict[str, pd.DataFrame]) -> dict[str, list[st
     return outside
 
 
+def files_read(data: Path, inputs: dict[str, Path | None], absent: list[str]) -> list[str]:
+    """Return the input files that a build read, as paths relative to the data folder.
+
+    An absent input is not read. The currency table needs both of its files, so when
+    one is absent the other is not read. The fertility input is a folder of files.
+    """
+    skipped = set(absent)
+    if skipped & CURRENCY_INPUTS:
+        skipped |= CURRENCY_INPUTS
+    files = []
+    for name, path in inputs.items():
+        if name in skipped:
+            continue
+        files += [path / file for file in fertility.FILE_COLUMNS] if name == "fertility" else [path]
+    return sorted({paths.data_relative(data, file) for file in files})
+
+
 def build(data: Path, *, allow_missing: bool = False, today: date | None = None) -> dict:
-    """Build the panel and write it to `clean/countries/<YYYYMMDD>/countries.parquet`."""
-    out = data / "clean" / "countries" / f"{today or date.today():%Y%m%d}" / "countries.parquet"
-    if out.exists():
-        raise FileExistsError(f"{out} exists; a panel is never written over")
-    tables, absent = read_tables(default_inputs(data), allow_missing=allow_missing)
+    """Build the panel and write it, with its manifest, to `clean/countries/<YYYYMMDD>/`.
+
+    The manifest names every input file that the build read. The folder is the
+    version of the panel; a correction is a build on a later day.
+    """
+    folder = paths.clean_countries_dir(data, today or date.today())
+    if folder.exists():
+        raise FileExistsError(
+            f"{folder} exists; a panel is never written over. "
+            f"A folder without {paths.MANIFEST_NAME} is a build that did not end."
+        )
+    inputs = default_inputs(data)
+    tables, absent = read_tables(inputs, allow_missing=allow_missing)
     panel = join_panel(tables, canonical(gdp.CONCEPT).source)
-    out.parent.mkdir(parents=True, exist_ok=True)
+    folder.mkdir(parents=True)
+    out = folder / manifests.COUNTRIES_FILE
     panel.write_parquet(str(out), compression="zstd")
+    notes = (
+        "The tracked files in resources/ that the build reads are inputs too; "
+        "code_commit names their version."
+    )
+    if absent:
+        notes += f" Absent inputs, their columns are empty: {', '.join(absent)}."
+    manifests.write_manifest(
+        data,
+        folder,
+        "clean_countries",
+        inputs=files_read(data, inputs, absent),
+        counts={"rows": len(panel), "countries": len(tables["registry"])},
+        notes=notes,
+    )
     return {
         "path": out,
+        "manifest": folder / paths.MANIFEST_NAME,
         "rows": len(panel),
         "absent_inputs": absent,
         "codes_outside_registry": codes_outside_registry(tables),

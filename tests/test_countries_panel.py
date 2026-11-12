@@ -9,6 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 from songs.cli import app
+from songs.common import manifests, paths
 from songs.common.paths import data_root
 from songs.stage_10_clean import (
     crises,
@@ -335,12 +336,48 @@ def test_build_stops_on_absent_inputs_and_never_writes_over_a_panel(tmp_path):
         panel.build(tmp_path, allow_missing=True, today=date(2026, 1, 2))
 
 
+def test_build_writes_a_manifest_that_names_the_inputs_it_read(tmp_path):
+    write_registry(tmp_path)
+    result = panel.build(tmp_path, allow_missing=True, today=date(2026, 1, 2))
+    folder = paths.latest_clean_countries_dir(tmp_path)
+    assert folder == result["path"].parent
+    assert result["manifest"] == folder / paths.MANIFEST_NAME
+    manifest = manifests.read_manifest(folder)
+    assert (manifest.kind, manifest.path) == ("clean_countries", "clean/countries/20260102/")
+    assert manifest.inputs == ["extraction/countries.parquet"]  # the only input that is present
+    assert [(file["path"], file["rows"]) for file in manifest.files] == [
+        ("countries.parquet", 2 * 127)
+    ]
+    assert manifest.counts == {"rows": 2 * 127, "countries": 2}
+    assert "democracy" in manifest.notes and "resources/" in manifest.notes
+    assert (manifest.country_iso3, manifest.source, manifest.run_id, manifest.origin) == (None,) * 4
+
+
+def test_the_inputs_of_a_build_are_the_files_that_it_read(tmp_path):
+    inputs = panel.default_inputs(tmp_path)
+    no_raw_folder = sorted(name for name, path in inputs.items() if path is None)
+    files = panel.files_read(
+        tmp_path, inputs, [*no_raw_folder, "currency_monthly", "registry.in_wvs"]
+    )
+    assert files == sorted(set(files)) and "extraction/countries.parquet" in files
+    assert not any(file.startswith("/") or ":" in file for file in files)
+    # Fertility is a folder: the build reads each of its files.
+    folder = inputs["fertility"].relative_to(tmp_path).as_posix()
+    assert {file for file in files if file.startswith(f"{folder}/")} == {
+        f"{folder}/{name}" for name in fertility.FILE_COLUMNS
+    }
+    # The currency table needs both files. One is absent, so the other was not read.
+    assert not any(file.endswith(inputs["currency_episodes"].name) for file in files)
+    assert any(file.endswith(inputs["sovereign_default"].name) for file in files)
+
+
 def test_the_command_reports_what_it_wrote(monkeypatch, tmp_path):
     monkeypatch.setenv("SONGS_DATA_ROOT", str(tmp_path))
     write_registry(tmp_path)
     result = CliRunner().invoke(app, ["panel", "countries", "--allow-missing"])
     assert result.exit_code == 0, result.output
     assert "wrote" in result.output and "absent inputs" in result.output
+    assert paths.MANIFEST_NAME in result.output
 
 
 @pytest.mark.needs_data
