@@ -1,0 +1,11 @@
+{
+  "pages": [
+    {
+      "records": [
+        {"id": "BRA", "name": "Brazil", "region": {"id": "LCN", "value": "Latin America & Caribbean "}},
+        {"id": "EGY", "name": "Egypt", "region": {"id": "MEA", "value": "Middle East, North Africa, Afghanistan & Pakistan"}},
+        {"id": "WLD", "name": "World", "region": {"id": "NA", "value": "Aggregates"}}
+      ]
+    }
+  ]
+}

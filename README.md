@@ -53,6 +53,7 @@ flowchart LR
 | Shared library (configuration, paths) | Working; storage helpers arrive with the code that needs them |
 | Country folders and run records | Working: `songs lyrics history`, and [coverage by country](docs/status/coverage.md) |
 | Lyric collection and matching | Planned |
+| Country-year panel | Working in part: `songs panel countries`. Democracy, populism, banking crises and the corpus counts wait for their inputs |
 | Topic scoring | Planned |
 | Figure and topic standards | Working: [figures](docs/standards/figures.md), [topics](docs/standards/topics.md) |
 | Analysis and figure registry | Planned |

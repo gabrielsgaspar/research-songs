@@ -1,0 +1,6 @@
+ISO3_code,LocTypeName,Location,Variant,Time,TPopulation1July
+BRA,Country/Area,Brazil,Medium,2023,200000.5
+BRA,Country/Area,Brazil,Medium,2024,201000
+BRA,Country/Area,Brazil,High,2024,205000
+BRA,Country/Area,Brazil,Medium,1949,50000
+,World,World,Medium,2023,8000000
