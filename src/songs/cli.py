@@ -39,6 +39,24 @@ def lyrics_history(
     typer.echo(run_records.format_history(records))
 
 
+@lyrics_app.command("import-review")
+def lyrics_import_review(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+) -> None:
+    """Import the songs that a person added to the reviewed workbook of a country."""
+    code = iso3.upper()
+    if not run_records.ISO3.fullmatch(code):
+        raise typer.BadParameter(f"not a three-letter country code: {iso3}")
+    # Imported here so that the other lyrics commands do not load the data libraries.
+    from songs.common.paths import data_root
+    from songs.stage_00_ingest import review_workbooks
+
+    result = review_workbooks.import_workbook(data_root(), code)
+    typer.echo(f"wrote {result['path']} ({result['rows']} songs)")
+    for gap in result["gaps"]:
+        typer.echo(f"note: {gap}")
+
+
 @lyrics_app.command("coverage")
 def lyrics_coverage(
     write: Annotated[bool, typer.Option("--write", help="Write the coverage page.")] = False,

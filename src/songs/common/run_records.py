@@ -26,6 +26,7 @@ ROUTES = (
     "archive",
     "dump_name",
     "local_source",
+    "manual_review",
 )
 STATES = ("complete", "partial", "failed")
 ISO3 = re.compile(r"[A-Z]{3}")
