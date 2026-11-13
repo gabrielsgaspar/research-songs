@@ -125,7 +125,7 @@ Every version folder holds one `_MANIFEST.json`. All kinds of folder use one for
 | `country_scores` | `lyrics/<ISO3>/scores/<run id>/` | `country_iso3`, `run_id`, `inputs` | `topics.parquet`, `provenance.parquet` |
 | `analysis` | `analysis/<YYYYMMDD>/` | `inputs` | `country_year.parquet`, `songs.parquet` |
 
-`write_manifest` lists every file in the folder and computes its size, its SHA-256 and its row count. It refuses a folder that has a manifest. `read_manifest` checks these rules:
+`write_manifest` lists every file in the folder and computes its size, its SHA-256 and its row count. A caller can add the entries of files that are in the bucket and no longer on the local disk (`uploaded_files`), such as the parts of a packed source. It refuses a folder that has a manifest. `read_manifest` checks these rules:
 
 - `kind` is one of the kinds in the table.
 - `path` is the path that the kind gives for the country, the source, the date or the run id of the manifest.
@@ -140,9 +140,46 @@ The run record says what a run collected. The manifest says which files exist an
 
 All tables are Parquet with zstd compression. Text is UTF-8. A time is a UTC string `YYYY-MM-DDTHH:MM:SSZ`, as `run_records.utc_now()` writes it. "Required" means that no row is null.
 
-The types are `string`, `boolean`, `int16`, `int32` and `float64`.
+The types are `string`, `boolean`, `int16`, `int32`, `int64` and `float64`.
 
 A writer calls `schemas.write_table(table, relation, folder)`. The function checks the table against its schema before it writes. The check names every problem: a missing column, an extra column, a wrong type, a null in a required column, and a duplicate key. A reader calls `schemas.read_table(table, folder)`, which makes the same check.
+
+## Packed raw sources
+
+Files in `raw/` stay as received, with one exception. A source that arrived as many loose files, such as the pages of a website with one file for each page, is packed into `tar.gz` parts. Millions of small objects are slow to list, to read and to prove; a few large parts are not. A file that arrived as one large file (a dump, an archive, a Parquet table) is never packed. It stays as received, and it can be in the same version folder as the parts.
+
+A packed `raw/<source>/<YYYYMMDD>/` folder holds these files:
+
+- `pages-00001.tar.gz`, `pages-00002.tar.gz`, and so on: the parts, numbered from 1, with 5 digits and no gap. Each member of a part is one file, with its bytes as received. The member name is the path of the file relative to the folder that was packed, with forward slashes. For the old data, that folder is the old data folder, so a member name is the old path.
+- `members.parquet`: one row for each member, with its size and its SHA-256. It holds no file content. A copy of a local file is proved by a member with the same size and the same SHA-256.
+- `_MANIFEST.json`: the kind is `raw`. The manifest lists the parts and `members.parquet`. Its counts are `parts`, `members` and `skipped`.
+
+The packer is `src/songs/common/tar_parts.py`. It follows these rules:
+
+- The order is stable: in each folder, the files by name, then the subfolders by name. Symbolic links are not packed.
+- A part closes after the file that makes its source bytes reach the limit (1 GiB by default). A file that is larger than the limit makes a part of its own.
+- The packer writes one part at a time to a work folder outside the version folder, for example under `staging/`. It gives the part to the caller before it starts the next part. The caller uploads the part and removes it, so the peak disk use is one part.
+- A file that changes or disappears while it is read is not packed: its size or its change time after the read differs from before the read. The record of its part names the file, and the manifest counts it as `skipped`.
+- The headers of a part are fixed (gzip time 0, no gzip file name, tar format PAX, mode 644, owner 0), so the same files give the same parts. A second run with the same input makes the same parts in the same order, and skips the parts that the caller names as done. When the files planned for a done part changed, the packer stops. Then pack into a new version folder.
+- `verify_part` reads a local part as a stream. `verify_stream` reads any stream, such as a download from the bucket. Both compare each member with its row in `members.parquet`: the name, the bytes and the SHA-256.
+- `tar_parts.write_manifest` writes the manifest after every part is in the bucket. It lists the recorded size and SHA-256 of each part, because the parts are no longer on the local disk. It refuses parts that do not agree with `members.parquet`.
+
+<!-- generated:raw_tables:start -->
+<!-- Do not edit by hand. To rebuild, run: python -m songs.common.schemas --write -->
+
+### `members.parquet`: one row per file in the parts of a packed source
+
+Folder: `raw/<source>/<YYYYMMDD>/`. Key: `member`.
+
+| Column | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `part` | string | yes | The part that holds the file: `pages-00001.tar.gz` |
+| `member` | string | yes | Name of the file in the part: its path as received, with forward slashes |
+| `bytes` | int64 | yes | Size of the file |
+| `sha256` | string | yes | SHA-256 of the bytes of the file, hex |
+| `modified_utc` | string | yes | Last change of the source file when it was packed |
+
+<!-- generated:raw_tables:end -->
 
 ## Tables of a country
 
@@ -370,7 +407,7 @@ These things do not follow the layout yet. Each one needs its own task. Do not c
 - **Raw folders with no dated folder, or with the date inside the name.** These `raw_path` values in `resources/data_sources.toml`: `raw/discogs/`, `raw/crisis_review_20261109/`, `raw/crisis_review_20261110/`, `raw/un_wpp/2024/`, `raw/unsd_divorces/undata_pop_table16/`. The two `crisis_review` folders also have a campaign name, and they hold the files of 7 sources.
 - **A raw path in the old order.** `musicbrainz/clean/20260624-001001/` is the `raw_path` of the MusicBrainz catalog. Its place in the layout is `clean/catalog/musicbrainz/20260624/`.
 - **Undated inputs of the country-year table.** The `CLEAN_FILES` values in `countries_panel.py` are files from the old pipeline: `extraction/countries.parquet`, `clean/analysis_sample.parquet`, `clean/country_year_song_counts.parquet`, `clean/country_year_artist_counts.parquet`, `clean/populism.parquet`. The layout has no `extraction` layer.
-- **No manifest in `raw/`.** No command writes a manifest for a `raw` folder or for a `raw_manual_review` folder. A person puts a review workbook in its folder, so the import of a workbook does not ask for a manifest there.
+- **No manifest in `raw/`.** No command writes a manifest for a `raw` folder or for a `raw_manual_review` folder. Only the packer writes one, for a packed folder, and no command calls the packer yet. A person puts a review workbook in its folder, so the import of a workbook does not ask for a manifest there.
 - **Earlier builds have no manifest.** A `clean/countries/<YYYYMMDD>/` folder that was built before this standard has no manifest, so `latest_clean_countries_dir` does not return it. Build the table again to get a folder with a manifest.
 - **Earlier imports of a review workbook.** Before this standard, the import wrote `lyrics/<ISO3>/manual_review/<run id>/songs.parquet`. A folder of that form is not in the layout, and no code reads it.
 - **`countries.parquet` has no schema in `schemas.py`.** Its column list is in `countries_panel.py`, and the build checks the list.

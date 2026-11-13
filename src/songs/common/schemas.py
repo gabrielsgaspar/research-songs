@@ -27,6 +27,7 @@ TYPES = {
     "boolean": "BOOLEAN",
     "int16": "SMALLINT",
     "int32": "INTEGER",
+    "int64": "BIGINT",
     "float64": "DOUBLE",
 }
 
@@ -66,9 +67,34 @@ class Table:
         return (*self.columns, *(replace(self.per_topic, name=topic) for topic in TOPIC_IDS))
 
 
+RAW_FOLDER = "raw/<source>/<YYYYMMDD>/"
 COUNTRY_FOLDER = "lyrics/<ISO3>/songs/<run id>/"
 SCORES_FOLDER = "lyrics/<ISO3>/scores/<run id>/"
 DUMP_FOLDER = "clean/dumps/<source>/<YYYYMMDD>/"
+
+RAW_MEMBERS = Table(
+    file="members.parquet",
+    folder=RAW_FOLDER,
+    rows="one row per file in the parts of a packed source",
+    key=("member",),
+    columns=(
+        Column("part", "string", True, "The part that holds the file: `pages-00001.tar.gz`"),
+        Column(
+            "member",
+            "string",
+            True,
+            "Name of the file in the part: its path as received, with forward slashes",
+        ),
+        Column("bytes", "int64", True, "Size of the file"),
+        Column("sha256", "string", True, "SHA-256 of the bytes of the file, hex"),
+        Column(
+            "modified_utc",
+            "string",
+            True,
+            "Last change of the source file when it was packed",
+        ),
+    ),
+)
 
 COUNTRY_ARTISTS = Table(
     file="artists.parquet",
@@ -328,6 +354,7 @@ DUMP_ARTIST_NAMES = Table(
 
 # Name of a generated part of the standard -> the tables that it shows.
 GROUPS: dict[str, tuple[Table, ...]] = {
+    "raw_tables": (RAW_MEMBERS,),
     "country_tables": (COUNTRY_ARTISTS, COUNTRY_SONGS, COUNTRY_LINKS),
     "score_tables": (SCORE_TOPICS, SCORE_PROVENANCE),
     "dump_tables": (DUMP_SONGS, DUMP_ARTIST_NAMES),
