@@ -26,6 +26,7 @@ ROUTES = (
     "dump_name",
     "local_source",
     "manual_review",
+    "old_layout",
 )
 STATES = ("complete", "partial", "failed")
 COVERAGE_PAGE = Path("docs") / "status" / "coverage.md"

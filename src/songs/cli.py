@@ -1,5 +1,6 @@
 """The `songs` command. Each stage adds its commands here as its code arrives."""
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -66,6 +67,45 @@ def lyrics_import_review(
     )
     for gap in result["gaps"]:
         typer.echo(f"note: {gap}")
+
+
+@lyrics_app.command("import-old")
+def lyrics_import_old(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+    old_data: Annotated[
+        Path,
+        typer.Option(
+            "--old-data",
+            envvar="SONGS_OLD_DATA_ROOT",
+            help="Data folder of the old pipeline. The command only reads it.",
+        ),
+    ],
+    reason: Annotated[
+        str | None,
+        typer.Option(help="Why the country is imported again. Needed for a second import."),
+    ] = None,
+) -> None:
+    """Import the state of a country from the files of the old pipeline.
+
+    The command writes a new folder lyrics/<ISO3>/songs/<run id>/ in the data folder, with
+    the full tables of the country and a manifest. It never changes an earlier folder.
+    """
+    code = iso3.upper()
+    if not run_records.ISO3.fullmatch(code):
+        raise typer.BadParameter(f"not a three-letter country code: {iso3}")
+    typer.echo(run_records.format_history(run_records.read_run_records(code)))
+    # Imported here so that the other lyrics commands do not load the data libraries.
+    from songs.common.paths import data_root
+    from songs.stage_00_ingest import old_layout
+
+    result = old_layout.import_country(old_data, data_root(), code, reason=reason)
+    typer.echo(
+        f"wrote {result['path']} ({result['songs']} songs, {result['artists']} artists, "
+        f"{result['links']} links)"
+    )
+    for name, value in result.items():
+        if "_dropped_" in name and value:
+            typer.echo(f"note: {name}: {value} rows")
 
 
 @lyrics_app.command("coverage")

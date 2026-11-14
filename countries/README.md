@@ -65,6 +65,7 @@ An empty value means "not recorded". It never means zero.
 | `dump_name` | Match by artist and title against a bulk file |
 | `local_source` | Import from a dataset that someone gave to the project |
 | `manual_review` | Import of the songs that a person added to a country review workbook |
+| `old_layout` | Import of the state of a country from the files of the old pipeline. The old files do not record how each song was first collected |
 
 ## Coverage page
 
