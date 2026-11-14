@@ -246,6 +246,29 @@ These are renamed: the old `provider` becomes `source`, `provider_song_id` becom
 - `title_key` is empty, because the shared function that makes the key does not exist yet.
 - When the country has no earlier folder, the new folder holds only the reviewed songs, and `links.parquet` has no rows.
 
+### How the import of the old layout fills the tables
+
+`songs lyrics import-old <ISO3>` writes the state of a country from the files of the old pipeline (`src/songs/stage_00_ingest/old_layout.py`). The old data folder is an argument (`--old-data`) or the environment variable `SONGS_OLD_DATA_ROOT`. The command only reads it. It is not the data folder of this layout.
+
+| Old file, relative to `lyrics/<iso3>/` in the old data folder | Place in the tables |
+| --- | --- |
+| `lyrics/*.parquet`, one file for each artist | `songs.parquet` |
+| `lyrics_links/*.parquet`, one file for each artist | `links.parquet`, and `song_name` in `songs.parquet` |
+| `artists.csv`, the roster | `artists.parquet` |
+| `discogs_cache/artists.parquet` | `discogs_artist_id` in `artists.parquet` |
+
+- **Songs.** `song_id`, `artist_id`, `artist_name`, `song_url`, `lyrics`, `year`, `year_source`, `year_basis`, `first_release_year`, `canonical_song_id`, `duplicate_decision` and `quality_status` keep their old values. The renamed columns are `source`, `source_song_id` and `collected_utc`. `lyrics_sha256` is computed again. The old files do not all have the same columns; a column that the files lack is empty.
+- **Route.** Every imported row has the route `old_layout`. The old files do not record how a row was first collected, so the import does not guess a route. `run_id` is the run id of the import.
+- **Title.** `song_name` is the `provider_title` of a link of the song: first a link to the page of the song, then the link with the highest `match_score`. A song with no link has no title. `title_key` and `language` are empty.
+- **Time.** An old time is UTC text with the offset `+00:00`. The import writes it as a UTC second. A time with another offset, or text that is not a time, is left empty and counted (`songs_time_not_read`).
+- **Artists.** `artist_id` is the old value. `artist_name` is the `name` of the roster, and `country_tag` is `country_basis`. `attempted` is true when the roster marks the artist as scraped or holds a time for it; that time is `last_attempt_utc`. The roster has no Discogs id. The import makes the artist id of each Discogs id in the Discogs cache of the country and joins on it; an artist that the cache does not hold has no `discogs_artist_id`. An artist with songs that the roster does not have gets a row with the name of its songs.
+- **Two names with one id.** When an artist id appears again in the roster, the first row stays. `songs.parquet` keeps each name as collected.
+- **Links.** `source_title` is the old `provider_title`. `match_score` becomes a number. `artist_id` is the artist of the song.
+- **Rows that are dropped.** Only these rules drop a row, and the manifest counts each one. A song row: no `song_id`; no lyrics, or only blank text; no `provider`; no artist id, or no artist name in the row and in the roster; a `song_id` that a run with another route already holds; a `song_id` that appears again (the row with the newest time stays). A link row: no Discogs release or no track position (it gives a title, but it is not a match with a catalog track); a song that is not in `songs.parquet`; a key that appears again (the row with the highest `match_score` stays). A roster row: no artist id or no name; an artist id that appears again.
+- **A second import.** The old pipeline still writes, so a country can be imported again. The command then needs `--reason`, and the reason goes to the run record. The new folder holds the old files as they are now, and the rows that a run with another route added to the earlier folder. The manifest names the earlier folder as an input, and counts the songs that are new (`songs_added`) and the songs that are gone (`songs_removed`).
+- **Inputs.** The first input in the manifest is `lyrics/<iso3>/`, relative to the old data folder. The manifest also counts the old files that the import read (`old_lyric_files`, `old_link_files`).
+- The import does not filter songs for analysis. `duplicate_decision` and `quality_status` stay as columns.
+
 ## Country-year table
 
 `clean/countries/<YYYYMMDD>/countries.parquet` has one row per country and year. `songs panel countries` builds it (`src/songs/stage_50_analysis/countries_panel.py`). The columns are `COUNTRY_COLUMNS` in that module. [Data sources](data_sources.md) says where each variable comes from. The manifest names every input file that the build read.
