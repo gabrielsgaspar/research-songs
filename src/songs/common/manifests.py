@@ -298,6 +298,26 @@ def write_manifest(
     return manifest
 
 
+def parse_manifest(text: str, where: str) -> Manifest:
+    """Parse and check the text of a manifest. `where` names its file in an error.
+
+    Raise ValueError when the manifest breaks a rule.
+    """
+    payload = json.loads(text)
+    known = {item.name for item in fields(Manifest)}
+    if not isinstance(payload, dict) or set(payload) != known:
+        found = set(payload) if isinstance(payload, dict) else set()
+        raise ValueError(
+            f"{where}: missing fields {sorted(known - found)}, "
+            f"unknown fields {sorted(found - known)}"
+        )
+    manifest = Manifest(**payload)
+    problems = manifest.problems()
+    if problems:
+        raise ValueError(f"{where}: " + "; ".join(problems))
+    return manifest
+
+
 def read_manifest(folder: Path) -> Manifest:
     """Read and check the manifest of a version folder.
 
@@ -305,18 +325,7 @@ def read_manifest(folder: Path) -> Manifest:
     Raise ValueError when the manifest breaks a rule or names another folder.
     """
     target = folder / paths.MANIFEST_NAME
-    payload = json.loads(target.read_text(encoding="utf-8"))
-    known = {item.name for item in fields(Manifest)}
-    if not isinstance(payload, dict) or set(payload) != known:
-        found = set(payload) if isinstance(payload, dict) else set()
-        raise ValueError(
-            f"{target}: missing fields {sorted(known - found)}, "
-            f"unknown fields {sorted(found - known)}"
-        )
-    manifest = Manifest(**payload)
-    problems = manifest.problems()
-    if not problems and not folder.resolve().as_posix().endswith("/" + manifest.path.rstrip("/")):
-        problems.append(f"the manifest is for {manifest.path}, not for this folder")
-    if problems:
-        raise ValueError(f"{target}: " + "; ".join(problems))
+    manifest = parse_manifest(target.read_text(encoding="utf-8"), str(target))
+    if not folder.resolve().as_posix().endswith("/" + manifest.path.rstrip("/")):
+        raise ValueError(f"{target}: the manifest is for {manifest.path}, not for this folder")
     return manifest
