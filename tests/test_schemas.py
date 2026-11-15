@@ -14,6 +14,7 @@ VALUES = {
     "boolean": lambda row: row % 2 == 0,
     "int16": lambda row: row,
     "int32": lambda row: 1990 + row,
+    "int64": lambda row: 2**40 + row,
     "float64": lambda row: row / 2,
 }
 ALL_TABLES = pytest.mark.parametrize("table", s.TABLES, ids=lambda table: table.folder + table.file)
@@ -148,6 +149,7 @@ def test_every_table_has_a_key_of_required_columns_and_known_types():
         assert table.key and all(columns[name].required for name in table.key), table.file
         assert all(column.type in s.TYPES and column.meaning for column in columns.values())
     assert [table.file for table in s.TABLES if not table.planned] == [
+        "members.parquet",
         "artists.parquet",
         "songs.parquet",
         "links.parquet",

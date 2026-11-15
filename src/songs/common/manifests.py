@@ -265,12 +265,15 @@ def write_manifest(
     origin: dict | None = None,
     counts: dict[str, int] | None = None,
     notes: str = "",
+    uploaded_files: Iterable[dict] = (),
 ) -> Manifest:
     """Write the manifest of a version folder, as the last file of the folder, and return it.
 
     The function lists every file in the folder with its size, SHA-256 and row
-    count. It refuses a folder that has a manifest (FileExistsError) and a
-    manifest that breaks a rule (ValueError); then it writes nothing.
+    count. `uploaded_files` adds the entries of files of the folder that are in
+    the bucket and no longer on this disk, such as the parts of a packed source
+    (`tar_parts`). It refuses a folder that has a manifest (FileExistsError) and
+    a manifest that breaks a rule (ValueError); then it writes nothing.
     """
     target = folder / paths.MANIFEST_NAME
     if not folder.is_dir():
@@ -282,7 +285,8 @@ def write_manifest(
         path=paths.data_relative(data, folder),
         created_utc=utc_now(),
         code_commit=git_sha(paths.resolve_project_root()),
-        files=[_describe(folder, path) for path in sorted(folder.rglob("*")) if path.is_file()],
+        files=[_describe(folder, path) for path in sorted(folder.rglob("*")) if path.is_file()]
+        + [dict(entry) for entry in uploaded_files],
         country_iso3=country_iso3,
         source=source,
         run_id=run_id,
