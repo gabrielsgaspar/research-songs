@@ -94,6 +94,16 @@ There is no file per artist in saved data. A collector can keep one file per art
 
 These folders are not versions and do not go to the bucket: `cache/`, `tmp/`, `staging/`, `interim/`.
 
+## Upload and download
+
+A complete version folder goes to the bucket under the same path, with the prefix `data/`. Three commands move and check folders. Each command takes the version folder relative to the data folder, for example `uv run songs data upload clean/countries/20261114/`. The bucket name comes from `SONGS_GCS_BUCKET`. The code is in `src/songs/common/storage.py`. It calls the `gcloud` program, as it is signed in.
+
+- `songs data upload <version folder>` copies a local folder to the bucket. The folder must have a valid manifest that lists each file in it, and each file must have the SHA-256 of the manifest. The bucket must have object versioning on. The command refuses a folder that has a manifest in the bucket, and an object of the folder that has other bytes. It writes nothing when one of these checks fails. It uploads the manifest last. A second run continues: it keeps each object that has the same size, MD5 and `sha256`. The command prints one line for each object: name, bytes, generation.
+- `songs data download <version folder>` copies a folder from the bucket to the data folder. The folder in the bucket must pass the check below. The command refuses a local folder that has a manifest, and it never replaces a local file that has other bytes. Each file goes to `tmp/` first and moves into place after its SHA-256 matches the manifest. The manifest goes last.
+- `songs data check <version folder>` compares a folder in the bucket with its manifest. It reads the listing and the manifest, and no data file. Each file of the manifest must have an object with the same size, an MD5, and the same `sha256` metadata. The folder must hold no other object.
+
+Each upload creates an object with the precondition "the object does not exist" (`--if-generation-match=0`), the MD5 of the file (`--content-md5`), and the custom metadata `sha256`: the SHA-256 of the file, 64 hex characters. The bucket refuses an upload whose bytes do not have that MD5. No command deletes, moves or replaces an object. Code that uploads a file that is not in a version folder uses `storage.upload_file`, which makes the same checks, and calls `storage.require_versioning` before its first upload.
+
 ## The manifest
 
 Every version folder holds one `_MANIFEST.json`. All kinds of folder use one format. The file is JSON with sorted keys, an indent of 2 spaces, UTF-8, and a final newline, like a run record. The code is in `src/songs/common/manifests.py`.

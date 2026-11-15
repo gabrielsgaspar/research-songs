@@ -16,6 +16,17 @@ app.add_typer(lyrics_app, name="lyrics")
 panel_app = typer.Typer(no_args_is_help=True, help="Country-year panels.")
 app.add_typer(panel_app, name="panel")
 
+data_app = typer.Typer(
+    no_args_is_help=True, help="Copy version folders between the data folder and the bucket."
+)
+app.add_typer(data_app, name="data")
+FolderArgument = Annotated[
+    str,
+    typer.Argument(
+        help="Version folder relative to the data folder, e.g. clean/countries/20261114/"
+    ),
+]
+
 
 @app.callback()
 def main() -> None:
@@ -104,3 +115,57 @@ def panel_countries(
         typer.echo(f"absent inputs, their columns are empty: {result['absent_inputs']}")
     for table, codes in result["codes_outside_registry"].items():
         typer.echo(f"{table}: codes outside the registry, left out: {codes}")
+
+
+def _bucket():
+    """Return the storage module, a gcloud transport and the bucket name."""
+    # Imported here so that the other commands do not load the data libraries.
+    from songs.common import storage
+    from songs.common.config import load_config
+
+    return storage, storage.GcloudTransport(), load_config().require("gcs_bucket")
+
+
+@data_app.command("upload")
+def data_upload(folder: FolderArgument) -> None:
+    """Copy one complete version folder to the bucket, create-only, with the manifest last.
+
+    The command prints one line for each object: name, bytes, generation.
+    """
+    from songs.common.paths import data_root
+
+    storage, transport, bucket = _bucket()
+    try:
+        storage.upload_folder(transport, bucket, data_root(), folder, echo=typer.echo)
+    except storage.StorageError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+
+
+@data_app.command("download")
+def data_download(folder: FolderArgument) -> None:
+    """Copy one complete version folder from the bucket to the data folder, manifest last."""
+    from songs.common.paths import data_root
+
+    storage, transport, bucket = _bucket()
+    try:
+        storage.download_folder(transport, bucket, data_root(), folder, echo=typer.echo)
+    except storage.StorageError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+
+
+@data_app.command("check")
+def data_check(folder: FolderArgument) -> None:
+    """Check a folder in the bucket against its manifest, from the listing only."""
+    storage, transport, bucket = _bucket()
+    try:
+        problems = storage.check_folder(transport, bucket, folder)
+    except storage.StorageError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    for problem in problems:
+        typer.echo(problem)
+    if problems:
+        raise typer.Exit(1)
+    typer.echo(f"{storage.version_folder(folder)}: every object matches the manifest")
