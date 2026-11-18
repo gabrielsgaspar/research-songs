@@ -1,0 +1,51 @@
+# Languages and the countries where a source in that language is worth a run.
+#
+# A working table for resources/lyric_sources.toml. It is not a list of official
+# languages, and it makes no claim about a country. A source with the scope
+# `languages` serves the countries listed here. To change which countries a
+# language reaches, edit this file only.
+#
+# Fields:
+#   code       ISO 639-1 code, two lower-case letters
+#   name       the name of the language in English
+#   countries  ISO 3166-1 alpha-3 codes
+
+[[language]]
+code = "ar"
+name = "Arabic"
+countries = ["ARE", "BHR", "DZA", "EGY", "IRQ", "JOR", "KWT", "LBN", "LBY", "MAR", "MRT", "OMN", "PSE", "QAT", "SAU", "SDN", "SYR", "TUN", "YEM"]
+
+[[language]]
+code = "de"
+name = "German"
+countries = ["AUT", "CHE", "DEU"]
+
+[[language]]
+code = "es"
+name = "Spanish"
+countries = ["ARG", "BOL", "CHL", "COL", "CRI", "CUB", "DOM", "ECU", "ESP", "GNQ", "GTM", "HND", "MEX", "NIC", "PAN", "PER", "PRI", "PRY", "SLV", "URY", "VEN"]
+
+[[language]]
+code = "fr"
+name = "French"
+countries = ["BDI", "BEL", "BEN", "BFA", "CAF", "CAN", "CHE", "CIV", "CMR", "COD", "COG", "COM", "DJI", "FRA", "GAB", "GIN", "HTI", "LUX", "MCO", "MDG", "MLI", "NER", "RWA", "SEN", "TCD", "TGO"]
+
+[[language]]
+code = "nl"
+name = "Dutch"
+countries = ["BEL", "NLD", "SUR"]
+
+[[language]]
+code = "pt"
+name = "Portuguese"
+countries = ["AGO", "BRA", "CPV", "GNB", "MOZ", "PRT", "STP", "TLS"]
+
+[[language]]
+code = "ru"
+name = "Russian"
+countries = ["BLR", "KAZ", "KGZ", "RUS"]
+
+[[language]]
+code = "zh"
+name = "Chinese"
+countries = ["CHN", "HKG", "MAC", "TWN"]

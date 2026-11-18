@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from songs.common import run_records
+from songs.common import lyric_sources, run_records
 from songs.common.config import load_env_file
 from songs.common.paths import resolve_project_root
 
@@ -53,6 +53,24 @@ def lyrics_history(
         if route is None or record.route == route
     ]
     typer.echo(run_records.format_history(records))
+
+
+@lyrics_app.command("sources")
+def lyrics_sources(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+) -> None:
+    """List the lyric sources that can serve a country, and the runs that already used each.
+
+    Copies that we hold come first, because a run on them sends no requests.
+    """
+    code = iso3.upper()
+    if not run_records.ISO3.fullmatch(code):
+        raise typer.BadParameter(f"not a three-letter country code: {iso3}")
+    typer.echo(
+        lyric_sources.format_sources_for(
+            code, lyric_sources.sources_for(code), run_records.read_run_records(code)
+        )
+    )
 
 
 @lyrics_app.command("import-review")

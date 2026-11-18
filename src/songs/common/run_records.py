@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass, field, fields
 from datetime import UTC, datetime
 from pathlib import Path
 
+from songs.common import lyric_sources
 from songs.common.paths import ISO3, RUN_ID, SOURCE, project_paths, resolve_project_root
 from songs.common.repo import git_sha
 
@@ -68,6 +69,11 @@ class RunRecord:
             problems.append(f"route must be one of {ROUTES}, got {self.route!r}")
         if not SOURCE.fullmatch(self.source):
             problems.append(f"source must be a lower-case key such as lrclib, got {self.source!r}")
+        elif self.source not in lyric_sources.source_ids():
+            problems.append(
+                f"source {self.source!r} is not in {lyric_sources.SOURCES_FILE.as_posix()}; "
+                "add its entry to that file before the run"
+            )
         if self.state not in STATES:
             problems.append(f"state must be one of {STATES}, got {self.state!r}")
         if self.bulk_file and "://" in self.bulk_file:
