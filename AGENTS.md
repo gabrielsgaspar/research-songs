@@ -32,7 +32,7 @@ tests/            tests and small fixtures (tests/fixtures/)
 docs/decisions/   one file per decision, numbered
 docs/status/      generated pages; never edit by hand
 docs/standards/   figure and topic standards
-countries/        one folder per country (ISO3 code) with its run records
+countries/        one folder per country (ISO3 code) with its run records and campaign records
 resources/        small tracked files that code reads (data_sources.toml)
 exhibits/         figures and tables for the paper and the presentation
 prompts/roles/    instructions for the planner, builder and reviewer agents
@@ -83,7 +83,8 @@ This file holds the rules. The details live in the files below. Read the one tha
 - Collection work is organized by country. Each country has one folder, `countries/<ISO3>/`.
 - Never run the same job twice. Before a collection run, read the run records of that country. If the same route and source already ran, reuse the result or state why a new run is needed.
 - Every collection run writes one run record: country, date, route, source, the path of any bulk file used, request delay, artist and song limits, code commit, rows added, and known gaps. The command writes the record through `songs.common.run_records.record_run`; nobody writes one by hand.
-- Before a run, read the history: `uv run songs lyrics history <ISO3>`.
+- Before a run, read the plan: `uv run songs lyrics plan <ISO3>`. It shows the last run of each source and what the last campaign said to try next.
+- A campaign is an effort with a goal for one country. Open it before its first run (`uv run songs lyrics campaign open <ISO3> --goal "..."`) and close it after its last run with `--next-time`: what the next campaign must try.
 - One country and route runs in one place at a time.
 
 ### Code

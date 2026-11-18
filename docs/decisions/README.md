@@ -28,3 +28,4 @@ Then three sections: **Context** (the problem), **Decision** (what we do), **Con
 | 0006 | [One file says where every external variable comes from](0006-one-file-for-external-data-sources.md) | accepted | 2026-11-12 |
 | 0007 | [One rule decides which songs enter an analysis, with named exceptions](0007-one-rule-for-eligible-songs.md) | accepted | 2026-11-12 |
 | 0008 | [Analysis code is one module per method, in Python where possible](0008-analysis-code-shape.md) | accepted | 2026-11-12 |
+| 0009 | [A campaign is an effort with a goal for one country, with its own record](0009-campaigns-have-a-goal-and-a-record.md) | accepted | 2026-11-18 |
