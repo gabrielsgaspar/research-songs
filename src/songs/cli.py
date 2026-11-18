@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from songs.common import run_records
+from songs.common import lyric_sources, run_records
 from songs.common.config import load_env_file
 from songs.common.paths import resolve_project_root
 
@@ -56,6 +56,24 @@ def lyrics_history(
         if route is None or record.route == route
     ]
     typer.echo(run_records.format_history(records))
+
+
+@lyrics_app.command("sources")
+def lyrics_sources(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+) -> None:
+    """List the lyric sources that can serve a country, and the runs that already used each.
+
+    Copies that we hold come first, because a run on them sends no requests.
+    """
+    code = iso3.upper()
+    if not run_records.ISO3.fullmatch(code):
+        raise typer.BadParameter(f"not a three-letter country code: {iso3}")
+    typer.echo(
+        lyric_sources.format_sources_for(
+            code, lyric_sources.sources_for(code), run_records.read_run_records(code)
+        )
+    )
 
 
 @lyrics_app.command("import-review")
@@ -120,6 +138,38 @@ def lyrics_import_old(
     for name, value in result.items():
         if "_dropped_" in name and value:
             typer.echo(f"note: {name}: {value} rows")
+
+
+@lyrics_app.command("import-scores")
+def lyrics_import_scores(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+    old_data: Annotated[
+        Path,
+        typer.Option(
+            "--old-data",
+            envvar="SONGS_OLD_DATA_ROOT",
+            help="Data folder of the old pipeline. The command only reads it.",
+        ),
+    ],
+) -> None:
+    """Import the topic scores of a country from the files of the old pipeline.
+
+    The command writes a new folder lyrics/<ISO3>/scores/<run id>/ in the data folder.
+    The scores join the newest songs folder of the country. The command calls no model.
+    """
+    code = iso3.upper()
+    if not run_records.ISO3.fullmatch(code):
+        raise typer.BadParameter(f"not a three-letter country code: {iso3}")
+    from songs.common.paths import data_root
+    from songs.stage_30_topics import old_scores
+
+    result = old_scores.import_scores(old_data, data_root(), code)
+    folder = result["path"].relative_to(data_root()).as_posix()
+    typer.echo(
+        f"wrote {folder}/ ({result['scores']} scores, "
+        f"{result['scores_no_song']} with no song, "
+        f"{result['scores_text_changed']} with changed text)"
+    )
 
 
 @lyrics_app.command("coverage")

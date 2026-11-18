@@ -1,0 +1,2246 @@
+# Lyric sources: every place that lyrics come from.
+#
+# One [[source]] block per source. A run record may name only an `id` from this
+# file, so add the block before the first run of a new source.
+# `docs/standards/lyric_sources.md` is generated from this file; a test fails
+# when that page is out of date.
+#
+# Fields:
+#   id           unique key, lower case with underscores; run records use it as `source`
+#   name         the name of the site, dataset or file
+#   kind         bulk_dump     a dataset file that we hold; a run sends no requests
+#                site_archive  a copy of a whole site that we collected; a run sends no requests
+#                manual        files that a person prepares for the project
+#                live_site     a site that a run sends requests to
+#                internal      a step of the project itself, not a place that lyrics come from
+#                A site with a copy that we hold is `site_archive`, also when live runs are possible.
+#   scope        global     the source can serve every country
+#                languages  the countries of the languages in `languages` (two-letter codes;
+#                           resources/language_countries.toml says which countries)
+#                countries  the countries in `countries` (three-letter codes)
+#   url          the address of the site or dataset; empty when not confirmed
+#   stored_path  version folder of our copy, relative to the data folder; empty when there
+#                is no copy or when the folder is not confirmed
+#   routes       the collection routes that can use the source (`ROUTES` in run_records.py)
+#   access       allowed         requests may be sent, with the delay in `request_delay_seconds`
+#                blocked         do not send requests to the site; `notes` says why. A copy that we hold stays usable
+#                not_applicable  the source takes no requests
+#                unknown         not confirmed; confirm before a run sends requests
+#   request_delay_seconds  the shortest wait between two requests, when known
+#   checked      true when the entry was confirmed from code or from project records;
+#                false when a part of it is inferred (`notes` says which part)
+#   notes        anything a reader must know
+#
+# After an edit, rebuild the page:
+#   python -m songs.common.lyric_sources --write
+
+
+# --- Project steps -------------------------------------------------------------
+
+[[source]]
+id = "review_workbook"
+name = "Country review workbook"
+kind = "manual"
+scope = "global"
+url = ""
+stored_path = ""
+routes = ["manual_review"]
+access = "not_applicable"
+checked = true
+notes = "A person adds missing songs to the workbook of a country. Each song keeps the link of the site it came from."
+
+[[source]]
+id = "old_pipeline"
+name = "State of a country in the earlier pipeline"
+kind = "internal"
+scope = "global"
+url = ""
+stored_path = ""
+routes = ["old_layout"]
+access = "not_applicable"
+checked = true
+notes = "A one-time import of the songs that a country already had. Each song keeps its first source."
+
+
+# --- All countries -------------------------------------------------------------
+
+[[source]]
+id = "genius"
+name = "Genius"
+kind = "bulk_dump"
+scope = "global"
+url = "https://genius.com"
+stored_path = ""
+routes = ["genius_local"]
+access = "blocked"
+checked = true
+notes = "Use the copy that we hold only. Never send a request to the site."
+
+[[source]]
+id = "lrclib"
+name = "LRCLIB"
+kind = "bulk_dump"
+scope = "global"
+url = "https://lrclib.net"
+stored_path = ""
+routes = ["lrclib_local"]
+access = "blocked"
+checked = true
+notes = "Use the copy that we hold only. Never send a request to the site. The copy is an export dated 2026-08-07."
+
+[[source]]
+id = "lyricstranslate"
+name = "LyricsTranslate"
+kind = "live_site"
+scope = "global"
+url = "https://lyricstranslate.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "blocked"
+checked = true
+notes = "Not approved for requests (2026-10-04). An index of artist pages exists from earlier runs."
+
+[[source]]
+id = "songlyrics"
+name = "SongLyrics"
+kind = "live_site"
+scope = "global"
+url = "https://www.songlyrics.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "blocked"
+checked = true
+notes = "Blocked by a project decision."
+
+[[source]]
+id = "azlyrics"
+name = "AZLyrics"
+kind = "live_site"
+scope = "global"
+url = "https://www.azlyrics.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "blocked"
+checked = true
+notes = "The site answers with an access-request page."
+
+[[source]]
+id = "lyrhub"
+name = "Lyrhub"
+kind = "live_site"
+scope = "global"
+url = "https://lyrhub.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The countries that this site serves are not confirmed."
+
+
+# --- Spanish and Portuguese ----------------------------------------------------
+
+[[source]]
+id = "letras"
+name = "Letras"
+kind = "site_archive"
+scope = "languages"
+languages = ["pt", "es"]
+url = "https://www.letras.com"
+stored_path = ""
+routes = ["archive", "live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 0.5
+checked = false
+notes = "A site archive exists. The site also holds songs in other languages; the language list is not confirmed. Up to 5 requests per second were approved for the archive run."
+
+[[source]]
+id = "musica"
+name = "Musica.com"
+kind = "site_archive"
+scope = "languages"
+languages = ["es"]
+url = "https://www.musica.com"
+stored_path = ""
+routes = ["archive", "live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "A site archive dated 2026-10-18 exists."
+
+[[source]]
+id = "buenamusica"
+name = "BuenaMusica"
+kind = "live_site"
+scope = "languages"
+languages = ["es"]
+url = "https://www.buenamusica.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "todotango"
+name = "Todo Tango"
+kind = "site_archive"
+scope = "countries"
+countries = ["ARG", "URY"]
+url = "https://www.todotango.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "hmpu_uy"
+name = "Historia de la musica popular uruguaya"
+kind = "site_archive"
+scope = "countries"
+countries = ["URY"]
+url = "https://www.historiadelamusicapopularuruguaya.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "jaimeroos"
+name = "Jaime Roos"
+kind = "site_archive"
+scope = "countries"
+countries = ["URY"]
+url = "https://jaimeroos.uy"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "mangulina"
+name = "Mangulina"
+kind = "site_archive"
+scope = "countries"
+countries = ["DOM"]
+url = "https://mangulina.do"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "catorze"
+name = "Catorze"
+kind = "live_site"
+scope = "countries"
+countries = ["AND", "ESP"]
+url = "https://www.catorze.cat"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "Songs in Catalan."
+
+
+# --- French --------------------------------------------------------------------
+
+[[source]]
+id = "parolesnet"
+name = "Paroles.net"
+kind = "site_archive"
+scope = "languages"
+languages = ["fr"]
+url = "https://www.paroles.net"
+stored_path = ""
+routes = ["archive", "live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "A site archive exists."
+
+[[source]]
+id = "paroles2chansons"
+name = "Paroles2Chansons"
+kind = "site_archive"
+scope = "languages"
+languages = ["fr"]
+url = ""
+stored_path = ""
+routes = ["archive", "live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "A site archive exists. The address of the site is not confirmed."
+
+[[source]]
+id = "lacoccinelle"
+name = "La Coccinelle"
+kind = "live_site"
+scope = "languages"
+languages = ["fr"]
+url = "https://www.lacoccinelle.net"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "blocked"
+checked = true
+notes = "Blocked: live runs returned no rows."
+
+[[source]]
+id = "wikimizik"
+name = "Wikimizik"
+kind = "site_archive"
+scope = "countries"
+countries = ["HTI"]
+url = "https://wikimizik.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "solfegebohio"
+name = "Solfege Bohio"
+kind = "live_site"
+scope = "countries"
+countries = ["HTI"]
+url = "https://solfegebohio.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The country is inferred."
+
+
+# --- Caribbean -----------------------------------------------------------------
+
+[[source]]
+id = "lyricsaz"
+name = "Lyrics.az"
+kind = "live_site"
+scope = "countries"
+countries = ["ATG", "BHS", "BRB", "DMA", "GRD", "GUY", "JAM", "KNA", "LCA", "TTO", "VCT"]
+url = "https://lyrics.az"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 0.75
+checked = false
+notes = "The list of Caribbean countries is not confirmed. Earlier runs also used it for CIV, CMR and COD."
+
+[[source]]
+id = "jahlyrics"
+name = "Jah Lyrics"
+kind = "live_site"
+scope = "countries"
+countries = ["ATG", "BHS", "BRB", "DMA", "GRD", "GUY", "JAM", "KNA", "LCA", "TTO", "VCT"]
+url = "https://jah-lyrics.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 0.75
+checked = false
+notes = "The list of Caribbean countries is not confirmed."
+
+[[source]]
+id = "reggaetranslate"
+name = "Reggae Translate"
+kind = "live_site"
+scope = "countries"
+countries = ["ATG", "BHS", "BRB", "DMA", "GRD", "GUY", "JAM", "KNA", "LCA", "TTO", "VCT"]
+url = "https://reggaetranslate.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 0.75
+checked = false
+notes = "The list of Caribbean countries is not confirmed."
+
+[[source]]
+id = "socarecords"
+name = "Soca Records"
+kind = "live_site"
+scope = "countries"
+countries = ["ATG", "BHS", "BRB", "DMA", "GRD", "GUY", "JAM", "KNA", "LCA", "TTO", "VCT"]
+url = "https://socarecords.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 0.75
+checked = false
+notes = "The list of Caribbean countries is not confirmed."
+
+[[source]]
+id = "mentomusic"
+name = "Mento Music"
+kind = "site_archive"
+scope = "countries"
+countries = ["JAM"]
+url = "https://www.mentomusic.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "gutenberg_jamaica"
+name = "Project Gutenberg, Jamaican song book"
+kind = "bulk_dump"
+scope = "countries"
+countries = ["JAM"]
+url = "https://www.gutenberg.org/ebooks/35410"
+stored_path = ""
+routes = ["dump_name"]
+access = "not_applicable"
+checked = true
+notes = ""
+
+
+# --- Africa --------------------------------------------------------------------
+
+[[source]]
+id = "afrikalyrics"
+name = "AfrikaLyrics"
+kind = "site_archive"
+scope = "countries"
+countries = ["CIV", "CMR", "COD", "ERI", "NGA"]
+url = "https://afrikalyrics.com"
+stored_path = ""
+routes = ["archive", "live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "A site archive dated 2026-10-19 exists. The site holds more African countries than this list."
+
+[[source]]
+id = "ethiozeima"
+name = "EthioZeima"
+kind = "site_archive"
+scope = "countries"
+countries = ["ETH"]
+url = "https://www.ethiozeima.com"
+stored_path = ""
+routes = ["local_source"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "A site archive dated 2026-09-13 exists. Text is in Ethiopic script and in Latin letters."
+
+[[source]]
+id = "oromolyrics"
+name = "Oromo Lyrics"
+kind = "site_archive"
+scope = "countries"
+countries = ["ETH"]
+url = "https://oromolyrics.wordpress.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "tewle"
+name = "Tewle"
+kind = "site_archive"
+scope = "countries"
+countries = ["ERI"]
+url = "https://tewle.com"
+stored_path = ""
+routes = ["local_source"]
+access = "unknown"
+checked = true
+notes = "A site archive dated 2026-09-13 exists. Text is in Tigrinya."
+
+[[source]]
+id = "tononkira"
+name = "Tononkira"
+kind = "site_archive"
+scope = "countries"
+countries = ["MDG"]
+url = "https://tononkira.serasera.org"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "bongolyrics"
+name = "Bongo Lyrics"
+kind = "site_archive"
+scope = "countries"
+countries = ["KEN", "TZA"]
+url = "https://bongolyrics.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "tooxclusive"
+name = "tooXclusive"
+kind = "site_archive"
+scope = "countries"
+countries = ["NGA"]
+url = "https://tooxclusive.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "ninejalyrics"
+name = "9jaLyrics"
+kind = "site_archive"
+scope = "countries"
+countries = ["NGA"]
+url = "https://9jalyrics.com.ng"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "lingala_cd"
+name = "Lingala.cd"
+kind = "site_archive"
+scope = "countries"
+countries = ["COD", "COG"]
+url = "https://lingala.cd"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "ndombolo"
+name = "Ndombolo"
+kind = "site_archive"
+scope = "countries"
+countries = ["COD", "COG"]
+url = "https://ndombolo.co"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "howwe"
+name = "Howwe"
+kind = "site_archive"
+scope = "countries"
+countries = ["UGA"]
+url = "https://howwe.ug"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "kasilyrics"
+name = "Kasi Lyrics"
+kind = "site_archive"
+scope = "countries"
+countries = ["ZAF"]
+url = "https://kasilyrics.co.za"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "zedlyric"
+name = "Zed Lyric"
+kind = "site_archive"
+scope = "countries"
+countries = ["ZMB"]
+url = "https://zedlyric.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+
+# --- Arabic --------------------------------------------------------------------
+
+[[source]]
+id = "aama"
+name = "AAMA"
+kind = "site_archive"
+scope = "languages"
+languages = ["ar"]
+url = "https://www.aama.sa"
+stored_path = ""
+routes = ["local_source"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "A site archive dated 2026-09-13 exists."
+
+[[source]]
+id = "fnanen"
+name = "Fnanen"
+kind = "site_archive"
+scope = "languages"
+languages = ["ar"]
+url = "https://fnanen.com"
+stored_path = ""
+routes = ["archive", "live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "A site archive dated 2026-09-13 exists."
+
+[[source]]
+id = "lyricsarabic"
+name = "Lyrics-Arabic"
+kind = "live_site"
+scope = "languages"
+languages = ["ar"]
+url = "https://lyrics-arabic.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "tarab_hf"
+name = "Tarab dataset"
+kind = "bulk_dump"
+scope = "languages"
+languages = ["ar"]
+url = "https://huggingface.co/datasets/drelhaj/Tarab"
+stored_path = ""
+routes = ["dump_name"]
+access = "not_applicable"
+checked = true
+notes = "License CC BY 4.0."
+
+[[source]]
+id = "kalimat_anghami"
+name = "Kalimat by Anghami"
+kind = "site_archive"
+scope = "languages"
+languages = ["ar"]
+url = "https://kalimat.anghami.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "aghanylyrics"
+name = "Aghany Lyrics"
+kind = "site_archive"
+scope = "languages"
+languages = ["ar"]
+url = "https://aghanylyrics.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "songnu"
+name = "Song.nu"
+kind = "site_archive"
+scope = "languages"
+languages = ["ar"]
+url = "https://song.nu"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "altkia"
+name = "Altkia"
+kind = "site_archive"
+scope = "languages"
+languages = ["ar"]
+url = "https://altkia.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "arabiclyrics_net"
+name = "ArabicLyrics.net"
+kind = "site_archive"
+scope = "countries"
+countries = ["EGY"]
+url = "http://arabiclyrics.net"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "aghanilyrics"
+name = "Aghani Lyrics"
+kind = "site_archive"
+scope = "countries"
+countries = ["DZA", "MAR", "TUN"]
+url = "https://aghanilyrics.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "lyricstn"
+name = "LyricsTN"
+kind = "site_archive"
+scope = "countries"
+countries = ["TUN"]
+url = "https://lyricstn.tn"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+
+# --- Persian, Hebrew and Turkish -----------------------------------------------
+
+[[source]]
+id = "ganjoor"
+name = "Ganjoor"
+kind = "live_site"
+scope = "countries"
+countries = ["IRN"]
+url = "https://ganjoor.net"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "mustext"
+name = "Mustext"
+kind = "site_archive"
+scope = "countries"
+countries = ["AFG", "IRN", "TJK"]
+url = "https://mustext.net"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "ritmahang"
+name = "Ritm Ahang"
+kind = "site_archive"
+scope = "countries"
+countries = ["IRN"]
+url = "https://ritmahang.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "zibamatn"
+name = "Ziba Matn"
+kind = "site_archive"
+scope = "countries"
+countries = ["IRN"]
+url = "https://zibamatn.ir"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "musicdel"
+name = "MusicDel"
+kind = "site_archive"
+scope = "countries"
+countries = ["IRN"]
+url = "https://musicdel.ir"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "satext"
+name = "Satext"
+kind = "site_archive"
+scope = "countries"
+countries = ["IRN"]
+url = "https://satext.rozblog.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "lyric_erfan"
+name = "Lyric Erfan"
+kind = "site_archive"
+scope = "countries"
+countries = ["IRN"]
+url = "https://lyric-erfan.blogfa.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "afghansonglyrics"
+name = "Afghan Song Lyrics"
+kind = "live_site"
+scope = "countries"
+countries = ["AFG"]
+url = "https://afghansonglyrics.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The country is inferred from the name."
+
+[[source]]
+id = "afghanlyric"
+name = "Afghan Lyric"
+kind = "live_site"
+scope = "countries"
+countries = ["AFG"]
+url = "https://afghanlyric.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The country is inferred from the name."
+
+[[source]]
+id = "hebrewsongs"
+name = "HebrewSongs"
+kind = "live_site"
+scope = "countries"
+countries = ["ISR"]
+url = "https://www.hebrewsongs.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "shironet"
+name = "Shironet"
+kind = "live_site"
+scope = "countries"
+countries = ["ISR"]
+url = "https://shironet.mako.co.il"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "zemereshet"
+name = "Zemereshet"
+kind = "site_archive"
+scope = "countries"
+countries = ["ISR"]
+url = "https://www.zemereshet.co.il"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "hngn"
+name = "Hngn"
+kind = "site_archive"
+scope = "countries"
+countries = ["ISR"]
+url = "https://hngn.co.il"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "jyrics"
+name = "Jyrics"
+kind = "site_archive"
+scope = "countries"
+countries = ["ISR"]
+url = "https://jyrics.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "tab4u"
+name = "Tab4u"
+kind = "site_archive"
+scope = "countries"
+countries = ["ISR"]
+url = "https://www.tab4u.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = "On hold: the pages are chord sheets, and no rows were published."
+
+[[source]]
+id = "joinmyjam"
+name = "JoinMyJam"
+kind = "site_archive"
+scope = "countries"
+countries = ["ISR"]
+url = "https://joinmyjam.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = "On hold: no rows were published."
+
+[[source]]
+id = "hebrew_lyrics_hf"
+name = "Hebrew lyrics dataset"
+kind = "bulk_dump"
+scope = "countries"
+countries = ["ISR"]
+url = "https://huggingface.co/datasets/Norod78/HebrewLyricsDataet"
+stored_path = ""
+routes = ["dump_name"]
+access = "not_applicable"
+checked = true
+notes = ""
+
+[[source]]
+id = "alternatifim"
+name = "Alternatifim"
+kind = "live_site"
+scope = "countries"
+countries = ["TUR"]
+url = "https://sarki.alternatifim.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "sarkisozum"
+name = "Sarki Sozum"
+kind = "site_archive"
+scope = "countries"
+countries = ["TUR"]
+url = "https://sarkisozum.gen.tr"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "repertukul"
+name = "Repertukul"
+kind = "site_archive"
+scope = "countries"
+countries = ["BGR", "TUR"]
+url = "https://repertukul.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "turkish_folk_kaggle"
+name = "Turkish folk songs dataset"
+kind = "bulk_dump"
+scope = "countries"
+countries = ["TUR"]
+url = ""
+stored_path = ""
+routes = ["dump_name"]
+access = "not_applicable"
+checked = true
+notes = "On hold: the artist column of the dataset is empty."
+
+
+# --- South Asia ----------------------------------------------------------------
+
+[[source]]
+id = "bharatlyrics"
+name = "Bharatlyrics"
+kind = "live_site"
+scope = "countries"
+countries = ["IND"]
+url = "https://bharatlyrics.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.25
+checked = true
+notes = "Text from this source is for local scoring only."
+
+[[source]]
+id = "hindigeetmala"
+name = "HindiGeetMala"
+kind = "live_site"
+scope = "countries"
+countries = ["IND"]
+url = "https://www.hindigeetmala.net"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "Earlier runs used it for ten approved singers only."
+
+[[source]]
+id = "giitaayan"
+name = "Giitaayan"
+kind = "bulk_dump"
+scope = "countries"
+countries = ["IND"]
+url = ""
+stored_path = ""
+routes = ["local_source"]
+access = "not_applicable"
+checked = true
+notes = "A pinned copy of a public file collection, dated 2026-07-07. Never sent requests."
+
+[[source]]
+id = "tamilcorpus"
+name = "Tamil songs corpus"
+kind = "bulk_dump"
+scope = "countries"
+countries = ["IND"]
+url = ""
+stored_path = ""
+routes = ["local_source"]
+access = "not_applicable"
+checked = true
+notes = "A pinned copy of a public file, dated 2026-09-08. Songs in Tamil."
+
+[[source]]
+id = "wikisource"
+name = "Wikisource, songs of India"
+kind = "bulk_dump"
+scope = "countries"
+countries = ["IND"]
+url = "https://en.wikisource.org"
+stored_path = ""
+routes = ["local_source"]
+access = "not_applicable"
+checked = true
+notes = ""
+
+[[source]]
+id = "bengalisonglyrics4u"
+name = "Bengali Song Lyrics 4U"
+kind = "live_site"
+scope = "countries"
+countries = ["BGD", "IND"]
+url = "https://bengalisonglyrics4u.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The countries are inferred. Songs in Bengali."
+
+[[source]]
+id = "tagoreweb"
+name = "Tagore Web"
+kind = "live_site"
+scope = "countries"
+countries = ["BGD", "IND"]
+url = "https://www.tagoreweb.in"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The countries are inferred. Songs in Bengali."
+
+[[source]]
+id = "gitimala"
+name = "Gitimala"
+kind = "live_site"
+scope = "countries"
+countries = ["BGD", "IND"]
+url = "https://gitimala.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The countries are not confirmed."
+
+[[source]]
+id = "musiccafenepal"
+name = "Music Cafe Nepal"
+kind = "live_site"
+scope = "countries"
+countries = ["NPL"]
+url = "https://lyrics.musiccafenepal.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "nepalilyrics"
+name = "Nepali Lyrics"
+kind = "live_site"
+scope = "countries"
+countries = ["NPL"]
+url = "https://nepalilyrics.net"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "Public artist pages only. Do not use the search or the API of the site."
+
+[[source]]
+id = "lyricslk"
+name = "Lyrics.lk"
+kind = "live_site"
+scope = "countries"
+countries = ["LKA"]
+url = "https://lyrics-lk.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The country is inferred from the name."
+
+[[source]]
+id = "lankawebsites"
+name = "Lanka Websites"
+kind = "live_site"
+scope = "countries"
+countries = ["LKA"]
+url = "https://lankawebsites.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The country is inferred from the name."
+
+
+# --- East and Southeast Asia ---------------------------------------------------
+
+[[source]]
+id = "mulanci"
+name = "Mulanci"
+kind = "live_site"
+scope = "languages"
+languages = ["zh"]
+url = "https://www.mulanci.org"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "qqmusic"
+name = "QQ Music"
+kind = "live_site"
+scope = "languages"
+languages = ["zh"]
+url = "https://y.qq.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "Reads the data routes of the site, not its pages."
+
+[[source]]
+id = "kugou"
+name = "KuGou"
+kind = "live_site"
+scope = "languages"
+languages = ["zh"]
+url = "https://www.kugou.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "Reads the data routes of the site, not its pages."
+
+[[source]]
+id = "lyricsasia"
+name = "LyricsAsia"
+kind = "live_site"
+scope = "languages"
+languages = ["zh"]
+url = "https://lyricsasia.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "The site also holds songs in Japanese and Korean."
+
+[[source]]
+id = "kugeci"
+name = "KuGeci"
+kind = "bulk_dump"
+scope = "countries"
+countries = ["CHN", "HKG", "TWN"]
+url = ""
+stored_path = ""
+routes = ["dump_name"]
+access = "not_applicable"
+checked = true
+notes = "A clean copy dated 2026-10-12 exists, with about 258,000 song rows. No pages were downloaded."
+
+[[source]]
+id = "pmdb_taipei"
+name = "Pop Music Database Taipei"
+kind = "site_archive"
+scope = "countries"
+countries = ["TWN"]
+url = "https://pmdb.taipei"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "utanet"
+name = "Uta-Net"
+kind = "live_site"
+scope = "countries"
+countries = ["JPN"]
+url = "https://www.uta-net.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The address of the site is inferred."
+
+[[source]]
+id = "utaten"
+name = "UtaTen"
+kind = "live_site"
+scope = "countries"
+countries = ["JPN"]
+url = "https://utaten.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The address of the site is inferred."
+
+[[source]]
+id = "bugs"
+name = "Bugs"
+kind = "live_site"
+scope = "countries"
+countries = ["KOR"]
+url = "https://music.bugs.co.kr"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "genie"
+name = "Genie"
+kind = "live_site"
+scope = "countries"
+countries = ["KOR"]
+url = "https://www.genie.co.kr"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "lyricscokr"
+name = "Lyrics.co.kr"
+kind = "live_site"
+scope = "countries"
+countries = ["KOR"]
+url = "https://lyrics.co.kr"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "The site has an index only, with no artist pages."
+
+[[source]]
+id = "kpoplyrics"
+name = "K-Pop Lyrics"
+kind = "live_site"
+scope = "countries"
+countries = ["KOR"]
+url = "https://k-poplyrics.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "siamzone"
+name = "SiamZone"
+kind = "live_site"
+scope = "countries"
+countries = ["THA"]
+url = "https://www.siamzone.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "kapanlagi"
+name = "KapanLagi"
+kind = "live_site"
+scope = "countries"
+countries = ["IDN", "MYS"]
+url = "https://lirik.kapanlagi.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "lirikid"
+name = "Lirik.id"
+kind = "live_site"
+scope = "countries"
+countries = ["IDN"]
+url = "https://lirik.id"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The address and the country are inferred."
+
+[[source]]
+id = "lyricvn"
+name = "LyricVN"
+kind = "live_site"
+scope = "countries"
+countries = ["VNM"]
+url = "https://lyricvn.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "lyricsvn"
+name = "Lyrics.vn"
+kind = "live_site"
+scope = "countries"
+countries = ["VNM"]
+url = "https://lyrics.vn"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "tkaraoke"
+name = "TKaraoke"
+kind = "site_archive"
+scope = "countries"
+countries = ["VNM"]
+url = "https://lyric.tkaraoke.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "nhaccuatui"
+name = "NhacCuaTui"
+kind = "site_archive"
+scope = "countries"
+countries = ["VNM"]
+url = "https://www.nhaccuatui.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "nhac_vn"
+name = "Nhac.vn"
+kind = "site_archive"
+scope = "countries"
+countries = ["VNM"]
+url = "https://nhac.vn"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "amnhacmiennam"
+name = "Am nhac mien Nam"
+kind = "site_archive"
+scope = "countries"
+countries = ["VNM"]
+url = "https://amnhacmiennam.blogspot.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "pinoysonghits"
+name = "PinoySongHits"
+kind = "live_site"
+scope = "countries"
+countries = ["PHL"]
+url = "https://www.pinoysonghits.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 60
+checked = true
+notes = "The site asks for 60 seconds between requests."
+
+[[source]]
+id = "opmtunes"
+name = "OPM Tunes"
+kind = "site_archive"
+scope = "countries"
+countries = ["PHL"]
+url = "https://opmtunes.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "nlb_sg"
+name = "National Library Board, Singapore"
+kind = "bulk_dump"
+scope = "countries"
+countries = ["MYS", "SGP"]
+url = "https://data.gov.sg"
+stored_path = ""
+routes = ["dump_name"]
+access = "not_applicable"
+checked = true
+notes = ""
+
+
+# --- Western and Northern Europe -----------------------------------------------
+
+[[source]]
+id = "songtexte"
+name = "Songtexte"
+kind = "live_site"
+scope = "languages"
+languages = ["de"]
+url = "https://www.songtexte.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "An index of the site was started and is not complete."
+
+[[source]]
+id = "lieder_net"
+name = "LiederNet"
+kind = "site_archive"
+scope = "countries"
+countries = ["DEU"]
+url = "https://www.lieder.net"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = "The site also holds songs of other countries."
+
+[[source]]
+id = "deutscheslied"
+name = "Deutsches Lied"
+kind = "site_archive"
+scope = "countries"
+countries = ["DEU"]
+url = "https://deutscheslied.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "volksmusikdatenbank"
+name = "Volksmusikdatenbank"
+kind = "site_archive"
+scope = "countries"
+countries = ["AUT"]
+url = "https://www.volksmusikdatenbank.at"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "songteksten"
+name = "Songteksten"
+kind = "live_site"
+scope = "languages"
+languages = ["nl"]
+url = "https://songteksten.net"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The address of the site is inferred."
+
+[[source]]
+id = "infinititesti"
+name = "InfinitiTesti"
+kind = "live_site"
+scope = "countries"
+countries = ["ITA"]
+url = "https://www.infinititesti.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "lyricsmania"
+name = "LyricsMania"
+kind = "live_site"
+scope = "countries"
+countries = ["ITA"]
+url = "https://www.lyricsmania.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "blocked"
+checked = true
+notes = "Suspended: the site banned the client after about 420 pages in 12 minutes."
+
+[[source]]
+id = "angolotesti"
+name = "Angolo Testi"
+kind = "live_site"
+scope = "countries"
+countries = ["ITA"]
+url = "https://www.angolotesti.it"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "blocked"
+checked = false
+notes = "Blocked: the site banned the client after about 280 pages. The address is inferred."
+
+[[source]]
+id = "bellsirishlyrics"
+name = "Bells Irish Lyrics"
+kind = "live_site"
+scope = "countries"
+countries = ["IRL"]
+url = "https://www.bellsirishlyrics.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "glatkistan"
+name = "Glatkistan"
+kind = "live_site"
+scope = "countries"
+countries = ["ISL"]
+url = "https://glatkistan.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 2.0
+checked = true
+notes = "Text from this source is for local scoring only."
+
+[[source]]
+id = "guitarparty"
+name = "Guitarparty"
+kind = "site_archive"
+scope = "countries"
+countries = ["ISL"]
+url = "https://www.guitarparty.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "musik_is"
+name = "Musik.is"
+kind = "site_archive"
+scope = "countries"
+countries = ["ISL"]
+url = "https://www.musik.is"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+
+# --- Central and Eastern Europe ------------------------------------------------
+
+[[source]]
+id = "local_file"
+name = "Compiled file of Greek songs"
+kind = "site_archive"
+scope = "countries"
+countries = ["GRC"]
+url = ""
+stored_path = ""
+routes = ["local_source"]
+access = "not_applicable"
+checked = true
+notes = "A file that a researcher gave to the project. Songs carry no page link."
+
+[[source]]
+id = "stixoi"
+name = "Stixoi"
+kind = "site_archive"
+scope = "countries"
+countries = ["GRC"]
+url = "https://stixoi.info"
+stored_path = ""
+routes = ["archive", "live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "A site archive dated 2026-09-25 exists."
+
+[[source]]
+id = "tekstowo"
+name = "Tekstowo"
+kind = "live_site"
+scope = "countries"
+countries = ["POL"]
+url = "https://www.tekstowo.pl"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "teksciory"
+name = "Teksciory"
+kind = "live_site"
+scope = "countries"
+countries = ["POL"]
+url = "https://teksciory.interia.pl"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "blocked"
+checked = true
+notes = "Blocked: live runs returned one row."
+
+[[source]]
+id = "supermusic"
+name = "Supermusic"
+kind = "live_site"
+scope = "countries"
+countries = ["CZE", "SVK"]
+url = "https://supermusic.cz"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "karaoketexty"
+name = "KaraokeTexty"
+kind = "site_archive"
+scope = "countries"
+countries = ["CZE", "SVK"]
+url = "https://www.karaoketexty.cz"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = "About 1.0 million songs. Up to 5 requests per second were approved for the archive run."
+
+[[source]]
+id = "zoznam_hudba"
+name = "Zoznam Hudba"
+kind = "site_archive"
+scope = "countries"
+countries = ["SVK"]
+url = "https://hudba.zoznam.sk"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = "About 568,000 lyrics. Up to 5 requests per second were approved for the archive run."
+
+[[source]]
+id = "dalszoveg"
+name = "Dalszoveg"
+kind = "live_site"
+scope = "countries"
+countries = ["HUN"]
+url = "https://www.dalszoveg.hu"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "zeneszoveg"
+name = "Zeneszoveg"
+kind = "live_site"
+scope = "countries"
+countries = ["HUN"]
+url = "https://www.zeneszoveg.hu"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "versurius"
+name = "Versuri.us"
+kind = "live_site"
+scope = "countries"
+countries = ["ROU"]
+url = "https://www.versuri.us"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "sergiudo"
+name = "Sergiudo"
+kind = "site_archive"
+scope = "countries"
+countries = ["MDA"]
+url = "https://sergiudo.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "textove"
+name = "Textove"
+kind = "live_site"
+scope = "countries"
+countries = ["BGR"]
+url = "https://textove.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "akordite"
+name = "Akordite"
+kind = "live_site"
+scope = "countries"
+countries = ["BGR"]
+url = "https://akordite.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "textovenapesni"
+name = "Textove na pesni"
+kind = "site_archive"
+scope = "countries"
+countries = ["BGR"]
+url = "https://textovenapesni.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "pevcheskipodsetnik"
+name = "Pevcheski Podsetnik"
+kind = "site_archive"
+scope = "countries"
+countries = ["BGR"]
+url = "https://pevcheskipodsetnik.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "bgtekstove"
+name = "BG Tekstove"
+kind = "site_archive"
+scope = "countries"
+countries = ["BGR"]
+url = "https://bgtekstove.start.bg"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "tekstovi"
+name = "Tekstovi.net"
+kind = "live_site"
+scope = "countries"
+countries = ["BIH", "HRV", "MNE", "SRB"]
+url = "https://tekstovi.net"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "blocked"
+checked = true
+notes = "Do not send requests: the site forbids mass download. A site archive dated 2026-09-25 exists, and rows from earlier runs stay."
+
+[[source]]
+id = "tekstovipesama"
+name = "Tekstovi Pesama"
+kind = "live_site"
+scope = "countries"
+countries = ["BIH", "HRV", "MNE", "SRB"]
+url = "https://tekstovi-pesama.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "A site archive dated 2026-09-25 exists."
+
+[[source]]
+id = "tekstovipjesama"
+name = "Tekstovi Pjesama"
+kind = "live_site"
+scope = "countries"
+countries = ["HRV", "MKD", "SRB"]
+url = "https://tekstovi-pjesama.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "A site archive dated 2026-09-25 exists."
+
+[[source]]
+id = "hitovi"
+name = "Hitovi.ba"
+kind = "live_site"
+scope = "countries"
+countries = ["BIH", "MNE"]
+url = "https://hitovi.ba"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "tekstomanija"
+name = "Tekstomanija"
+kind = "site_archive"
+scope = "countries"
+countries = ["BIH", "HRV", "MNE", "SRB"]
+url = ""
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = false
+notes = "A site archive dated 2026-09-25 exists. The address and the countries are not confirmed."
+
+[[source]]
+id = "cuspajz"
+name = "Cuspajz"
+kind = "site_archive"
+scope = "countries"
+countries = ["BIH", "HRV", "MNE", "SRB"]
+url = ""
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = false
+notes = "A site archive dated 2026-09-25 exists. The address and the countries are not confirmed."
+
+[[source]]
+id = "pesmarica"
+name = "Pesmarica"
+kind = "site_archive"
+scope = "countries"
+countries = ["BIH", "HRV", "MNE", "SRB"]
+url = ""
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = false
+notes = "A site archive dated 2026-09-25 exists. The address and the countries are not confirmed."
+
+[[source]]
+id = "besedilo"
+name = "Besedilo.si"
+kind = "live_site"
+scope = "countries"
+countries = ["SVN"]
+url = "https://www.besedilo.si"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "slolyrics"
+name = "SloLyrics"
+kind = "live_site"
+scope = "countries"
+countries = ["SVN"]
+url = "https://slolyrics.com"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "pesmi"
+name = "Pesmi.si"
+kind = "live_site"
+scope = "countries"
+countries = ["SVN"]
+url = "https://pesmi.si"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "The address of the site is inferred."
+
+[[source]]
+id = "dainutekstai"
+name = "Dainu tekstai"
+kind = "live_site"
+scope = "countries"
+countries = ["LTU"]
+url = "https://www.dainutekstai.lt"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "dainuzodziai"
+name = "Dainu zodziai"
+kind = "site_archive"
+scope = "countries"
+countries = ["LTU"]
+url = "https://dainuzodziai.lt"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "pisniua"
+name = "Pisni.ua"
+kind = "live_site"
+scope = "countries"
+countries = ["UKR"]
+url = "https://pisni.ua"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "pisni_org_ua"
+name = "Pisni.org.ua"
+kind = "site_archive"
+scope = "countries"
+countries = ["UKR"]
+url = "https://www.pisni.org.ua"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "nashe_com_ua"
+name = "Nashe"
+kind = "site_archive"
+scope = "countries"
+countries = ["UKR"]
+url = "https://nashe.com.ua"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+
+# --- Russian, Caucasus and Central Asia ----------------------------------------
+
+[[source]]
+id = "tekstpesni"
+name = "Tekst-pesni"
+kind = "site_archive"
+scope = "languages"
+languages = ["ru"]
+url = ""
+stored_path = ""
+routes = ["archive", "live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = false
+notes = "A site archive exists. The address of the site is not confirmed."
+
+[[source]]
+id = "tekstpesnionline"
+name = "Tekst-pesni.online"
+kind = "live_site"
+scope = "languages"
+languages = ["ru"]
+url = "https://tekst-pesni.online"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "textpesenok"
+name = "Text-pesenok"
+kind = "site_archive"
+scope = "languages"
+languages = ["ru"]
+url = "https://text-pesenok.ru"
+stored_path = ""
+routes = ["archive"]
+access = "blocked"
+checked = true
+notes = "A site archive exists. Blocked for live runs: they returned almost no rows."
+
+[[source]]
+id = "ilyrics"
+name = "iLyrics"
+kind = "live_site"
+scope = "languages"
+languages = ["ru"]
+url = "https://ru.ilyrics.net"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "Earlier runs also used it for ARM and IRN."
+
+[[source]]
+id = "geniusru"
+name = "Russian Genius dataset"
+kind = "bulk_dump"
+scope = "countries"
+countries = ["RUS"]
+url = "https://huggingface.co/datasets/sevenreasons/genius-lyrics-russian"
+stored_path = ""
+routes = ["dump_name"]
+access = "not_applicable"
+checked = true
+notes = "A copy dated 2026-09-24 exists. On hold: rows carry no song link."
+
+[[source]]
+id = "armlyric"
+name = "ArmLyric"
+kind = "live_site"
+scope = "countries"
+countries = ["ARM"]
+url = "https://armlyric.do.am"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = "Allowed on 2026-10-19 for catalog and song pages only. Do not use the search of the site. Text from this source is for local scoring only."
+
+[[source]]
+id = "gitar"
+name = "Gitar.az"
+kind = "live_site"
+scope = "countries"
+countries = ["AZE"]
+url = "https://gitar.az"
+stored_path = ""
+routes = ["live", "roster_update", "recover"]
+access = "allowed"
+request_delay_seconds = 1.0
+checked = true
+notes = ""
+
+[[source]]
+id = "akkordlar"
+name = "Akkordlar"
+kind = "site_archive"
+scope = "countries"
+countries = ["AZE"]
+url = "https://akkordlar.az"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "georgianlyrics"
+name = "Georgian Lyrics"
+kind = "site_archive"
+scope = "countries"
+countries = ["GEO"]
+url = "https://georgianlyrics.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = ""
+
+[[source]]
+id = "uztext"
+name = "Uztext"
+kind = "site_archive"
+scope = "countries"
+countries = ["UZB"]
+url = ""
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = false
+notes = "A site archive dated 2026-09-13 exists. The address of the site is not confirmed."
+
+[[source]]
+id = "uzmatn"
+name = "Uzmatn"
+kind = "site_archive"
+scope = "countries"
+countries = ["UZB"]
+url = ""
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = false
+notes = "A site archive dated 2026-09-13 exists. The address of the site is not confirmed."
