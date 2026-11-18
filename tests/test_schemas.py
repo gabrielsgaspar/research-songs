@@ -153,6 +153,8 @@ def test_every_table_has_a_key_of_required_columns_and_known_types():
         "artists.parquet",
         "songs.parquet",
         "links.parquet",
+        "songs.parquet",
+        "artist_names.parquet",
     ]
 
 

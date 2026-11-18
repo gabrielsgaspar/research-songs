@@ -17,6 +17,9 @@ app.add_typer(lyrics_app, name="lyrics")
 panel_app = typer.Typer(no_args_is_help=True, help="Country-year panels.")
 app.add_typer(panel_app, name="panel")
 
+dumps_app = typer.Typer(no_args_is_help=True, help="Lyric dumps in the uniform format.")
+app.add_typer(dumps_app, name="dumps")
+
 data_app = typer.Typer(
     no_args_is_help=True, help="Copy version folders between the data folder and the bucket."
 )
@@ -209,3 +212,62 @@ def data_check(folder: FolderArgument) -> None:
     if problems:
         raise typer.Exit(1)
     typer.echo(f"{storage.version_folder(folder)}: every object matches the manifest")
+
+
+@dumps_app.command("build")
+def dumps_build(
+    source: Annotated[str, typer.Argument(help="Source key, lower case.")],
+    folder: Annotated[
+        Path, typer.Argument(help="Folder of the old dump. The command only reads it.")
+    ],
+    raw_input: Annotated[
+        str,
+        typer.Argument(help="raw/<source>/<YYYYMMDD>/ relative to the data folder."),
+    ],
+    family: Annotated[
+        str | None,
+        typer.Option(help="Format family. The command detects the family when this is omitted."),
+    ] = None,
+    day: Annotated[
+        str | None,
+        typer.Option(help="Build date as YYYYMMDD. The default is today, in UTC."),
+    ] = None,
+    incomplete: Annotated[
+        bool,
+        typer.Option("--incomplete", help="Mark the crawl as incomplete in the manifest."),
+    ] = False,
+) -> None:
+    """Read one old dump and write clean/dumps/<source>/<YYYYMMDD>/.
+
+    The date of the folder is the date of the build. The command reads the folder you name.
+    It does not choose a snapshot.
+    """
+    from songs.common.paths import data_root
+    from songs.stage_00_ingest.dumps import DumpError, build_dump
+
+    try:
+        result = build_dump(
+            source,
+            folder,
+            raw_input,
+            data_root(),
+            family=family,
+            day=day,
+            incomplete=incomplete,
+        )
+    except DumpError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    if result["skipped"]:
+        typer.echo(f"skipped {result['source']}: {result['reason']}")
+        return
+    typer.echo(
+        f"wrote {result['path']} ({result['rows_out']} songs, {result['artists_out']} artists, "
+        f"family {result['family']})"
+    )
+    for reason, count in result["dropped"].items():
+        typer.echo(f"dropped {reason}: {count}")
+    if result["credits_not_performer"]:
+        typer.echo(f"credits left out, not a performer: {result['credits_not_performer']}")
+    if result["incomplete"]:
+        typer.echo("note: the crawl is incomplete")
