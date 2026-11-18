@@ -257,7 +257,6 @@ SCORE_TOPICS = Table(
     folder=SCORES_FOLDER,
     rows="one row per scored song",
     key=("song_id",),
-    planned=True,
     columns=(
         Column("country_iso3", "string", True, "Country of the folder"),
         Column("song_id", "string", True, "Joins to `songs.parquet` of the country"),
@@ -278,7 +277,6 @@ SCORE_PROVENANCE = Table(
     folder=SCORES_FOLDER,
     rows="one row per scored song",
     key=("song_id",),
-    planned=True,
     columns=(
         Column("country_iso3", "string", True, "Country of the folder"),
         Column("song_id", "string", True, "Joins to `songs.parquet` of the country"),

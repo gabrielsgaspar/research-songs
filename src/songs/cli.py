@@ -119,6 +119,38 @@ def lyrics_import_old(
             typer.echo(f"note: {name}: {value} rows")
 
 
+@lyrics_app.command("import-scores")
+def lyrics_import_scores(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+    old_data: Annotated[
+        Path,
+        typer.Option(
+            "--old-data",
+            envvar="SONGS_OLD_DATA_ROOT",
+            help="Data folder of the old pipeline. The command only reads it.",
+        ),
+    ],
+) -> None:
+    """Import the topic scores of a country from the files of the old pipeline.
+
+    The command writes a new folder lyrics/<ISO3>/scores/<run id>/ in the data folder.
+    The scores join the newest songs folder of the country. The command calls no model.
+    """
+    code = iso3.upper()
+    if not run_records.ISO3.fullmatch(code):
+        raise typer.BadParameter(f"not a three-letter country code: {iso3}")
+    from songs.common.paths import data_root
+    from songs.stage_30_topics import old_scores
+
+    result = old_scores.import_scores(old_data, data_root(), code)
+    folder = result["path"].relative_to(data_root()).as_posix()
+    typer.echo(
+        f"wrote {folder}/ ({result['scores']} scores, "
+        f"{result['scores_no_song']} with no song, "
+        f"{result['scores_text_changed']} with changed text)"
+    )
+
+
 @lyrics_app.command("coverage")
 def lyrics_coverage(
     write: Annotated[bool, typer.Option("--write", help="Write the coverage page.")] = False,
