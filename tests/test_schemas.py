@@ -142,11 +142,35 @@ def test_the_score_table_has_one_column_per_topic_id():
     assert {column.type for column in s.SCORE_TOPICS.all_columns[3:]} == {"int16"}
 
 
-def test_every_table_has_a_key_of_required_columns_and_known_types():
+OPTIONAL_KEY = {
+    ("links.parquet", "discogs_release_id"),
+    ("links.parquet", "discogs_track_index"),
+}
+
+
+def test_a_link_with_no_catalog_track_fits():
+    frame = sample(s.COUNTRY_LINKS, rows=1)
+    frame[["discogs_release_id", "discogs_track_index"]] = None
+    assert s.check_table(s.COUNTRY_LINKS, s.cast_to_schema(s.COUNTRY_LINKS, frame)) == []
+
+
+def test_one_song_keeps_one_link_with_no_catalog_track():
+    frame = pd.concat([sample(s.COUNTRY_LINKS, rows=1)] * 2, ignore_index=True)
+    frame[["discogs_release_id", "discogs_track_index"]] = None
+    assert s.check_table(s.COUNTRY_LINKS, s.cast_to_schema(s.COUNTRY_LINKS, frame)) == [
+        "duplicate key (song_id, discogs_release_id, discogs_track_index): "
+        "1 keys have more than one row"
+    ]
+
+
+def test_every_table_has_a_key_and_known_types():
     for table in s.TABLES:
         columns = {column.name: column for column in table.all_columns}
         assert len(columns) == len(table.all_columns), table.file
-        assert table.key and all(columns[name].required for name in table.key), table.file
+        assert table.key, table.file
+        for name in table.key:
+            optional = (table.file, name) in OPTIONAL_KEY
+            assert columns[name].required is not optional, (table.file, name)
         assert all(column.type in s.TYPES and column.meaning for column in columns.values())
     assert [table.file for table in s.TABLES if not table.planned] == [
         "members.parquet",
