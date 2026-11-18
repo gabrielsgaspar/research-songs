@@ -320,16 +320,16 @@ These are renamed: the old `provider` becomes `source`, `provider_song_id` becom
 
 `clean/countries/<YYYYMMDD>/countries.parquet` has one row per country and year. `songs panel countries` builds it (`src/songs/stage_50_analysis/countries_panel.py`). The columns are `COUNTRY_COLUMNS` in that module. [Data sources](data_sources.md) says where each variable comes from. The manifest names every input file that the build read.
 
-## Score tables (planned)
+## Score tables
 
-No code writes these tables yet. Only a person starts a scoring run.
+`songs lyrics import-scores <ISO3>` writes these tables from the old topic scores. Only a person starts a scoring run. The command calls no model.
 
 <!-- generated:score_tables:start -->
 <!-- Do not edit by hand. To rebuild, run: python -m songs.common.schemas --write -->
 
 ### `topics.parquet`: one row per scored song
 
-Folder: `lyrics/<ISO3>/scores/<run id>/`. Key: `song_id`. Planned: no code writes this table yet.
+Folder: `lyrics/<ISO3>/scores/<run id>/`. Key: `song_id`.
 
 | Column | Type | Required | Meaning |
 | --- | --- | --- | --- |
@@ -340,7 +340,7 @@ Folder: `lyrics/<ISO3>/scores/<run id>/`. Key: `song_id`. Planned: no code write
 
 ### `provenance.parquet`: one row per scored song
 
-Folder: `lyrics/<ISO3>/scores/<run id>/`. Key: `song_id`. Planned: no code writes this table yet.
+Folder: `lyrics/<ISO3>/scores/<run id>/`. Key: `song_id`.
 
 | Column | Type | Required | Meaning |
 | --- | --- | --- | --- |
@@ -354,6 +354,26 @@ Folder: `lyrics/<ISO3>/scores/<run id>/`. Key: `song_id`. Planned: no code write
 | `scored_utc` | string | no | When the song was scored |
 
 <!-- generated:score_tables:end -->
+
+### How the import of the old scores fills the tables
+
+`songs lyrics import-scores <ISO3>` reads the old topic scores of one country and writes `lyrics/<ISO3>/scores/<run id>/` (`src/songs/stage_30_topics/old_scores.py`). The old data folder is `--old-data` or the environment variable `SONGS_OLD_DATA_ROOT`. The command only reads that folder.
+
+| Old file, under `lyrics/<iso3>/scores/` in the old data folder | Place in the tables |
+| --- | --- |
+| `topics.parquet`, columns `t1` to `t38` | `topics.parquet`, one column per topic id, in the order of `TOPIC_IDS` |
+| `topic_provenance.parquet`, or `provenance.parquet` when that file is absent | `provenance.parquet` |
+
+- A score joins a song on `song_id`. The manifest names the newest songs folder of the country that has a manifest.
+- A score with no song in that folder stays. The manifest counts it as `scores_no_song`.
+- `lyrics_sha256` is the value stored in the old provenance. The old scorer stored the SHA-256 of the lyric text that it scored. The command keeps that value.
+- When the song is in the songs folder and the two hashes differ, the lyric text changed after the score. The command keeps the score and keeps the stored hash. The manifest counts the row as `scores_text_changed`.
+- `prompt_sha256`, `model` and `text_kind` come from the provenance row. `status` is the old `measurement_status`. When a row has no value for one of these, or no `lyrics_sha256`, the command stops and writes no folder.
+- `scored_utc` is empty. The old files have no time of the score.
+- A topic cell that is empty stays empty. The old files leave every topic empty when the text is not song lyrics.
+- The command reads neither `values.parquet` nor `value_flags.parquet`. This project keeps topic scores only.
+- The command writes no collection run record. A score import is not a collection run.
+- The first manifest input is `lyrics/<iso3>/scores/`, relative to the old data folder. The second input is the songs folder.
 
 The old data also has value scores. This project scores topics only (decision 0005).
 
