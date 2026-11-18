@@ -5,9 +5,11 @@ Each check is a function that reads one file and returns the problems it finds.
 """
 
 import ast
+import io
 import json
 import re
 import subprocess
+import tokenize
 from collections.abc import Callable
 from pathlib import Path
 
@@ -149,6 +151,21 @@ def paragraph_hard_wrapped(path: str, text: str) -> list[str]:
     return problems
 
 
+CONSTRAINT_COMMENT = re.compile(
+    r"do not (change|remove|touch|edit)|don't (change|remove|touch|edit)|workaround|\bhack\b",
+    re.IGNORECASE,
+)
+
+
+def comment_stands_in_for_a_test(path: str, text: str) -> list[str]:
+    return [
+        f"{path}:{token.start[0]} has a comment that states a constraint or a workaround; "
+        "write a test that fails when the constraint is broken, then delete the comment"
+        for token in tokenize.generate_tokens(io.StringIO(text).readline)
+        if token.type == tokenize.COMMENT and CONSTRAINT_COMMENT.search(token.string)
+    ]
+
+
 # Each check, the files it reads, and one bad example that it must catch.
 CHECKS: list[tuple[Callable[[str, str], list[str]], str, str, str]] = [
     (figure_saved_without_save_png, SRC, ".py", 'fig.savefig("figure.png", dpi=200)'),
@@ -159,6 +176,8 @@ CHECKS: list[tuple[Callable[[str, str], list[str]], str, str, str]] = [
     (data_folder_built_by_hand, SRC, ".py", 'folder = Path("data")'),
     (retired_source_named, SRC, ".py", 'SOURCE = "gini_swiid"'),
     (bucket_named, "", "", 'ADDRESS = "gs://some-bucket/raw"'),
+    (comment_stands_in_for_a_test, SRC, ".py", "x = 1  # do not change: the panel needs it\n"),
+    (comment_stands_in_for_a_test, SRC, ".py", "# Workaround for the bad header row\nx = 1\n"),
     (paragraph_hard_wrapped, "", ".md", "A paragraph that goes on\nto a second line.\n"),
     (paragraph_hard_wrapped, "", ".md", "- A list item that goes on\n  to a second line.\n"),
 ]
@@ -216,6 +235,20 @@ def test_the_settings_deny_a_merge_by_an_agent():
     ]["deny"]
     assert any(rule.startswith("Bash(gh pr merge") for rule in deny), (
         ".claude/settings.json must deny `gh pr merge`; agents never merge"
+    )
+
+
+def test_no_new_workflow_while_most_rules_have_no_check():
+    """Automation waits for the checks. `ci.yml` and the three agent workflows exist already."""
+    known = {"ci.yml", "agent-plan.yml", "agent-build.yml", "agent-review.yml"}
+    new = sorted(
+        Path(path).name for path in tracked(".github/workflows/") if Path(path).name not in known
+    )
+    listed = rules.load_rules()
+    unchecked = sum(1 for rule in listed if not rule.tests)
+    assert not new or unchecked * 2 <= len(listed), (
+        f"new workflows {new}, but {unchecked} of {len(listed)} rules have no check; "
+        "add checks first (docs/standards/rules.md shows the rules that have none)"
     )
 
 

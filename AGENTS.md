@@ -91,6 +91,9 @@ This file holds the rules. The details live in the files below. Read the one tha
 - Logic lives in `src/songs/` with tests. Scripts and command-line entry points stay thin.
 - Organize code by what it does, not by who asked for it or when. Before you add a module, look for one that already does the job and extend it.
 - Python 3.14, uv, ruff, pytest. Prefer the standard library, then polars or duckdb for data.
+- Code that moves into this repository leaves its old patterns behind. Each job has one implementation. Do not move a second copy; delete it or merge it first.
+- A comment enforces nothing. A comment that says "do not change" or "do not remove", or that names a workaround, is not allowed in `src/`. Write a test that fails when the constraint is broken, then delete the comment.
+- Every importer and every analysis reports its rows: rows in, rows out, and rows left out with the reason for each. A result with no row counts is not finished.
 - Agents do not add dependencies. A person adds a package in its own pull request (`uv add <package>`) before the task that needs it.
 - `.gitignore` patterns for folders are anchored to the root (`/data/`, not `data/`). A test lists paths that must stay committable.
 
@@ -120,6 +123,7 @@ This file holds the rules. The details live in the files below. Read the one tha
 ### Git
 
 - `main` accepts only pull requests. CI must pass. Gabriel merges.
+- A task is done when CI on GitHub passes for its pull request. Tests that pass on one computer are not enough: read the CI result before you report.
 - Work on a short branch: `<topic>/<short-name>` for Gabriel and agents, `<github-username>/<short-name>` for everyone else. Delete the branch after the merge.
 - One pull request does one thing. Its description says what changed and why.
 - Never force-push. Never rewrite pushed history.
@@ -131,6 +135,8 @@ This file holds the rules. The details live in the files below. Read the one tha
 - Three agents can work on an issue: a planner, a builder and a reviewer. A person with write access starts each stage with a label (`agent-plan`, then `agent-build`), and a person merges. `prompts/roles/README.md` describes the flow.
 - A plan lists every file it changes. A build changes only those files.
 - A stop always states the real cause.
+- When the same mistake happens twice, fix it with a check, not with a new sentence in this file. Add a test, and name it in `resources/rules.toml`. Write a rule with no test only for a matter of judgment.
+- Do not add an agent workflow or an automatic merge while more than half of the rules in `docs/standards/rules.md` have no check. Automation on weak checks makes weak work faster.
 - When a decision, a large data change or the end of a campaign happens, record it: a decision file for a real choice, a run record for a run. Do not record noise.
 
 ### Writing

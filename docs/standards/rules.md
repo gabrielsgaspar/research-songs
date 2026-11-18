@@ -9,8 +9,8 @@ It answers one question: what fails when someone breaks a rule? A rule that is "
 | Status | Rules |
 | --- | --- |
 | Checked | 7 |
-| Partly checked | 13 |
-| Not checked | 27 |
+| Partly checked | 15 |
+| Not checked | 31 |
 
 When you add a rule to `AGENTS.md`, add a test for it and name the test in `resources/rules.toml`. If no test can check the rule, it stays not checked.
 
@@ -52,6 +52,9 @@ When you add a rule to `AGENTS.md`, add a test for it and name the test in `reso
 | Logic lives in `src/songs/` with tests. Scripts and command-line entry points stay thin. | not checked |
 | Organize code by what it does, not by who asked for it or when. Before you add a module, look for one that already does the job and extend it. | not checked |
 | Python 3.14, uv, ruff, pytest. Prefer the standard library, then polars or duckdb for data. | not checked |
+| Code that moves into this repository leaves its old patterns behind. Each job has one implementation. Do not move a second copy; delete it or merge it first. | not checked |
+| A comment enforces nothing. A comment that says "do not change" or "do not remove", or that names a workaround, is not allowed in `src/`. Write a test that fails when the constraint is broken, then delete the comment. | Partly: comments with the words "do not change", "do not remove", "workaround" or "hack" are found; the same idea in other words is not<br>`tests/test_code_rules.py::test_the_code_follows_the_rule` |
+| Every importer and every analysis reports its rows: rows in, rows out, and rows left out with the reason for each. A result with no row counts is not finished. | not checked |
 | Agents do not add dependencies. A person adds a package in its own pull request (`uv add <package>`) before the task that needs it. | not checked |
 | `.gitignore` patterns for folders are anchored to the root (`/data/`, not `data/`). A test lists paths that must stay committable. | `tests/test_repo_rules.py::test_gitignore_keeps_project_paths` |
 
@@ -91,6 +94,7 @@ When you add a rule to `AGENTS.md`, add a test for it and name the test in `reso
 | Rule | Checked by |
 | --- | --- |
 | `main` accepts only pull requests. CI must pass. Gabriel merges. | not checked |
+| A task is done when CI on GitHub passes for its pull request. Tests that pass on one computer are not enough: read the CI result before you report. | not checked |
 | Work on a short branch: `<topic>/<short-name>` for Gabriel and agents, `<github-username>/<short-name>` for everyone else. Delete the branch after the merge. | not checked |
 | One pull request does one thing. Its description says what changed and why. | not checked |
 | Never force-push. Never rewrite pushed history. | not checked |
@@ -104,6 +108,8 @@ When you add a rule to `AGENTS.md`, add a test for it and name the test in `reso
 | Three agents can work on an issue: a planner, a builder and a reviewer. A person with write access starts each stage with a label (`agent-plan`, then `agent-build`), and a person merges. `prompts/roles/README.md` describes the flow. | Partly: each role file loads and its workflow uses it; who may add a label is set on GitHub, not here<br>`tests/test_agent_roles.py::test_role_file_loads_and_its_workflow_uses_it` |
 | A plan lists every file it changes. A build changes only those files. | Partly: the workflows protect the same paths; the comparison of a build with its plan runs in the workflow, not in a test<br>`tests/test_agent_roles.py::test_the_three_workflows_protect_the_same_paths` |
 | A stop always states the real cause. | not checked |
+| When the same mistake happens twice, fix it with a check, not with a new sentence in this file. Add a test, and name it in `resources/rules.toml`. Write a rule with no test only for a matter of judgment. | not checked |
+| Do not add an agent workflow or an automatic merge while more than half of the rules in `docs/standards/rules.md` have no check. Automation on weak checks makes weak work faster. | Partly: a new workflow file and a merge command in an agent workflow are found; automation that runs outside this repository is not<br>`tests/test_code_rules.py::test_no_new_workflow_while_most_rules_have_no_check`<br>`tests/test_agent_roles.py::test_no_agent_workflow_merges_or_trusts_every_bot` |
 | When a decision, a large data change or the end of a campaign happens, record it: a decision file for a real choice, a run record for a run. Do not record noise. | not checked |
 
 ## Writing
