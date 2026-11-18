@@ -74,8 +74,10 @@ tests = [
     "tests/test_run_records.py::test_record_run_writes_a_complete_record",
     "tests/test_run_records.py::test_record_run_writes_a_failed_record_and_raises_again",
     "tests/test_run_records.py::test_the_committed_coverage_page_is_current",
+    "tests/test_lyric_sources.py::test_a_run_record_may_name_only_a_registered_source",
+    "tests/test_lyric_sources.py::test_every_committed_run_record_names_a_registered_source",
 ]
-part = "a record written through `record_run` is complete, and every committed record is valid; a command that writes no record is not found"
+part = "a record written through `record_run` is complete, every committed record is valid, and its source is in `resources/lyric_sources.toml`; a command that writes no record is not found"
 
 # --- Code ---------------------------------------------------------------------------
 
