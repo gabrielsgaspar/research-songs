@@ -218,14 +218,24 @@ COUNTRY_SONGS = Table(
 COUNTRY_LINKS = Table(
     file="links.parquet",
     folder=COUNTRY_FOLDER,
-    rows="one row per match between a catalog track and a song",
+    rows="one row per link from a song to a source page",
     key=("song_id", "discogs_release_id", "discogs_track_index"),
     columns=(
         Column("country_iso3", "string", True, "Country of the folder"),
         Column("song_id", "string", True, "Joins to `songs.parquet`"),
         Column("artist_id", "string", True, "Joins to `artists.parquet`"),
-        Column("discogs_release_id", "string", True, "Release on the catalog side"),
-        Column("discogs_track_index", "string", True, "Position of the track in the release"),
+        Column(
+            "discogs_release_id",
+            "string",
+            False,
+            "Release on the catalog side. Empty when the link has no catalog track",
+        ),
+        Column(
+            "discogs_track_index",
+            "string",
+            False,
+            "Position of the track in the release. Empty when the link has no catalog track",
+        ),
         Column("discogs_title", "string", False, "Track title in the catalog"),
         Column("source", "string", True, "Same meaning as in `songs.parquet`"),
         Column("source_song_id", "string", False, "Id of the song at the source"),

@@ -240,7 +240,7 @@ Folder: `lyrics/<ISO3>/songs/<run id>/`. Key: `song_id`.
 | `run_id` | string | yes | Run that added or last replaced the row |
 | `collected_utc` | string | no | When the lyrics were fetched or imported |
 
-### `links.parquet`: one row per match between a catalog track and a song
+### `links.parquet`: one row per link from a song to a source page
 
 Folder: `lyrics/<ISO3>/songs/<run id>/`. Key: `song_id`, `discogs_release_id`, `discogs_track_index`.
 
@@ -249,8 +249,8 @@ Folder: `lyrics/<ISO3>/songs/<run id>/`. Key: `song_id`, `discogs_release_id`, `
 | `country_iso3` | string | yes | Country of the folder |
 | `song_id` | string | yes | Joins to `songs.parquet` |
 | `artist_id` | string | yes | Joins to `artists.parquet` |
-| `discogs_release_id` | string | yes | Release on the catalog side |
-| `discogs_track_index` | string | yes | Position of the track in the release |
+| `discogs_release_id` | string | no | Release on the catalog side. Empty when the link has no catalog track |
+| `discogs_track_index` | string | no | Position of the track in the release. Empty when the link has no catalog track |
 | `discogs_title` | string | no | Track title in the catalog |
 | `source` | string | yes | Same meaning as in `songs.parquet` |
 | `source_song_id` | string | no | Id of the song at the source |
@@ -264,7 +264,7 @@ Folder: `lyrics/<ISO3>/songs/<run id>/`. Key: `song_id`, `discogs_release_id`, `
 
 `songs.parquet` of a country holds lyric text. It never goes to Git.
 
-A link says: this Discogs track is this song from this source. One song can have many links. A hand-collected song has no catalog track, so it has no link.
+A link records the source page of a song. `discogs_release_id` and `discogs_track_index` name the catalog track when the link has one. Both columns are empty when the link has no catalog track, and the row stays. One song can have many links. The key includes those two columns, so one song has at most one link with both of them empty. The import of a review workbook writes songs and no link rows.
 
 The rule for eligible songs (decision 0007) is not built yet. It will read `duplicate_decision` and `quality_status`; that is why these columns stay.
 
@@ -310,8 +310,8 @@ These are renamed: the old `provider` becomes `source`, `provider_song_id` becom
 - **Time.** An old time is UTC text with the offset `+00:00`. The import writes it as a UTC second. A time with another offset, or text that is not a time, is left empty and counted (`songs_time_not_read`).
 - **Artists.** `artist_id` is the old value. `artist_name` is the `name` of the roster, and `country_tag` is `country_basis`. `attempted` is true when the roster marks the artist as scraped or holds a time for it; that time is `last_attempt_utc`. The roster has no Discogs id. The import makes the artist id of each Discogs id in the Discogs cache of the country and joins on it; an artist that the cache does not hold has no `discogs_artist_id`. An artist with songs that the roster does not have gets a row with the name of its songs.
 - **Two names with one id.** When an artist id appears again in the roster, the first row stays. `songs.parquet` keeps each name as collected.
-- **Links.** `source_title` is the old `provider_title`. `match_score` becomes a number. `artist_id` is the artist of the song.
-- **Rows that are dropped.** Only these rules drop a row, and the manifest counts each one. A song row: no `song_id`; no lyrics, or only blank text; no `provider`; no artist id, or no artist name in the row and in the roster; a `song_id` that a run with another route already holds; a `song_id` that appears again (the row with the newest time stays). A link row: no Discogs release or no track position (it gives a title, but it is not a match with a catalog track); a song that is not in `songs.parquet`; a key that appears again (the row with the highest `match_score` stays). A roster row: no artist id or no name; an artist id that appears again.
+- **Links.** `source_title` is the old `provider_title`. `match_score` becomes a number. `artist_id` is the artist of the song. A row with no Discogs release or no track position stays. `discogs_release_id` and `discogs_track_index` are empty, and the row still records the source page.
+- **Rows that are dropped.** Only these rules drop a row, and the manifest counts each one. A song row: no `song_id`; no lyrics, or only blank text; no `provider`; no artist id, or no artist name in the row and in the roster; a `song_id` that a run with another route already holds; a `song_id` that appears again (the row with the newest time stays). A link row: a song that is not in `songs.parquet`; a key that appears again (the row with the highest `match_score` stays). A roster row: no artist id or no name; an artist id that appears again.
 - **A second import.** The old pipeline still writes, so a country can be imported again. The command then needs `--reason`, and the reason goes to the run record. The new folder holds the old files as they are now, and the rows that a run with another route added to the earlier folder. The manifest names the earlier folder as an input, and counts the songs that are new (`songs_added`) and the songs that are gone (`songs_removed`).
 - **Inputs.** The first input in the manifest is `lyrics/<iso3>/`, relative to the old data folder. The manifest also counts the old files that the import read (`old_lyric_files`, `old_link_files`).
 - The import does not filter songs for analysis. `duplicate_decision` and `quality_status` stay as columns.

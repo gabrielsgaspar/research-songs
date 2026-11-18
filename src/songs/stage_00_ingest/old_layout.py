@@ -75,7 +75,7 @@ SONG_DROPS = (
     "held_by_other_route",
     "duplicate_song_id",
 )
-LINK_DROPS = ("no_catalog_track", "no_song", "duplicate_key")
+LINK_DROPS = ("no_song", "duplicate_key")
 # An old time is UTC text with the offset +00:00, and can have a fraction of a second. The
 # layout wants a UTC second. The cast ignores an offset, so a time with another offset is
 # read as empty, and never as a wrong UTC time.
@@ -286,11 +286,7 @@ def _write_country(
                 p.artist_id,
                 p.source AS song_source,
                 p.song_url AS song_page,
-                CASE
-                    WHEN l.discogs_release_id IS NULL OR l.discogs_track_index IS NULL
-                        THEN 'no_catalog_track'
-                    WHEN p.song_id IS NULL THEN 'no_song'
-                END AS fault
+                CASE WHEN p.song_id IS NULL THEN 'no_song' END AS fault
             FROM old_links AS l
             LEFT JOIN (SELECT * FROM picked WHERE status = 'keep') AS p ON p.song_id = l.song_id
         )

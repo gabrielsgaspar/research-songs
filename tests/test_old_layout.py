@@ -166,7 +166,7 @@ def test_the_command_maps_each_column_and_writes_a_manifest_and_one_run_record(
     monkeypatch.setattr(run_records, "countries_dir", lambda: countries)
     result = CliRunner().invoke(app, ["lyrics", "import-old", "tgo"])
     assert result.exit_code == 0, result.output
-    assert "3 songs, 4 artists, 2 links" in result.output
+    assert "3 songs, 4 artists, 3 links" in result.output
     assert "invented line" not in result.output
     assert snapshot(old) == before  # the old data folder is read only
 
@@ -251,9 +251,17 @@ def test_the_command_maps_each_column_and_writes_a_manifest_and_one_run_record(
         "match_method": "exact",
         "run_id": record.run_id,
     }
-    assert table(schemas.COUNTRY_LINKS, out, "discogs_release_id") == [
+    assert table(schemas.COUNTRY_LINKS, out, "discogs_release_id NULLS LAST") == [
         link_row | {"discogs_release_id": "10", "discogs_track_index": "2", "match_score": None},
         link_row | {"discogs_release_id": "9", "discogs_track_index": "A1", "match_score": 0.9},
+        # No Discogs track. The row stays, and it still records the source page.
+        link_row
+        | {
+            "discogs_release_id": None,
+            "discogs_track_index": None,
+            "source_title": "Zed",
+            "match_score": 0.1,
+        },
     ]
 
     manifest = manifests.read_manifest(out)
@@ -266,7 +274,7 @@ def test_the_command_maps_each_column_and_writes_a_manifest_and_one_run_record(
     assert manifest.counts == {
         "songs": 3,
         "artists": 4,
-        "links": 2,
+        "links": 3,
         "songs_added": 3,
         "songs_removed": 0,
         "songs_from_other_routes": 0,
@@ -278,7 +286,6 @@ def test_the_command_maps_each_column_and_writes_a_manifest_and_one_run_record(
         "songs_dropped_no_artist": 1,
         "songs_dropped_held_by_other_route": 0,
         "songs_dropped_duplicate_song_id": 1,
-        "links_dropped_no_catalog_track": 1,
         "links_dropped_no_song": 1,
         "links_dropped_duplicate_key": 1,
         "roster_rows_dropped_no_id_or_name": 1,
@@ -425,10 +432,14 @@ def test_an_import_keeps_the_rows_that_another_route_added(tmp_path):
         result["songs_removed"],
     ) == (2, 1, 2, 1)
     links = schemas.read_table(schemas.COUNTRY_LINKS, out)
-    assert sorted(links.project("song_id, discogs_release_id").fetchall()) == [
+    assert sorted(
+        links.project("song_id, discogs_release_id").fetchall(),
+        key=lambda row: (row[0], row[1] is None, row[1] or ""),
+    ) == [
         ("live_1", "7"),
         ("s1", "10"),
         ("s1", "9"),
+        ("s1", None),
     ]
     artists = schemas.read_table(schemas.COUNTRY_ARTISTS, out)
     assert artists.project("artist_name, country_tag, attempted, songs").fetchall() == [
