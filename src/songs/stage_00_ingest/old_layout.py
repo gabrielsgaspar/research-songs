@@ -455,7 +455,7 @@ def import_country(
                 "Give a reason to import it again."
             )
     with run_records.record_run(
-        iso3, ROUTE, SOURCE, countries=countries, notes=reason or ""
+        iso3, ROUTE, SOURCE, countries=countries, repeat_reason=reason
     ) as record:
         earlier = paths.latest_country_songs_dir(data, iso3)
         # The first input is relative to the old data folder; no path of that folder is recorded.
@@ -483,6 +483,14 @@ def import_country(
             ),
         )
         record.rows_added = counts["songs_added"]
+        record.requests_sent, record.limits_hit = 0, {}
+        record.songs_rejected = {
+            name.removeprefix("songs_dropped_"): value
+            for name, value in counts.items()
+            if name.startswith("songs_dropped_") and value
+        }
+        record.songs_accepted = counts["songs"]
+        record.songs_attempted = counts["songs"] + sum(record.songs_rejected.values())
         record.known_gaps = [
             f"{name}: {value} rows"
             for name, value in counts.items()

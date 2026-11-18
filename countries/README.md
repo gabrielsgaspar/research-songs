@@ -5,6 +5,7 @@ One folder per country, named by its ISO 3166-1 alpha-3 code (`BRA`, `NGA`, `JPN
 ```
 countries/<ISO3>/
   runs/        one JSON file per collection run, written by the command that ran
+  campaigns/   two JSON files per campaign: one when it opens, one when it closes
   notes.md     known gaps and their causes (optional, written by people)
 ```
 
@@ -25,8 +26,41 @@ Each run writes the full tables of the country to a new folder, and the name of 
 Read what already ran, so the same job does not run twice:
 
 ```bash
-uv run songs lyrics history BRA
+uv run songs lyrics plan BRA
 ```
+
+The plan lists each source that can serve the country. For a source that already ran, it shows the last run: date, route, duration, delay, limits, requests sent, songs accepted of songs attempted, rejections by reason, and limits that were hit. Then it shows what the last closed campaign said to try next. `uv run songs lyrics history BRA` lists every run, with its duration and its campaign.
+
+A run that repeats a complete run is refused before any work. The same job is the same country, route, source, bulk file, request delay, artist limit and song limit. To run it again, change a setting or give a reason; the reason goes to `notes` of the new record.
+
+## Campaigns
+
+A campaign is one effort with a goal for one country, for example "add songs before 1990". It is made of several runs. Open the campaign before its first run and close it after its last run:
+
+```bash
+uv run songs lyrics campaign open BRA --goal "Add songs before 1990"
+uv run songs lyrics campaign close BRA --outcome complete --next-time "Raise the song limit from 5 to 20."
+uv run songs lyrics campaign list BRA
+```
+
+Each run that starts while the campaign is open carries its id in `campaign_id`. Nobody types the list of runs. A country has at most one open campaign.
+
+The close command refuses an empty `--next-time`. That text is what a later campaign reads first, so write what to try next, or why no more work is useful. The outcomes `stopped` and `abandoned` also need `--reason`.
+
+A campaign has two files in `countries/<ISO3>/campaigns/`: `<campaign id>_open.json` and `<campaign id>_close.json`. Each file is written one time and never changed. A campaign with no close file is open. The name of a campaign never appears in a folder name of the data.
+
+| Field | File | Meaning |
+| --- | --- | --- |
+| `iso3` | both | Country code |
+| `campaign_id` | both | Time the campaign opened in UTC, `YYYYMMDDTHHMMSSZ` |
+| `goal` | open | What the campaign must reach |
+| `opened_utc` | open | Time the campaign opened |
+| `songs_before` | open | Songs of the country at the start. The command reads the newest songs folder; `--songs` gives the number by hand |
+| `closed_utc` | close | Time the campaign closed |
+| `songs_after` | close | Songs of the country at the end |
+| `outcome` | close | `complete`, `stopped` or `abandoned` |
+| `reason` | close | Why the campaign stopped |
+| `next_time` | close | What the next campaign must try |
 
 ## Run records
 
@@ -47,10 +81,19 @@ A collection command writes one record when it ends, also when it fails. Nobody 
 | `deadline_utc` | Time limit set for the run |
 | `artists_attempted`, `rows_added` | What the run did |
 | `known_gaps` | What the run could not get, one line each |
+| `campaign_id` | The campaign that was open when the run started |
+| `requests_sent` | Requests sent to the source. A run on a local copy sends 0 |
+| `songs_attempted`, `songs_accepted` | Songs that the run looked at, and songs that passed its checks |
+| `songs_rejected` | Songs that failed a check: the reason, then the count |
+| `limits_hit` | Limits that stopped work early: the name of the limit, then the number of artists or a note. An empty value `{}` means that no limit was hit |
 | `notes` | Anything else a later reader needs |
 | `backfilled` | `true` when the record was rebuilt later from old run files |
 
 An empty value means "not recorded". It never means zero.
+
+The duration of a run has no field. The commands compute it from `started_utc` and `ended_utc`.
+
+Records of schema version 1 do not have the fields from `campaign_id` to `limits_hit`. They still load, and each of these fields reads as "not recorded".
 
 ## Routes
 

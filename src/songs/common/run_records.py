@@ -16,7 +16,9 @@ from songs.common import lyric_sources
 from songs.common.paths import ISO3, RUN_ID, SOURCE, project_paths, resolve_project_root
 from songs.common.repo import git_sha
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+# Version 1 has no campaign and no counts of requests, songs and limits. It still loads.
+SCHEMA_VERSIONS = (1, 2)
 ROUTES = (
     "live",
     "roster_update",
@@ -30,6 +32,8 @@ ROUTES = (
     "old_layout",
 )
 STATES = ("complete", "partial", "failed")
+# The settings that make two runs of one country, route and source "the same job".
+JOB_SETTINGS = ("bulk_file", "request_delay_seconds", "artist_limit", "song_limit")
 COVERAGE_PAGE = Path("docs") / "status" / "coverage.md"
 COVERAGE_COMMAND = "uv run songs lyrics coverage --write"
 
@@ -54,6 +58,12 @@ class RunRecord:
     artists_attempted: int | None = None
     rows_added: int | None = None
     known_gaps: list[str] = field(default_factory=list)
+    campaign_id: str | None = None
+    requests_sent: int | None = None
+    songs_attempted: int | None = None
+    songs_accepted: int | None = None
+    songs_rejected: dict[str, int] | None = None
+    limits_hit: dict[str, int | str] | None = None
     notes: str = ""
     backfilled: bool = False
     schema_version: int = SCHEMA_VERSION
@@ -76,6 +86,10 @@ class RunRecord:
             )
         if self.state not in STATES:
             problems.append(f"state must be one of {STATES}, got {self.state!r}")
+        if self.campaign_id is not None and not RUN_ID.fullmatch(self.campaign_id):
+            problems.append(f"campaign_id must look like a run id, got {self.campaign_id!r}")
+        if self.schema_version not in SCHEMA_VERSIONS:
+            problems.append(f"schema_version must be one of {SCHEMA_VERSIONS}")
         if self.bulk_file and "://" in self.bulk_file:
             problems.append("bulk_file is a path inside the bucket, without scheme or bucket name")
         if problems:
@@ -132,6 +146,34 @@ def read_run_records(iso3: str | None = None, countries: Path | None = None) -> 
     return sorted(records, key=lambda record: (record.iso3, record.run_id, record.route))
 
 
+def open_campaign_id(iso3: str, countries: Path | None = None) -> str | None:
+    """Return the id of the open campaign of a country, or None.
+
+    A campaign is open when it has an open file and no close file
+    (`songs.common.campaigns` writes both).
+    """
+    folder = (countries or countries_dir()) / iso3 / "campaigns"
+    closed = {path.name.removesuffix("_close.json") for path in folder.glob("*_close.json")}
+    opened = {path.name.removesuffix("_open.json") for path in folder.glob("*_open.json")}
+    return max(opened - closed, default=None)
+
+
+def check_not_repeated(record: RunRecord, earlier: list[RunRecord], reason: str | None) -> None:
+    """Raise FileExistsError when a complete run already did the same job and no reason is given.
+
+    The same job is the same country, route, source and `JOB_SETTINGS`.
+    """
+    job = [getattr(record, name) for name in ("iso3", "route", "source", *JOB_SETTINGS)]
+    for past in earlier:
+        same = [getattr(past, name) for name in ("iso3", "route", "source", *JOB_SETTINGS)]
+        if past.state == "complete" and same == job and not (reason or "").strip():
+            raise FileExistsError(
+                f"run {past.run_id} already did this job for {record.iso3}: route {record.route}, "
+                f"source {record.source}, the same bulk file, delay and limits. "
+                "Use its result, change a setting, or give a reason for a second run."
+            )
+
+
 @contextmanager
 def record_run(
     iso3: str,
@@ -139,6 +181,7 @@ def record_run(
     source: str,
     *,
     countries: Path | None = None,
+    repeat_reason: str | None = None,
     **settings: object,
 ) -> Iterator[RunRecord]:
     """Open a run and write its record when the block ends, also when it fails.
@@ -146,6 +189,10 @@ def record_run(
     The caller sets results on the yielded record (`rows_added`, `known_gaps`,
     `state = "partial"`). An exception sets the state to "failed", names the
     error type in `notes`, writes the record, and is raised again.
+
+    The run joins the open campaign of the country, when there is one. A run that
+    repeats a complete run with the same settings is refused before any work,
+    unless `repeat_reason` says why; the reason goes to `notes`.
     """
     record = RunRecord(
         iso3=iso3,
@@ -159,6 +206,11 @@ def record_run(
         **settings,  # type: ignore[arg-type]
     )
     record.validate()
+    check_not_repeated(record, read_run_records(iso3, countries), repeat_reason)
+    if repeat_reason and repeat_reason.strip():
+        record.notes = f"{record.notes} {repeat_reason.strip()}".strip()
+    if record.campaign_id is None:
+        record.campaign_id = open_campaign_id(iso3, countries)
     try:
         yield record
     except BaseException as error:
@@ -168,6 +220,24 @@ def record_run(
     finally:
         record.ended_utc = utc_now()
         write_run_record(record, countries)
+
+
+def duration_text(record: RunRecord) -> str:
+    """Return how long a run took, such as "1 h 5 min", or "" when a time is absent."""
+    try:
+        start, end = (
+            datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+            for value in (record.started_utc, record.ended_utc)
+        )
+    except ValueError:
+        return ""
+    if end < start:
+        return ""
+    minutes, seconds = divmod(int((end - start).total_seconds()), 60)
+    if minutes < 1:
+        return f"{seconds} s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours} h {minutes} min" if hours else f"{minutes} min"
 
 
 def format_history(records: list[RunRecord]) -> str:
@@ -187,9 +257,12 @@ def format_history(records: list[RunRecord]) -> str:
         )
         rows = "rows not recorded" if record.rows_added is None else f"{record.rows_added} rows"
         marks = " (backfilled)" if record.backfilled else ""
+        took = duration_text(record)
+        campaign = f"; campaign {record.campaign_id}" if record.campaign_id else ""
         lines.append(
             f"{record.iso3} {record.started_utc[:10]} {record.route} {record.source}: "
-            f"{record.state}, {rows}{'; ' + limits if limits else ''}{marks}"
+            f"{record.state}, {rows}{', ' + took if took else ''}"
+            f"{'; ' + limits if limits else ''}{campaign}{marks}"
         )
         lines.extend(f"    gap: {gap}" for gap in record.known_gaps)
     return "\n".join(lines)

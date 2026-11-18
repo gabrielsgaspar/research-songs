@@ -21,6 +21,7 @@ stays in the data folder; it never goes to Git, to a manifest or to a run record
 """
 
 import hashlib
+import re
 import uuid
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -33,6 +34,8 @@ from songs.common.years import is_admissible_year
 
 ROUTE = paths.MANUAL_REVIEW
 SOURCE = "review_workbook"
+# A line of `read_added_songs` for songs that it left out: the count, then the reason.
+LEFT_OUT = re.compile(r"(\d+) added songs left out: (.+)")
 # The workbook marks a song that was already in the data with this text. Reviewers mark
 # the songs they add in their own words, so every other row counts as added.
 ALREADY_IN_DATA = "Link in our files"
@@ -297,6 +300,11 @@ def import_workbook(data: Path, iso3: str, *, countries: Path | None = None) -> 
             notes=f"Songs that a person added to the review workbook {bulk_file}.",
         )
         record.rows_added = counts["songs_added"]
+        record.requests_sent, record.limits_hit = 0, {}
+        left_out = (LEFT_OUT.fullmatch(gap) for gap in gaps)
+        record.songs_rejected = {found[2]: int(found[1]) for found in left_out if found}
+        record.songs_accepted = len(reviewed)
+        record.songs_attempted = len(reviewed) + sum(record.songs_rejected.values())
         record.artists_attempted = int(reviewed["artist_id"].nunique())
         record.known_gaps = gaps
     return {"path": out, "gaps": gaps, **counts}

@@ -69,6 +69,11 @@ part = "bucket addresses outside `tests/` and defaults in the settings; a projec
 # --- Countries and runs -----------------------------------------------------------
 
 [[check]]
+rule = "Never run the same job twice."
+tests = ["tests/test_campaigns.py::test_the_same_job_does_not_run_twice_without_a_reason"]
+part = "a run through `record_run` that repeats a complete run with the same route, source, bulk file, delay and limits is refused unless it gives a reason; a job that differs only in a setting outside the record is not found"
+
+[[check]]
 rule = "Every collection run writes one run record"
 tests = [
     "tests/test_run_records.py::test_record_run_writes_a_complete_record",
@@ -76,6 +81,7 @@ tests = [
     "tests/test_run_records.py::test_the_committed_coverage_page_is_current",
     "tests/test_lyric_sources.py::test_a_run_record_may_name_only_a_registered_source",
     "tests/test_lyric_sources.py::test_every_committed_run_record_names_a_registered_source",
+    "tests/test_campaigns.py::test_a_record_of_schema_version_1_still_loads",
 ]
 part = "a record written through `record_run` is complete, every committed record is valid, and its source is in `resources/lyric_sources.toml`; a command that writes no record is not found"
 
@@ -84,6 +90,14 @@ part = "a record written through `record_run` is complete, every committed recor
 [[check]]
 rule = "`.gitignore` patterns for folders"
 tests = ["tests/test_repo_rules.py::test_gitignore_keeps_project_paths"]
+
+[[check]]
+rule = "Every importer and every analysis reports its rows"
+tests = [
+    "tests/test_review_workbooks.py::test_the_command_writes_the_country_tables_a_manifest_and_one_run_record",
+    "tests/test_old_layout.py::test_the_command_maps_each_column_and_writes_a_manifest_and_one_run_record",
+]
+part = "the two importers that write a run record put songs attempted, accepted and rejected by reason in it; other importers and the analyses are not checked"
 
 [[check]]
 rule = "A comment enforces nothing."
