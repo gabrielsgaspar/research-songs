@@ -1,0 +1,161 @@
+# Which tests check which rule of AGENTS.md.
+#
+# One [[check]] block per rule that a test checks. A rule of AGENTS.md with no
+# block here is "not checked". `docs/standards/rules.md` is generated from this
+# file and from AGENTS.md; a test fails when that page is out of date.
+#
+# Fields:
+#   rule   the first words of the rule in AGENTS.md, enough to match one rule only
+#   tests  the tests that fail when the rule is broken, as `file::test name`
+#   part   only when the tests check a part of the rule: what they do not check
+#
+# After an edit, rebuild the page:
+#   python -m songs.common.rules --write
+
+# --- Data ---------------------------------------------------------------------
+
+[[check]]
+rule = "Data never goes to Git."
+tests = [
+    "tests/test_repo_rules.py::test_no_data_files_outside_fixtures",
+    "tests/test_repo_rules.py::test_gitignore_blocks_data_and_secrets",
+]
+
+[[check]]
+rule = "Code finds the local data folder"
+tests = [
+    "tests/test_code_rules.py::test_the_code_follows_the_rule",
+    "tests/test_common.py::test_data_root_follows_the_environment_variable",
+]
+
+[[check]]
+rule = "Raw data is write-once."
+tests = [
+    "tests/test_schemas.py::test_a_writer_checks_before_it_writes_and_never_writes_over_a_file",
+    "tests/test_storage.py::test_an_object_with_other_bytes_is_an_error_and_is_kept",
+    "tests/test_countries_panel.py::test_build_stops_on_absent_inputs_and_never_writes_over_a_panel",
+]
+part = "the shared writers refuse to write over a file; code that deletes a file by another way is not found"
+
+[[check]]
+rule = "Fixtures are small text files"
+tests = ["tests/test_repo_rules.py::test_fixtures_are_small"]
+part = "the size is checked; that a fixture is text is not"
+
+[[check]]
+rule = "Every text read, write and `open()`"
+tests = ["tests/test_repo_rules.py::test_text_io_names_its_encoding"]
+
+# --- This repository is public --------------------------------------------------
+
+[[check]]
+rule = "No credentials, tokens or keys"
+tests = ["tests/test_repo_rules.py::test_gitignore_blocks_data_and_secrets"]
+part = "Git ignores `.env` and key files; a secret typed into a tracked file is not found"
+
+[[check]]
+rule = "No personal details"
+tests = ["tests/test_repo_rules.py::test_no_email_addresses_in_the_repository"]
+part = "email addresses only; names and private notes are not found"
+
+[[check]]
+rule = "No identifiers of private resources"
+tests = [
+    "tests/test_code_rules.py::test_the_code_follows_the_rule",
+    "tests/test_common.py::test_config_has_no_defaults_for_private_identifiers",
+]
+part = "bucket addresses outside `tests/` and defaults in the settings; a project id or a spreadsheet id is not found"
+
+# --- Countries and runs -----------------------------------------------------------
+
+[[check]]
+rule = "Every collection run writes one run record"
+tests = [
+    "tests/test_run_records.py::test_record_run_writes_a_complete_record",
+    "tests/test_run_records.py::test_record_run_writes_a_failed_record_and_raises_again",
+    "tests/test_run_records.py::test_the_committed_coverage_page_is_current",
+]
+part = "a record written through `record_run` is complete, and every committed record is valid; a command that writes no record is not found"
+
+# --- Code ---------------------------------------------------------------------------
+
+[[check]]
+rule = "`.gitignore` patterns for folders"
+tests = ["tests/test_repo_rules.py::test_gitignore_keeps_project_paths"]
+
+# --- External data ------------------------------------------------------------------
+
+[[check]]
+rule = "Every variable that is not lyrics"
+tests = ["tests/test_code_rules.py::test_every_clean_builder_names_a_concept_with_a_canonical_source"]
+part = "each clean builder names a concept that has an entry; a builder that names no concept is not found"
+
+[[check]]
+rule = "Each concept has at most one `canonical` source."
+tests = [
+    "tests/test_data_sources.py::test_a_bad_file_is_refused",
+    "tests/test_code_rules.py::test_the_code_follows_the_rule",
+]
+
+[[check]]
+rule = "A change of source needs a decision file."
+tests = ["tests/test_data_sources.py::test_generated_page_is_current"]
+part = "the page is current; that a decision file exists is not checked"
+
+# --- Scoring --------------------------------------------------------------------------
+
+[[check]]
+rule = "Songs are scored on topics only"
+tests = [
+    "tests/test_scoring_prompt.py::test_the_prompt_is_the_one_that_scored_the_stored_songs",
+    "tests/test_scoring_prompt.py::test_a_changed_file_is_refused",
+    "tests/test_scoring_prompt.py::test_a_changed_label_or_definition_is_refused",
+]
+
+# --- Figures and tables -----------------------------------------------------------------
+
+[[check]]
+rule = "Figures are PNG at 300 dpi."
+tests = [
+    "tests/test_code_rules.py::test_the_code_follows_the_rule",
+    "tests/test_plot_style.py::test_save_png",
+    "tests/test_plot_style.py::test_figures_page_matches_module",
+]
+part = "no code saves a figure another way; that a figure calls `apply_paper_matplotlib` is not checked"
+
+[[check]]
+rule = "Topic ids, topic labels and families"
+tests = [
+    "tests/test_code_rules.py::test_the_code_follows_the_rule",
+    "tests/test_topic_ids.py::test_generated_page_is_current",
+]
+part = "labels and definitions typed in Python code are found; family names and text in other files are not"
+
+# --- Git ----------------------------------------------------------------------------------
+
+[[check]]
+rule = "Agents never push to `main`"
+tests = [
+    "tests/test_code_rules.py::test_the_settings_deny_a_merge_by_an_agent",
+    "tests/test_agent_roles.py::test_no_agent_workflow_merges_or_trusts_every_bot",
+    "tests/test_agent_roles.py::test_the_three_workflows_protect_the_same_paths",
+]
+
+# --- Agents ---------------------------------------------------------------------------------
+
+[[check]]
+rule = "Three agents can work on an issue"
+tests = ["tests/test_agent_roles.py::test_role_file_loads_and_its_workflow_uses_it"]
+part = "each role file loads and its workflow uses it; who may add a label is set on GitHub, not here"
+
+[[check]]
+rule = "A plan lists every file it changes."
+tests = ["tests/test_agent_roles.py::test_the_three_workflows_protect_the_same_paths"]
+part = "the workflows protect the same paths; the comparison of a build with its plan runs in the workflow, not in a test"
+
+# --- Writing ----------------------------------------------------------------------------------
+
+[[check]]
+rule = "In Markdown, write each paragraph"
+tests = ["tests/test_code_rules.py::test_the_code_follows_the_rule"]
+part = "every tracked Markdown file outside `.claude/`; text in issues and pull requests is not read"

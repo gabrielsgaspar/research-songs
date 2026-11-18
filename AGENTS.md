@@ -55,6 +55,7 @@ This file holds the rules. The details live in the files below. Read the one tha
 | Which model and prompt score songs? | `prompts/scoring/README.md` |
 | What was collected for a country, and how? | `countries/README.md`, then `uv run songs lyrics history <ISO3>` |
 | How do the planner, builder and reviewer agents work? | `prompts/roles/README.md` |
+| Which test checks a rule, and which rules have no check? | `docs/standards/rules.md`, generated from `AGENTS.md` and `resources/rules.toml` |
 | Why does the project work this way? | `docs/decisions/README.md` |
 | How do I make a change? | `CONTRIBUTING.md` |
 
