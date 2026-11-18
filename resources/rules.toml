@@ -83,6 +83,11 @@ part = "a record written through `record_run` is complete, and every committed r
 rule = "`.gitignore` patterns for folders"
 tests = ["tests/test_repo_rules.py::test_gitignore_keeps_project_paths"]
 
+[[check]]
+rule = "A comment enforces nothing."
+tests = ["tests/test_code_rules.py::test_the_code_follows_the_rule"]
+part = "comments with the words \"do not change\", \"do not remove\", \"workaround\" or \"hack\" are found; the same idea in other words is not"
+
 # --- External data ------------------------------------------------------------------
 
 [[check]]
@@ -152,6 +157,14 @@ part = "each role file loads and its workflow uses it; who may add a label is se
 rule = "A plan lists every file it changes."
 tests = ["tests/test_agent_roles.py::test_the_three_workflows_protect_the_same_paths"]
 part = "the workflows protect the same paths; the comparison of a build with its plan runs in the workflow, not in a test"
+
+[[check]]
+rule = "Do not add an agent workflow"
+tests = [
+    "tests/test_code_rules.py::test_no_new_workflow_while_most_rules_have_no_check",
+    "tests/test_agent_roles.py::test_no_agent_workflow_merges_or_trusts_every_bot",
+]
+part = "a new workflow file and a merge command in an agent workflow are found; automation that runs outside this repository is not"
 
 # --- Writing ----------------------------------------------------------------------------------
 
