@@ -384,18 +384,18 @@ No code writes these files yet.
 - `analysis/<YYYYMMDD>/country_year.parquet` will have one row per country and year: the economic and social variables of the country-year table, the region, the number of songs, the number of artists, and the mean score of each topic.
 - `analysis/<YYYYMMDD>/songs.parquet` will have one row per eligible song: country, year, artist, source, and the score of each topic. It will hold no lyric text.
 
-## Clean dumps (planned)
+## Clean dumps
 
 A dump is a source that the project holds whole and searches by artist and title: the lyric websites, Letras, LRCLIB and Genius. MusicBrainz and Discogs are catalogs, not dumps, because they hold no lyrics.
 
-In the old data, each dump has its own shape. The uniform format is 2 tables per dump, always both, always these columns. The date of the folder is the date of the build. The manifest names the `raw/` folder that the dump was built from. No code builds a dump in this format yet.
+In the old data, each dump has its own shape. The uniform format is 2 tables per dump, always both, always these columns. The date of the folder is the date of the build. The manifest names the `raw/` folder that the dump was built from. `songs dumps build` reads one old dump and writes this format. The command reads the folder the caller names and the `raw/` folder the caller names. It does not choose a folder itself.
 
 <!-- generated:dump_tables:start -->
 <!-- Do not edit by hand. To rebuild, run: python -m songs.common.schemas --write -->
 
 ### `songs.parquet`: one row per song and credited performer
 
-Folder: `clean/dumps/<source>/<YYYYMMDD>/`. Key: `source_song_id`, `credit_position`. Planned: no code writes this table yet.
+Folder: `clean/dumps/<source>/<YYYYMMDD>/`. Key: `source_song_id`, `credit_position`.
 
 | Column | Type | Required | Meaning |
 | --- | --- | --- | --- |
@@ -416,7 +416,7 @@ Folder: `clean/dumps/<source>/<YYYYMMDD>/`. Key: `source_song_id`, `credit_posit
 
 ### `artist_names.parquet`: one row per name of an artist at the source
 
-Folder: `clean/dumps/<source>/<YYYYMMDD>/`. Key: `source_artist_id`, `artist_name`. Planned: no code writes this table yet.
+Folder: `clean/dumps/<source>/<YYYYMMDD>/`. Key: `source_artist_id`, `artist_name`.
 
 | Column | Type | Required | Meaning |
 | --- | --- | --- | --- |
@@ -432,10 +432,11 @@ Folder: `clean/dumps/<source>/<YYYYMMDD>/`. Key: `source_artist_id`, `artist_nam
 
 ### Rules for a dump
 
-- A dump stores no normalized name key and no normalized title key. Matching code computes keys with one shared function, so a change of the normalization does not need a new build of every dump.
+- A dump stores no normalized name key and no normalized title key. Matching code computes keys with one shared function, so a change of the normalization does not need a new build of every dump. The builder does not copy LRCLIB `artist_key` or `title_key`, a site-snapshot `latin_matching_key`, or the Letras `source_artist_key`.
 - Crawl state is not clean data. Queues, attempts, HTTP status, parser versions, receipts and logs stay in `raw/`.
-- A source that is held back from matching is a list in tracked code or in `resources/`, with the reason. It is not a missing dump.
+- A source that is held back from matching is a list in tracked code or in `resources/`, with the reason. It is not a missing dump. The list is `resources/lyrics/held_back_from_matching.csv`.
 - `year` and `language` are null for most rows of Letras, AAMA, Fnanen, Kugeci and the text-only sources. That is correct. Do not invent values.
+- A crawl that did not finish has the manifest note `The crawl is incomplete.` A result with no songs is not written.
 
 ### Where each uniform column comes from
 
@@ -444,14 +445,32 @@ This table is guidance for the builder of the dumps. It gives the column of each
 | Uniform column | Site snapshot family | Letras | Stixoi | Kugeci | AAMA, Fnanen | Genius | LRCLIB |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `source_song_id` | `provider_song_id` | `source_song_key` | `provider_song_id` | `provider_song_id` | `provider_song_id` | `genius_song_id` | `track_id` |
-| `song_url` | `song_url` | `song_url` | `provider_url` | `song_url` in the song index | `url` | none | none |
-| `artist_name` | `artist_name`, performer credits only | `artist_name` | through `artist_songs` | labels in a JSON list | through `relations` or the artist heading | `artist_name` | `artist_name` |
-| `song_name` | `song_name` | `song_name` | `title` | `provider_title` | `title` | `song_name` | `name` |
-| `lyrics` | `lyrics`, rows with `text_kind` = `lyrics` | `lyrics` | `lyrics` | `lyrics_text` | `lyrics` | `lyrics` | `plain_lyrics` |
-| `language` | `language_label` | none | `language` | none | none | `language_cld3` | none |
+| `song_url` | `song_url` | `song_url` | `provider_url` | `song_url` in the song index | `song_url` | none | none |
+| `artist_name` | `artist_name`, performer credits only | `artist_name` | through `artist_songs`, role `performer` | labels in a JSON list | `artist_name` on the song, or `<site>_artist_songs.artist_name`, or `artist_heading` | `artist_name` | `artist_name` |
+| `song_name` | `song_name` | `song_name` | `title` | `provider_title` | `song_name`, or `provider_title` | `song_name` | `name` |
+| `lyrics` | `lyrics`, rows with `text_kind` = `lyrics` | `lyrics` | `lyrics` | `lyrics_text` | `lyrics`, or `lyrics_text` when `lyrics` is empty | `lyrics` | `plain_lyrics` |
+| `language` | `language_label` | none | `language` | none | `language` when the column exists | `language_cld3` | none |
 | `year` | `release_year_raw` | none | `release_year` | none | none | `year` | none |
-| `album` | `album_name` | none | through `song_albums` | none | none | none | `album_name` |
-| `fetched_utc` | `retrieved_at_utc` | `retrieved_at_utc` | `parsed_at_utc` | `last_attempt_at_utc` | `fetched_at` | none | `updated_at` |
+| `album` | `album_name` | none | through `song_albums`, when the song has one album | none | none | none | `album_name` |
+| `fetched_utc` | `retrieved_at_utc` | `retrieved_at_utc` | `parsed_at_utc` | `last_attempt_at_utc` | `fetched_at_utc` | none | `updated_at` |
+
+The columns `url`, `title`, `fetched_at` and the table `relations` are not the AAMA or Fnanen dump. Those names were wrong.
+
+These shapes are not in the table above. The same uniform columns come from them as follows.
+
+| Uniform column | Balkan engine | Central Asia harvest | Corpus import | Russian dump | GeniusRU import |
+| --- | --- | --- | --- | --- | --- |
+| `source_song_id` | `source_song_key` | `provider_song_id` | `provider_song_id`, or `source_record_id` | `source_song_id` | `source_song_key` |
+| `song_url` | `song_url` | `song_url` | `song_url` | `song_url`, or `source_url` | `song_url` |
+| `artist_name` | `artist_name` | `artist_name`, or rows of `artist_songs` | performer credits, or `artist_name`, or `source_singer_credit` | `artist_name`, or `artist` | performer credits, then `featured_artists` |
+| `song_name` | `song_name` | `song_name`, or `provider_title` | `song_name` | `song_name`, or `song_title` | `song_name` |
+| `lyrics` | `lyrics`, rows with `text_kind` = `lyrics` | `lyrics`, or `lyrics_text` when `lyrics` is empty | `lyrics` | `lyrics` | `lyrics` |
+| `language` | none | none | none | none | `verified_language` |
+| `year` | none | none | `source_year` | none | `release_year` |
+| `album` | none | none | none | none | none |
+| `fetched_utc` | `fetched_at_utc` | `fetched_at_utc` | none | `fetched_at_utc` | `imported_at_utc` |
+
+Four integration builds have no column map yet: `appleofmyeye`, `deungdutjai`, `lidicity` and `lyricsmy`. Their columns were not read.
 
 ## Known gaps
 

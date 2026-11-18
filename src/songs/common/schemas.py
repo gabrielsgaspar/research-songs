@@ -294,7 +294,6 @@ DUMP_SONGS = Table(
     folder=DUMP_FOLDER,
     rows="one row per song and credited performer",
     key=("source_song_id", "credit_position"),
-    planned=True,
     columns=(
         Column("source", "string", True, "Source key, the same in every row"),
         Column(
@@ -350,7 +349,6 @@ DUMP_ARTIST_NAMES = Table(
     folder=DUMP_FOLDER,
     rows="one row per name of an artist at the source",
     key=("source_artist_id", "artist_name"),
-    planned=True,
     columns=(
         Column("source", "string", True, "Source key"),
         Column("source_artist_id", "string", True, "Id or key of the artist at the source"),
