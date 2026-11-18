@@ -104,7 +104,7 @@ def test_history_text():
         ]
     )
     assert text.splitlines() == [
-        "BRA 2026-01-31 live genius: complete, 42 rows; delay s 0.25, artist limit 100",
+        "BRA 2026-01-31 live genius: complete, 42 rows, 1 h 0 min; delay s 0.25, artist limit 100",
         "    gap: a gap",
         "BRA 2026-02-01 live genius: complete, rows not recorded (backfilled)",
     ]

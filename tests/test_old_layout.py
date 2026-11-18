@@ -173,6 +173,8 @@ def test_the_command_maps_each_column_and_writes_a_manifest_and_one_run_record(
     (record,) = run_records.read_run_records("TGO", countries)
     assert (record.route, record.source, record.state) == ("old_layout", "old_pipeline", "complete")
     assert (record.rows_added, record.artists_attempted, record.bulk_file) == (3, None, None)
+    assert (record.requests_sent, record.limits_hit, record.campaign_id) == (0, {}, None)
+    assert record.songs_attempted == record.songs_accepted + sum(record.songs_rejected.values())
     out = paths.latest_country_songs_dir(data, "TGO")
     assert out == data / "lyrics" / "TGO" / "songs" / record.run_id
 

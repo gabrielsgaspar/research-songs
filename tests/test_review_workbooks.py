@@ -168,6 +168,12 @@ def test_the_command_writes_the_country_tables_a_manifest_and_one_run_record(tmp
     )
     assert (record.rows_added, record.artists_attempted) == (3, 3)
     assert record.bulk_file == "raw/manual_review/TGO/20261101/TGO_Togo_reviewed.xlsx"
+    # Rows in, rows out, and rows left out by reason.
+    assert record.songs_accepted == 3 and (record.requests_sent, record.limits_hit) == (0, {})
+    assert record.songs_attempted == 3 + sum(record.songs_rejected.values())
+    assert [f"{n} added songs left out: {why}" for why, n in record.songs_rejected.items()] == [
+        gap for gap in sorted(record.known_gaps) if "left out" in gap
+    ]
 
     # With no earlier folder, the new folder holds only the reviewed songs and no links.
     out = paths.latest_country_songs_dir(data, "TGO")

@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from songs.common import lyric_sources, run_records
+from songs.common import campaigns, lyric_sources, run_records
 from songs.common.config import load_env_file
 from songs.common.paths import resolve_project_root
 
@@ -13,6 +13,9 @@ app = typer.Typer(no_args_is_help=True, help="Song lyrics research dataset.")
 lyrics_app = typer.Typer(no_args_is_help=True, help="Lyric collection by country.")
 app.add_typer(lyrics_app, name="lyrics")
 
+
+campaign_app = typer.Typer(no_args_is_help=True, help="Campaigns: a goal and its runs.")
+lyrics_app.add_typer(campaign_app, name="campaign")
 
 panel_app = typer.Typer(no_args_is_help=True, help="Country-year panels.")
 app.add_typer(panel_app, name="panel")
@@ -74,6 +77,112 @@ def lyrics_sources(
             code, lyric_sources.sources_for(code), run_records.read_run_records(code)
         )
     )
+
+
+def _country(iso3: str) -> str:
+    code = iso3.upper()
+    if not run_records.ISO3.fullmatch(code):
+        raise typer.BadParameter(f"not a three-letter country code: {iso3}")
+    return code
+
+
+def _songs_now(code: str) -> int | None:
+    """Return the number of songs in the newest songs folder of a country, or None."""
+    from songs.common import manifests
+    from songs.common.paths import data_root, latest_country_songs_dir
+
+    try:
+        folder = latest_country_songs_dir(data_root(), code)
+        return manifests.read_manifest(folder).counts.get("songs") if folder else None
+    except OSError, ValueError:
+        return None
+
+
+SongsOption = Annotated[
+    int | None,
+    typer.Option(
+        "--songs", help="Songs of the country now. The default reads the newest songs folder."
+    ),
+]
+
+
+@campaign_app.command("open")
+def campaign_open(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+    goal: Annotated[str, typer.Option(help="What the campaign must reach, in one sentence.")],
+    songs: SongsOption = None,
+) -> None:
+    """Open a campaign for a country. Each later run of the country joins it."""
+    code = _country(iso3)
+    try:
+        campaign = campaigns.open_campaign(
+            code, goal, songs_before=_songs_now(code) if songs is None else songs
+        )
+    except (FileExistsError, ValueError) as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    typer.echo(f"opened campaign {campaign.campaign_id} for {code}")
+    typer.echo(_plan(code))
+
+
+@campaign_app.command("close")
+def campaign_close(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+    outcome: Annotated[str, typer.Option(help="complete, stopped or abandoned.")],
+    next_time: Annotated[str, typer.Option("--next-time", help="What the next campaign must try.")],
+    reason: Annotated[
+        str, typer.Option(help="Why the campaign stopped. Needed for stopped and abandoned.")
+    ] = "",
+    songs: SongsOption = None,
+) -> None:
+    """Close the open campaign of a country, with what the next campaign must try."""
+    code = _country(iso3)
+    try:
+        campaign = campaigns.close_campaign(
+            code,
+            outcome,
+            next_time,
+            reason=reason,
+            songs_after=_songs_now(code) if songs is None else songs,
+        )
+    except (FileNotFoundError, ValueError) as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    typer.echo(campaigns.format_campaigns([campaign], run_records.read_run_records(code)))
+
+
+@campaign_app.command("list")
+def campaign_list(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+) -> None:
+    """Show the campaigns of a country, each with its runs."""
+    code = _country(iso3)
+    typer.echo(
+        campaigns.format_campaigns(
+            campaigns.read_campaigns(code), run_records.read_run_records(code)
+        )
+    )
+
+
+def _plan(code: str) -> str:
+    return campaigns.format_plan(
+        code,
+        lyric_sources.sources_for(code),
+        run_records.read_run_records(code),
+        campaigns.read_campaigns(code),
+    )
+
+
+@lyrics_app.command("plan")
+def lyrics_plan(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+) -> None:
+    """Show what a new campaign for a country must read first.
+
+    For each source that can serve the country: never ran, or the settings and the
+    results of its last run. Then what the last closed campaign said to try next.
+    """
+    typer.echo(_plan(_country(iso3)))
 
 
 @lyrics_app.command("import-review")

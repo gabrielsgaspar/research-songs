@@ -9,8 +9,8 @@ It answers one question: what fails when someone breaks a rule? A rule that is "
 | Status | Rules |
 | --- | --- |
 | Checked | 7 |
-| Partly checked | 15 |
-| Not checked | 31 |
+| Partly checked | 17 |
+| Not checked | 29 |
 
 When you add a rule to `AGENTS.md`, add a test for it and name the test in `resources/rules.toml`. If no test can check the rule, it stays not checked.
 
@@ -40,8 +40,8 @@ When you add a rule to `AGENTS.md`, add a test for it and name the test in `reso
 | Rule | Checked by |
 | --- | --- |
 | Collection work is organized by country. Each country has one folder, `countries/<ISO3>/`. | not checked |
-| Never run the same job twice. Before a collection run, read the run records of that country. If the same route and source already ran, reuse the result or state why a new run is needed. | not checked |
-| Every collection run writes one run record: country, date, route, source, the path of any bulk file used, request delay, artist and song limits, code commit, rows added, and known gaps. The command writes the record through `songs.common.run_records.record_run`; nobody writes one by hand. | Partly: a record written through `record_run` is complete, every committed record is valid, and its source is in `resources/lyric_sources.toml`; a command that writes no record is not found<br>`tests/test_run_records.py::test_record_run_writes_a_complete_record`<br>`tests/test_run_records.py::test_record_run_writes_a_failed_record_and_raises_again`<br>`tests/test_run_records.py::test_the_committed_coverage_page_is_current`<br>`tests/test_lyric_sources.py::test_a_run_record_may_name_only_a_registered_source`<br>`tests/test_lyric_sources.py::test_every_committed_run_record_names_a_registered_source` |
+| Never run the same job twice. Before a collection run, read the run records of that country. If the same route and source already ran, reuse the result or state why a new run is needed. | Partly: a run through `record_run` that repeats a complete run with the same route, source, bulk file, delay and limits is refused unless it gives a reason; a job that differs only in a setting outside the record is not found<br>`tests/test_campaigns.py::test_the_same_job_does_not_run_twice_without_a_reason` |
+| Every collection run writes one run record: country, date, route, source, the path of any bulk file used, request delay, artist and song limits, code commit, rows added, and known gaps. The command writes the record through `songs.common.run_records.record_run`; nobody writes one by hand. | Partly: a record written through `record_run` is complete, every committed record is valid, and its source is in `resources/lyric_sources.toml`; a command that writes no record is not found<br>`tests/test_run_records.py::test_record_run_writes_a_complete_record`<br>`tests/test_run_records.py::test_record_run_writes_a_failed_record_and_raises_again`<br>`tests/test_run_records.py::test_the_committed_coverage_page_is_current`<br>`tests/test_lyric_sources.py::test_a_run_record_may_name_only_a_registered_source`<br>`tests/test_lyric_sources.py::test_every_committed_run_record_names_a_registered_source`<br>`tests/test_campaigns.py::test_a_record_of_schema_version_1_still_loads` |
 | Before a run, read the history: `uv run songs lyrics history <ISO3>`. | not checked |
 | One country and route runs in one place at a time. | not checked |
 
@@ -54,7 +54,7 @@ When you add a rule to `AGENTS.md`, add a test for it and name the test in `reso
 | Python 3.14, uv, ruff, pytest. Prefer the standard library, then polars or duckdb for data. | not checked |
 | Code that moves into this repository leaves its old patterns behind. Each job has one implementation. Do not move a second copy; delete it or merge it first. | not checked |
 | A comment enforces nothing. A comment that says "do not change" or "do not remove", or that names a workaround, is not allowed in `src/`. Write a test that fails when the constraint is broken, then delete the comment. | Partly: comments with the words "do not change", "do not remove", "workaround" or "hack" are found; the same idea in other words is not<br>`tests/test_code_rules.py::test_the_code_follows_the_rule` |
-| Every importer and every analysis reports its rows: rows in, rows out, and rows left out with the reason for each. A result with no row counts is not finished. | not checked |
+| Every importer and every analysis reports its rows: rows in, rows out, and rows left out with the reason for each. A result with no row counts is not finished. | Partly: the two importers that write a run record put songs attempted, accepted and rejected by reason in it; other importers and the analyses are not checked<br>`tests/test_review_workbooks.py::test_the_command_writes_the_country_tables_a_manifest_and_one_run_record`<br>`tests/test_old_layout.py::test_the_command_maps_each_column_and_writes_a_manifest_and_one_run_record` |
 | Agents do not add dependencies. A person adds a package in its own pull request (`uv add <package>`) before the task that needs it. | not checked |
 | `.gitignore` patterns for folders are anchored to the root (`/data/`, not `data/`). A test lists paths that must stay committable. | `tests/test_repo_rules.py::test_gitignore_keeps_project_paths` |
 
