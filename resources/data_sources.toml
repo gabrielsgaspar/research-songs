@@ -350,7 +350,7 @@ columns = []
 source = "Discogs monthly data dumps"
 version = "2026-06-01"
 url = "https://data.discogs.com/"
-raw_path = "raw/discogs/"
+raw_path = "raw/discogs/20260601/"
 checked = false
 notes = "Artists, releases, release countries and years. The version is read from a folder name."
 

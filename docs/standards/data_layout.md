@@ -522,7 +522,6 @@ Four integration builds have no column map yet: `appleofmyeye`, `deungdutjai`, `
 
 These things do not follow the layout yet. Each one needs its own task. Do not copy them in new code.
 
-- **A raw folder with no dated folder.** The `raw_path` of the Discogs catalog in `resources/data_sources.toml` is `raw/discogs/`.
 - **Undated inputs of the country-year table.** The `CLEAN_FILES` values in `countries_panel.py` are files from the old pipeline: `extraction/countries.parquet`, `clean/analysis_sample.parquet`, `clean/country_year_song_counts.parquet`, `clean/country_year_artist_counts.parquet`, `clean/populism.parquet`. The layout has no `extraction` layer. The analysis release counts the songs and the artists again from the eligible songs, so it drops `num_songs`, `num_artists` and `artist_count_method`. It keeps `discogs_artists_available` and `discogs_dump_date` of the artist count file. The registry, the analysis sample and the populism file stay inputs.
 - **No manifest in `raw/`.** No command writes a manifest for a `raw` folder or for a `raw_manual_review` folder. Only the packer writes one, for a packed folder, and no command calls the packer yet. A person puts a review workbook in its folder, so the import of a workbook does not ask for a manifest there.
 - **Earlier builds have no manifest.** A `clean/countries/<YYYYMMDD>/` folder that was built before this standard has no manifest, so `latest_clean_countries_dir` does not return it. Build the table again to get a folder with a manifest.

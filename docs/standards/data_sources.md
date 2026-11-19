@@ -311,7 +311,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Source: Discogs monthly data dumps
 - Version: 2026-06-01
 - Link: <https://data.discogs.com/>
-- Raw files: `raw/discogs/`
+- Raw files: `raw/discogs/20260601/`
 - Checked: no
 - Notes: Artists, releases, release countries and years. The version is read from a folder name.
 
