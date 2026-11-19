@@ -166,6 +166,21 @@ def comment_stands_in_for_a_test(path: str, text: str) -> list[str]:
     ]
 
 
+ELIGIBILITY_VALUES = {"suppress_duplicate", "quarantine"}
+ELIGIBILITY_SQL = re.compile(r"(duplicate_decision|quality_status|canonical_song_id)\s*(=|<>|!=)")
+
+
+def eligibility_rule_written_again(path: str, text: str) -> list[str]:
+    if path.endswith("stage_50_analysis/eligible_songs.py"):
+        return []
+    return [
+        f"{path}:{line} filters songs on a column of the eligibility rule; "
+        "call songs.stage_50_analysis.eligible_songs.classify"
+        for line, value in strings(text)
+        if value in ELIGIBILITY_VALUES or ELIGIBILITY_SQL.search(value)
+    ]
+
+
 # Each check, the files it reads, and one bad example that it must catch.
 CHECKS: list[tuple[Callable[[str, str], list[str]], str, str, str]] = [
     (figure_saved_without_save_png, SRC, ".py", 'fig.savefig("figure.png", dpi=200)'),
@@ -178,6 +193,8 @@ CHECKS: list[tuple[Callable[[str, str], list[str]], str, str, str]] = [
     (bucket_named, "", "", 'ADDRESS = "gs://some-bucket/raw"'),
     (comment_stands_in_for_a_test, SRC, ".py", "x = 1  # do not change: the panel needs it\n"),
     (comment_stands_in_for_a_test, SRC, ".py", "# Workaround for the bad header row\nx = 1\n"),
+    (eligibility_rule_written_again, SRC, ".py", 'keep = frame["quality_status"] != "quarantine"'),
+    (eligibility_rule_written_again, SRC, ".py", "SQL = \"WHERE duplicate_decision <> 'x'\""),
     (paragraph_hard_wrapped, "", ".md", "A paragraph that goes on\nto a second line.\n"),
     (paragraph_hard_wrapped, "", ".md", "- A list item that goes on\n  to a second line.\n"),
 ]

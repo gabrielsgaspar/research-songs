@@ -133,6 +133,25 @@ tests = [
     "tests/test_scoring_prompt.py::test_a_changed_label_or_definition_is_refused",
 ]
 
+# --- Eligible songs -------------------------------------------------------------------
+
+[[check]]
+rule = "One shared function decides which songs enter"
+tests = [
+    "tests/test_code_rules.py::test_the_code_follows_the_rule",
+    "tests/test_release.py::test_the_rule_gives_each_song_one_reason",
+]
+part = "a filter on the columns of the rule outside the shared function is found; a filter on other columns, such as the year, is not"
+
+[[check]]
+rule = "Songs collected by hand, and other exceptions"
+tests = [
+    "tests/test_release.py::test_the_tracked_exceptions_file_is_valid",
+    "tests/test_release.py::test_a_bad_exceptions_file_is_refused",
+    "tests/test_release.py::test_the_manifest_counts_songs_in_out_and_left_out",
+]
+part = "the analysis release reports the songs that entered by exception; other analyses are not checked"
+
 # --- Figures and tables -----------------------------------------------------------------
 
 [[check]]

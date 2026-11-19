@@ -48,7 +48,8 @@ class Table:
 
     `planned` marks a table that the standard specifies and no code writes yet.
     `per_topic` is the pattern of the score columns; the table has one such column
-    for each topic id.
+    for each topic id. `other_columns` names another table whose columns this table
+    also holds; the check then accepts columns that the schema does not name.
     """
 
     file: str
@@ -58,6 +59,7 @@ class Table:
     columns: tuple[Column, ...]
     planned: bool = False
     per_topic: Column | None = None
+    other_columns: str = ""
 
     @property
     def all_columns(self) -> tuple[Column, ...]:
@@ -71,6 +73,7 @@ RAW_FOLDER = "raw/<source>/<YYYYMMDD>/"
 COUNTRY_FOLDER = "lyrics/<ISO3>/songs/<run id>/"
 SCORES_FOLDER = "lyrics/<ISO3>/scores/<run id>/"
 DUMP_FOLDER = "clean/dumps/<source>/<YYYYMMDD>/"
+ANALYSIS_FOLDER = "analysis/<YYYYMMDD>/"
 
 RAW_MEMBERS = Table(
     file="members.parquet",
@@ -358,12 +361,84 @@ DUMP_ARTIST_NAMES = Table(
     ),
 )
 
+ANALYSIS_COUNTRY_YEAR = Table(
+    file="country_year.parquet",
+    folder=ANALYSIS_FOLDER,
+    rows="one row per country and year of the country-year table",
+    key=("country_iso3", "year"),
+    columns=(
+        Column("country_iso3", "string", True, "Country"),
+        Column("year", "int32", True, "Year"),
+        Column(
+            "num_songs",
+            "int64",
+            False,
+            "Eligible songs of the country and year. Null when the release has no songs "
+            "folder for the country",
+        ),
+        Column("num_artists", "int64", False, "Distinct artists of those songs"),
+        Column(
+            "num_songs_by_exception",
+            "int64",
+            False,
+            "Those songs that entered by exception (`resources/lyrics/eligibility_exceptions.csv`)",
+        ),
+        Column("num_songs_scored", "int64", False, "Those songs that have topic scores"),
+    ),
+    per_topic=Column(
+        "",
+        "float64",
+        False,
+        "One column per topic id: the mean score of the scored songs. Null when no song "
+        "of the country and year has a score",
+    ),
+    other_columns="every column of `countries.parquet` (`COUNTRY_COLUMNS` in "
+    "`countries_panel.py`), except `num_songs`, `num_artists` and `artist_count_method`, "
+    "which the release counts again",
+)
+
+ANALYSIS_SONGS = Table(
+    file="songs.parquet",
+    folder=ANALYSIS_FOLDER,
+    rows="one row per eligible song; no lyric text",
+    key=("country_iso3", "song_id"),
+    columns=(
+        Column("country_iso3", "string", True, "Country"),
+        Column("song_id", "string", True, "Id of the song in the country tables"),
+        Column("artist_id", "string", True, "Joins to `artists.parquet` of the country"),
+        Column("year", "int32", True, "Release year"),
+        Column("source", "string", True, "Where the lyrics come from"),
+        Column("route", "string", True, "Route of the run that added the song"),
+        Column(
+            "by_exception",
+            "boolean",
+            True,
+            "True when the song entered by exception "
+            "(`resources/lyrics/eligibility_exceptions.csv`)",
+        ),
+        Column(
+            "scored",
+            "boolean",
+            True,
+            "True when a score of the newest scoring run has the same `song_id` and "
+            "`lyrics_sha256`",
+        ),
+    ),
+    per_topic=Column(
+        "",
+        "int16",
+        False,
+        "One column per topic id: the score of the song. Null when the song has no score",
+    ),
+)
+
 # Name of a generated part of the standard -> the tables that it shows.
 GROUPS: dict[str, tuple[Table, ...]] = {
     "raw_tables": (RAW_MEMBERS,),
     "country_tables": (COUNTRY_ARTISTS, COUNTRY_SONGS, COUNTRY_LINKS),
     "score_tables": (SCORE_TOPICS, SCORE_PROVENANCE),
     "dump_tables": (DUMP_SONGS, DUMP_ARTIST_NAMES),
+    "analysis_tables": (ANALYSIS_COUNTRY_YEAR, ANALYSIS_SONGS),
 }
 TABLES: tuple[Table, ...] = tuple(table for tables in GROUPS.values() for table in tables)
 
@@ -381,7 +456,8 @@ def check_table(table: Table, relation: duckdb.DuckDBPyRelation) -> list[str]:
     expected = {column.name: column for column in table.all_columns}
     found = dict(zip(relation.columns, (str(kind) for kind in relation.types), strict=True))
     problems = [f"missing column {name}" for name in expected if name not in found]
-    problems += [f"extra column {name}" for name in found if name not in expected]
+    if not table.other_columns:
+        problems += [f"extra column {name}" for name in found if name not in expected]
     present = [column for column in expected.values() if column.name in found]
     problems += [
         f"wrong type in {column.name}: {found[column.name]}, "
@@ -456,6 +532,7 @@ def write_table(table: Table, relation: duckdb.DuckDBPyRelation, folder: Path) -
         raise FileExistsError(f"{path} exists; a version folder is never written over")
     _fail(table, path, check_table(table, relation))
     names = [column.name for column in table.all_columns]
+    names += [name for name in relation.columns if name not in names]
     relation.project(_quoted(names)).write_parquet(str(path), compression="zstd")
     return path
 
@@ -499,6 +576,8 @@ def render_group(group: str) -> str:
                 f"| `{TOPIC_IDS[0]}` to `{TOPIC_IDS[-1]}` | {column.type} "
                 f"| {'yes' if column.required else 'no'} | {column.meaning} |"
             )
+        if table.other_columns:
+            lines += ["", f"The file also holds {table.other_columns}."]
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 

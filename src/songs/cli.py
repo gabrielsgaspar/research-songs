@@ -20,6 +20,9 @@ lyrics_app.add_typer(campaign_app, name="campaign")
 panel_app = typer.Typer(no_args_is_help=True, help="Country-year panels.")
 app.add_typer(panel_app, name="panel")
 
+analysis_app = typer.Typer(no_args_is_help=True, help="Analysis releases.")
+app.add_typer(analysis_app, name="analysis")
+
 dumps_app = typer.Typer(no_args_is_help=True, help="Lyric dumps in the uniform format.")
 app.add_typer(dumps_app, name="dumps")
 
@@ -317,6 +320,23 @@ def panel_countries(
         typer.echo(f"absent inputs, their columns are empty: {result['absent_inputs']}")
     for table, codes in result["codes_outside_registry"].items():
         typer.echo(f"{table}: codes outside the registry, left out: {codes}")
+
+
+@analysis_app.command("release")
+def analysis_release() -> None:
+    """Build the analysis release and write it to a new dated folder in the data folder.
+
+    The folder is analysis/<YYYYMMDD>/. It holds country_year.parquet, songs.parquet and a
+    manifest that names every input folder and counts the songs in, out and left out.
+    """
+    # Imported here so that the lyrics commands do not load the data libraries.
+    from songs.common.paths import data_root
+    from songs.stage_50_analysis import release
+
+    result = release.build(data_root())
+    typer.echo(f"wrote {result['folder']}")
+    for name, number in result["counts"].items():
+        typer.echo(f"{name}: {number}")
 
 
 def _bucket():
