@@ -227,6 +227,6 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [XKX](../../countries/XKX/) | 1 | 2026-11-19 | old_layout | old_pipeline | 244 |
 | [YEM](../../countries/YEM/) | 1 | 2026-11-19 | old_layout | old_pipeline | 899 |
 | [YUG](../../countries/YUG/) | 1 | 2026-11-19 | old_layout | old_pipeline | 568 |
-| [ZAF](../../countries/ZAF/) | 1 | 2026-11-19 | old_layout | old_pipeline | 15006 |
+| [ZAF](../../countries/ZAF/) | 2 | 2026-11-19 | dump_name, old_layout | kasilyrics, old_pipeline | 15067 |
 | [ZMB](../../countries/ZMB/) | 1 | 2026-11-19 | old_layout | old_pipeline | 323 |
 | [ZWE](../../countries/ZWE/) | 1 | 2026-11-19 | old_layout | old_pipeline | 1431 |
