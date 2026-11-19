@@ -252,6 +252,45 @@ def lyrics_import_old(
             typer.echo(f"note: {name}: {value} rows")
 
 
+@lyrics_app.command("import-dump")
+def lyrics_import_dump(
+    source: Annotated[str, typer.Argument(help="Source key of the dump, lower case.")],
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+    discogs: Annotated[
+        Path, typer.Option(help="Folder of Discogs tables. The command only reads it.")
+    ],
+) -> None:
+    """Add the songs of the newest dump that match a Discogs track of their roster artist.
+
+    The command writes a new folder lyrics/<ISO3>/songs/<run id>/ in the data folder, with
+    the full tables of the country and a manifest, and one run record with the route
+    dump_name. Only exact and loose title matches are added. It never changes an earlier
+    folder.
+    """
+    import os
+
+    from songs.common.paths import data_root
+    from songs.stage_00_ingest import dump_match
+
+    code = _country(iso3)
+    typer.echo(run_records.format_history(run_records.read_run_records(code)))
+    old = os.environ.get("SONGS_OLD_DATA_ROOT", "").strip()
+    folder = discogs.resolve()
+    label = (
+        f"{folder.relative_to(Path(old).resolve()).as_posix()}/ in the old data folder"
+        if old and folder.is_relative_to(Path(old).resolve())
+        else folder.name
+    )
+    result = dump_match.import_dump(data_root(), source, code, discogs, discogs_label=label)
+    typer.echo(
+        f"wrote {result['path']} ({result['songs_added']} songs added, "
+        f"{result['songs']} songs in the country, {result['links']} links)"
+    )
+    for name, value in result["rejected"].items():
+        if value:
+            typer.echo(f"not added, {name}: {value}")
+
+
 @lyrics_app.command("import-scores")
 def lyrics_import_scores(
     iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
