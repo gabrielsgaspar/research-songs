@@ -1,0 +1,29 @@
+{
+  "artist_limit": null,
+  "artists_attempted": null,
+  "backfilled": false,
+  "bulk_file": null,
+  "campaign_id": null,
+  "code_commit": "95c03f2d447118c9288a6471b5bef9a72803099d",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-19T07:04:47Z",
+  "iso3": "BRA",
+  "known_gaps": [
+    "links_dropped_duplicate_key: 15 rows"
+  ],
+  "limits_hit": {},
+  "notes": "",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "old_layout",
+  "rows_added": 159297,
+  "run_id": "20261119T070436Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 159297,
+  "songs_attempted": 159297,
+  "songs_rejected": {},
+  "source": "old_pipeline",
+  "started_utc": "2026-11-19T07:04:36Z",
+  "state": "complete"
+}
