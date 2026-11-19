@@ -450,3 +450,44 @@ def dumps_build(
         typer.echo(f"credits left out, not a performer: {result['credits_not_performer']}")
     if result["incomplete"]:
         typer.echo("note: the crawl is incomplete")
+
+
+@dumps_app.command("match")
+def dumps_match(
+    source: Annotated[str, typer.Argument(help="Source key of the dump, lower case.")],
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+) -> None:
+    """Compare the newest dump of a source with the newest songs folder of a country.
+
+    The command only reads. It prints the count of each class, the songs left out with
+    their reasons, and up to 10 artist and title pairs of each new class. No lyric text.
+    """
+    from songs.common.paths import (
+        data_relative,
+        data_root,
+        latest_clean_dump_dir,
+        latest_country_songs_dir,
+    )
+    from songs.stage_00_ingest.dump_match import match_dump
+
+    code = _country(iso3)
+    data = data_root()
+    dump, country = latest_clean_dump_dir(data, source), latest_country_songs_dir(data, code)
+    if dump is None or country is None:
+        typer.echo(f"error: no dump of {source} or no songs folder of {code}", err=True)
+        raise typer.Exit(1)
+    result = match_dump(dump, country)
+    typer.echo(f"dump {data_relative(data, dump)} against {data_relative(data, country)}")
+    typer.echo(f"credit rows in: {result['credit_rows_in']}")
+    typer.echo(f"songs in: {result['songs_in']}, songs out: {result['songs_out']}")
+    for name, number in result["counts"].items():
+        typer.echo(f"  {name}: {number}")
+    for name, number in result["left_out"].items():
+        typer.echo(f"left out, {name}: {number}")
+    typer.echo(
+        f"roster_new with more than one roster artist: {result['roster_new_more_than_one_artist']}"
+    )
+    for name, pairs in result["examples"].items():
+        typer.echo(f"examples of {name}:")
+        for artist, title in pairs:
+            typer.echo(f"  {artist} - {title}")
