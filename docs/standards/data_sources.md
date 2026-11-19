@@ -322,6 +322,6 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Source: MusicBrainz JSON data dumps
 - Version: 2026-06-24
 - Link: <https://metabrainz.org/datasets>
-- Raw files: `musicbrainz/clean/20260624-001001/`
+- Raw files: `clean/catalog/musicbrainz/20260624/`
 - Checked: no
 - Notes: Used for artist names in other scripts and for country rosters. The version is read from a folder name.
