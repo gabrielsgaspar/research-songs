@@ -526,4 +526,4 @@ These things do not follow the layout yet. Each one needs its own task. Do not c
 - **Earlier imports of a review workbook.** Before this standard, the import wrote `lyrics/<ISO3>/manual_review/<run id>/songs.parquet`. A folder of that form is not in the layout, and no code reads it.
 - **`countries.parquet` has no schema in `schemas.py`.** Its column list is in `countries_panel.py`, and the build checks the list.
 - **Tiers outside the layout.** `DataLayout` in `paths.py` still names `extraction`, `processed`, `restricted`, `manifests`, `rankings` and `matching`. The layout has no such layers.
-- **Old data.** All data of the old repository and everything in the bucket today has the old layout. The exceptions are the `raw/<source>/<YYYYMMDD>/` folders that `resources/data_sources.toml` names for the economic sources. They have the new layout and a manifest.
+- **Old data.** All data collected before this layout, and everything in the bucket today, has the old layout. The exceptions are the `raw/<source>/<YYYYMMDD>/` folders that `resources/data_sources.toml` names for the economic sources. They have the new layout and a manifest.
