@@ -2,13 +2,14 @@
 
 from pathlib import Path
 
+import duckdb
 import pandas as pd
 from typer.testing import CliRunner
 
 from songs.cli import app
 from songs.common import paths, schemas
 from songs.common.paths import DATA_ROOT_ENV
-from songs.stage_00_ingest.dump_match import match_dump, name_key
+from songs.stage_00_ingest.dump_match import loose_key, match_discogs, match_dump, name_key
 
 RUN = "20260101T000000Z"
 
@@ -103,7 +104,12 @@ def make_folders(data: Path) -> tuple[Path, Path]:
             held("s2", "a1", "Anna Jons", "Sol sol", "other"),
         ],
     )
-    write(schemas.COUNTRY_ARTISTS, country, [artist("a1", "Anna Jóns"), artist("a2", "Bára")])
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [artist("a1", "Anna Jóns") | {"discogs_artist_id": "11"}, artist("a2", "Bára")],
+    )
+    write(schemas.COUNTRY_LINKS, country, [])
     return dump, country
 
 
@@ -143,4 +149,105 @@ def test_cli_prints_counts_and_no_lyrics(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "roster_new: 3" in result.output
     assert "left out, no_title_key: 1" in result.output
+    assert "invented line" not in result.output
+
+
+def write_discogs(folder: Path) -> None:
+    """Invented Discogs tables with the column names of the Discogs dump."""
+    folder.mkdir(parents=True)
+    tables = {
+        "release_artists": "SELECT * FROM (VALUES (100, 11), (200, 11), (900, 11)) "
+        "AS t(release_id, artist_id)",
+        "release_track_artists": "SELECT * FROM (VALUES (300, 2, 11)) "
+        "AS t(release_id, track_index, artist_id)",
+        "release_tracklist": "SELECT * FROM (VALUES (100, 1, 'Sól Sól'), "
+        "(100, 2, 'Morning Light (Remix)'), (200, 1, 'Sól, sól!'), (200, 2, 'Riverside'), "
+        "(300, 1, 'Other Artist Song'), (300, 2, 'Night Train'), (900, 1, 'Old Song')) "
+        "AS t(release_id, track_index, title)",
+        "releases": "SELECT * FROM (VALUES (100, 50, '1999-05-00'), (200, NULL, '1995'), "
+        "(300, NULL, '2001'), (900, NULL, '1990')) AS t(release_id, master_id, released)",
+        "masters": "SELECT * FROM (VALUES (50, 1997)) AS t(master_id, year)",
+    }
+    for name, sql in tables.items():
+        duckdb.sql(sql).write_parquet(str(folder / f"{name}.parquet"))
+
+
+def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [artist("a1", "Anna Jóns") | {"discogs_artist_id": "11"}, artist("a2", "Bára")],
+    )
+    link = {"country_iso3": "ISL", "song_id": "s1", "artist_id": "a1", "source": "invented"}
+    write(
+        schemas.COUNTRY_LINKS,
+        country,
+        [link | {"discogs_release_id": "900", "discogs_track_index": "1", "run_id": RUN}],
+    )
+    write_discogs(tmp_path / "discogs")
+
+    def song(song_id, title, artists=("a1",), kind="roster_new"):
+        return {
+            "source_song_id": song_id,
+            "class": kind,
+            "song_name": title,
+            "roster_artist_ids": list(artists),
+        }
+
+    songs = [
+        song("exact", "Sol sol"),
+        song("loose", "Morning Light"),
+        song("close", "Riversde"),
+        song("track_credit", "Night Train (feat. Someone)"),
+        song("linked", "Old Song"),
+        song("taken", "SOL SOL"),
+        song("none", "Other Artist Song"),
+        song("no_discogs_id", "Sol sol", ("a2",)),
+        song("two_artists", "Sol sol", ("a1", "a2")),
+        song("held", "Sol sol", kind="held"),
+    ]
+    rows = {
+        row["source_song_id"]: row for row in match_discogs(songs, country, tmp_path / "discogs")
+    }
+    assert {key: row["discogs_class"] for key, row in rows.items()} == {
+        "exact": "exact",
+        "loose": "loose",
+        "close": "close",
+        "track_credit": "loose",
+        "linked": "already_linked",
+        "taken": "track_taken",
+        "none": "no_track",
+        "no_discogs_id": "out_of_scope",
+        "two_artists": "out_of_scope",
+    }
+    assert (rows["exact"]["discogs_release_id"], rows["exact"]["year"]) == ("200", 1995)
+    assert rows["exact"]["match_method"] == "dump_discogs_exact_title"
+    assert (rows["loose"]["discogs_title"], rows["loose"]["year"]) == (
+        "Morning Light (Remix)",
+        1997,
+    )
+    assert rows["loose"]["match_score"] == 95.0
+    assert rows["close"]["discogs_title"] == "Riverside"
+    assert rows["close"]["match_score"] == 94.1
+    assert rows["track_credit"]["discogs_release_id"] == "300"
+
+
+def test_loose_key_drops_brackets_and_featuring():
+    assert loose_key("Night Train (feat. Someone)") == "night train"
+    assert loose_key("Song ft Other") == "song"
+    assert loose_key("(Intro)") == "intro"
+
+
+def test_cli_prints_discogs_matches(tmp_path, monkeypatch):
+    dump, country = make_folders(tmp_path)
+    for folder in (dump, country):
+        (folder / paths.MANIFEST_NAME).write_text("{}", encoding="utf-8")
+    write_discogs(tmp_path / "discogs")
+    monkeypatch.setenv(DATA_ROOT_ENV, str(tmp_path))
+    result = CliRunner().invoke(
+        app, ["dumps", "match", "example", "ISL", "--discogs", str(tmp_path / "discogs")]
+    )
+    assert result.exit_code == 0, result.output
+    assert "roster_new songs looked up in Discogs: 3" in result.output
     assert "invented line" not in result.output

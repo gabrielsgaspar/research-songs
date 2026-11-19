@@ -456,11 +456,17 @@ def dumps_build(
 def dumps_match(
     source: Annotated[str, typer.Argument(help="Source key of the dump, lower case.")],
     iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+    discogs: Annotated[
+        Path | None,
+        typer.Option(help="Folder of Discogs tables. Also look for the roster_new songs there."),
+    ] = None,
 ) -> None:
     """Compare the newest dump of a source with the newest songs folder of a country.
 
     The command only reads. It prints the count of each class, the songs left out with
-    their reasons, and up to 10 artist and title pairs of each new class. No lyric text.
+    their reasons, and up to 10 artist and title pairs of each new class. With
+    --discogs, it also prints the count of each Discogs class, up to 10 exact and loose
+    matches, and every close match. No lyric text.
     """
     from songs.common.paths import (
         data_relative,
@@ -468,7 +474,7 @@ def dumps_match(
         latest_clean_dump_dir,
         latest_country_songs_dir,
     )
-    from songs.stage_00_ingest.dump_match import match_dump
+    from songs.stage_00_ingest.dump_match import DISCOGS_CLASSES, match_discogs, match_dump
 
     code = _country(iso3)
     data = data_root()
@@ -491,3 +497,18 @@ def dumps_match(
         typer.echo(f"examples of {name}:")
         for artist, title in pairs:
             typer.echo(f"  {artist} - {title}")
+    if discogs is None:
+        return
+    found = match_discogs(result["songs"], country, discogs)
+    typer.echo(f"roster_new songs looked up in Discogs: {len(found)}")
+    for name in DISCOGS_CLASSES:
+        typer.echo(f"  {name}: {sum(row['discogs_class'] == name for row in found)}")
+    songs = {song["source_song_id"]: song for song in result["songs"]}
+    for name, limit in (("exact", 10), ("loose", 10), ("close", None)):
+        typer.echo(f"Discogs matches, {name} (artist | dump title | Discogs title | release):")
+        for row in [row for row in found if row["discogs_class"] == name][:limit]:
+            song = songs[row["source_song_id"]]
+            typer.echo(
+                f"  {song['artist_name']} | {song['song_name']} | {row['discogs_title']} | "
+                f"{row['discogs_release_id']}"
+            )
