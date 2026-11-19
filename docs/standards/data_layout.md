@@ -476,7 +476,7 @@ Four integration builds have no column map yet: `appleofmyeye`, `deungdutjai`, `
 
 These things do not follow the layout yet. Each one needs its own task. Do not copy them in new code.
 
-- **Raw folders with no dated folder, or with the date inside the name.** These `raw_path` values in `resources/data_sources.toml`: `raw/discogs/`, `raw/crisis_review_20261109/`, `raw/crisis_review_20261110/`, `raw/un_wpp/2024/`, `raw/unsd_divorces/undata_pop_table16/`. The two `crisis_review` folders also have a campaign name, and they hold the files of 7 sources.
+- **A raw folder with no dated folder.** The `raw_path` of the Discogs catalog in `resources/data_sources.toml` is `raw/discogs/`.
 - **A raw path in the old order.** `musicbrainz/clean/20260624-001001/` is the `raw_path` of the MusicBrainz catalog. Its place in the layout is `clean/catalog/musicbrainz/20260624/`.
 - **Undated inputs of the country-year table.** The `CLEAN_FILES` values in `countries_panel.py` are files from the old pipeline: `extraction/countries.parquet`, `clean/analysis_sample.parquet`, `clean/country_year_song_counts.parquet`, `clean/country_year_artist_counts.parquet`, `clean/populism.parquet`. The layout has no `extraction` layer.
 - **No manifest in `raw/`.** No command writes a manifest for a `raw` folder or for a `raw_manual_review` folder. Only the packer writes one, for a packed folder, and no command calls the packer yet. A person puts a review workbook in its folder, so the import of a workbook does not ask for a manifest there.
@@ -484,4 +484,4 @@ These things do not follow the layout yet. Each one needs its own task. Do not c
 - **Earlier imports of a review workbook.** Before this standard, the import wrote `lyrics/<ISO3>/manual_review/<run id>/songs.parquet`. A folder of that form is not in the layout, and no code reads it.
 - **`countries.parquet` has no schema in `schemas.py`.** Its column list is in `countries_panel.py`, and the build checks the list.
 - **Tiers outside the layout.** `DataLayout` in `paths.py` still names `extraction`, `processed`, `restricted`, `manifests`, `rankings` and `matching`. The layout has no such layers.
-- **Old data.** All data of the old repository and everything in the bucket today has the old layout. Nothing there has the new layout yet.
+- **Old data.** All data of the old repository and everything in the bucket today has the old layout. The exceptions are the `raw/<source>/<YYYYMMDD>/` folders that `resources/data_sources.toml` names for the economic sources. They have the new layout and a manifest.
