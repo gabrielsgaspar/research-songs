@@ -1,0 +1,32 @@
+{
+  "artist_limit": null,
+  "artists_attempted": null,
+  "backfilled": false,
+  "bulk_file": null,
+  "campaign_id": null,
+  "code_commit": "5c0fa79a4d9d37595762015b4f1910ada77df0ba",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-19T12:21:54Z",
+  "iso3": "LBN",
+  "known_gaps": [
+    "songs_dropped_duplicate_song_id: 17 rows",
+    "links_dropped_duplicate_key: 4 rows"
+  ],
+  "limits_hit": {},
+  "notes": "",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "old_layout",
+  "rows_added": 14971,
+  "run_id": "20261119T122152Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 14971,
+  "songs_attempted": 14988,
+  "songs_rejected": {
+    "duplicate_song_id": 17
+  },
+  "source": "old_pipeline",
+  "started_utc": "2026-11-19T12:21:52Z",
+  "state": "complete"
+}
