@@ -266,7 +266,7 @@ Folder: `lyrics/<ISO3>/songs/<run id>/`. Key: `song_id`, `discogs_release_id`, `
 
 A link records the source page of a song. `discogs_release_id` and `discogs_track_index` name the catalog track when the link has one. Both columns are empty when the link has no catalog track, and the row stays. One song can have many links. The key includes those two columns, so one song has at most one link with both of them empty. The import of a review workbook writes songs and no link rows.
 
-The rule for eligible songs (decision 0007) is not built yet. It will read `duplicate_decision` and `quality_status`; that is why these columns stay.
+The rule for eligible songs (decision 0007) reads `duplicate_decision`, `quality_status` and `canonical_song_id`; that is why these columns stay. The section "Analysis release" gives the rule.
 
 ### Columns of the old data that are not kept
 
@@ -377,12 +377,55 @@ Folder: `lyrics/<ISO3>/scores/<run id>/`. Key: `song_id`.
 
 The old data also has value scores. This project scores topics only (decision 0005).
 
-## Analysis release (planned)
+## Analysis release
 
-No code writes these files yet.
+`songs analysis release` writes `analysis/<YYYYMMDD>/` (`src/songs/stage_50_analysis/release.py`). Every table and regression of the paper reads these files.
 
-- `analysis/<YYYYMMDD>/country_year.parquet` will have one row per country and year: the economic and social variables of the country-year table, the region, the number of songs, the number of artists, and the mean score of each topic.
-- `analysis/<YYYYMMDD>/songs.parquet` will have one row per eligible song: country, year, artist, source, and the score of each topic. It will hold no lyric text.
+<!-- generated:analysis_tables:start -->
+<!-- Do not edit by hand. To rebuild, run: python -m songs.common.schemas --write -->
+
+### `country_year.parquet`: one row per country and year of the country-year table
+
+Folder: `analysis/<YYYYMMDD>/`. Key: `country_iso3`, `year`.
+
+| Column | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `country_iso3` | string | yes | Country |
+| `year` | int32 | yes | Year |
+| `num_songs` | int64 | no | Eligible songs of the country and year. Null when the release has no songs folder for the country |
+| `num_artists` | int64 | no | Distinct artists of those songs |
+| `num_songs_by_exception` | int64 | no | Those songs that entered by exception (`resources/lyrics/eligibility_exceptions.csv`) |
+| `num_songs_scored` | int64 | no | Those songs that have topic scores |
+| `T01` to `T38` | float64 | no | One column per topic id: the mean of the scores on that topic that are not null. Null when no song of the country and year has a score on the topic |
+
+The file also holds every column of `countries.parquet` (`COUNTRY_COLUMNS` in `countries_panel.py`), except `num_songs`, `num_artists` and `artist_count_method`, which the release counts again.
+
+### `songs.parquet`: one row per eligible song; no lyric text
+
+Folder: `analysis/<YYYYMMDD>/`. Key: `country_iso3`, `song_id`.
+
+| Column | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `country_iso3` | string | yes | Country |
+| `song_id` | string | yes | Id of the song in the country tables |
+| `artist_id` | string | yes | Joins to `artists.parquet` of the country |
+| `year` | int32 | no | Release year. Empty when the song has no year; such a song is not in `country_year.parquet` |
+| `source` | string | yes | Where the lyrics come from |
+| `route` | string | yes | Route of the run that added the song |
+| `by_exception` | boolean | yes | True when the song entered by exception (`resources/lyrics/eligibility_exceptions.csv`) |
+| `scored` | boolean | yes | True when a score of the newest scoring run has the same `song_id` and `lyrics_sha256` |
+| `T01` to `T38` | int16 | no | One column per topic id: the score of the song. Null when the song has no score |
+
+<!-- generated:analysis_tables:end -->
+
+### How the release is built
+
+- **Inputs.** The newest complete songs folder and scores folder of each country (`latest_country_songs_dir`, `latest_country_scores_dir`), and the newest complete country-year table (`latest_clean_countries_dir`). A country with no complete songs folder is not in the release. The manifest names each input folder.
+- **Eligible songs.** One function decides which songs enter: `classify` in `src/songs/stage_50_analysis/eligible_songs.py` (decision 0007). It gives each song that it leaves out one reason, in this order: `quality_quarantine` (`quality_status` is `quarantine`), `suppressed_duplicate` (`duplicate_decision` is `suppress_duplicate`), `not_canonical` (`canonical_song_id` names another row), `entered_by_hand` (route `manual_review`, and the country has no group in the exceptions file), and `year_out_of_range` (outside 1900 to 2026). A song with no year is eligible: it is in `songs.parquet` with an empty `year`, and it is not in `country_year.parquet`.
+- **Exceptions.** `resources/lyrics/eligibility_exceptions.csv` names the countries whose hand-collected songs enter, with the reason and the date of the decision. Such a song has `by_exception` true. `country_year.parquet` counts them in `num_songs_by_exception`, and the manifest counts them for each country (`songs_by_exception_<ISO3>`). The file has no rows while no country has a `manual_review` run. A test fails when a run record names that route and the file has no row for its country.
+- **Scores.** A score joins a song on `country_iso3`, `song_id` and `lyrics_sha256`. A score of other lyric text, or of a song that is not in the songs folder, does not join. The manifest counts both (`scores_other_lyrics`, `scores_no_song`), and the scores of songs that are left out (`scores_ineligible_song`). The build stops when these counts and `songs_scored` do not add up to the scores read, when a country has scores and no complete songs folder, and when a row names another country than its folder. A song with no score stays, with empty topic columns.
+- **Counts.** The manifest counts `songs` (rows read), `eligible_songs` (rows in `songs.parquet`), `left_out_<reason>` for each reason, `songs_by_exception`, `songs_scored`, `songs_in_country_year`, `country_year_left_out_no_year` (eligible songs that are not in `country_year.parquet` because they have no year), `songs_outside_panel` (eligible songs with a year whose country and year are not in the country-year table), `scores`, `countries` and `country_years`. The build stops when the eligible songs and the songs left out do not add up to the songs read, and when `songs_in_country_year`, `country_year_left_out_no_year` and `songs_outside_panel` do not add up to the eligible songs.
+- `songs.parquet` of the release holds no lyric text.
 
 ## Clean dumps
 
@@ -477,7 +520,7 @@ Four integration builds have no column map yet: `appleofmyeye`, `deungdutjai`, `
 These things do not follow the layout yet. Each one needs its own task. Do not copy them in new code.
 
 - **A raw folder with no dated folder.** The `raw_path` of the Discogs catalog in `resources/data_sources.toml` is `raw/discogs/`.
-- **Undated inputs of the country-year table.** The `CLEAN_FILES` values in `countries_panel.py` are files from the old pipeline: `extraction/countries.parquet`, `clean/analysis_sample.parquet`, `clean/country_year_song_counts.parquet`, `clean/country_year_artist_counts.parquet`, `clean/populism.parquet`. The layout has no `extraction` layer.
+- **Undated inputs of the country-year table.** The `CLEAN_FILES` values in `countries_panel.py` are files from the old pipeline: `extraction/countries.parquet`, `clean/analysis_sample.parquet`, `clean/country_year_song_counts.parquet`, `clean/country_year_artist_counts.parquet`, `clean/populism.parquet`. The layout has no `extraction` layer. The analysis release counts the songs and the artists again from the eligible songs, so it drops `num_songs`, `num_artists` and `artist_count_method`. It keeps `discogs_artists_available` and `discogs_dump_date` of the artist count file. The registry, the analysis sample and the populism file stay inputs.
 - **No manifest in `raw/`.** No command writes a manifest for a `raw` folder or for a `raw_manual_review` folder. Only the packer writes one, for a packed folder, and no command calls the packer yet. A person puts a review workbook in its folder, so the import of a workbook does not ask for a manifest there.
 - **Earlier builds have no manifest.** A `clean/countries/<YYYYMMDD>/` folder that was built before this standard has no manifest, so `latest_clean_countries_dir` does not return it. Build the table again to get a folder with a manifest.
 - **Earlier imports of a review workbook.** Before this standard, the import wrote `lyrics/<ISO3>/manual_review/<run id>/songs.parquet`. A folder of that form is not in the layout, and no code reads it.

@@ -27,7 +27,6 @@ from songs.common.run_records import utc_now
 
 SCHEMA_VERSION = 1
 COUNTRIES_FILE = "countries.parquet"
-ANALYSIS_FILES = ("country_year.parquet", "songs.parquet")
 ORIGIN_KEYS = ("url", "retrieved_utc", "license")
 FILE_KEYS = ("path", "bytes", "sha256", "rows")
 # The fields that are null for the kinds that they do not apply to.
@@ -107,7 +106,12 @@ KINDS: dict[str, Kind] = {
         _files("score_tables"),
     ),
     "analysis": Kind(
-        "analysis/<YYYYMMDD>/", paths.analysis_dir, None, "day", ("inputs",), ANALYSIS_FILES
+        schemas.ANALYSIS_FOLDER,
+        paths.analysis_dir,
+        None,
+        "day",
+        ("inputs",),
+        _files("analysis_tables"),
     ),
 }
 

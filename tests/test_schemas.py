@@ -52,7 +52,8 @@ def test_a_missing_column_is_named(table):
 @ALL_TABLES
 def test_an_extra_column_is_named(table):
     relation = s.cast_to_schema(table, sample(table).assign(scratch="x"))
-    assert s.check_table(table, relation) == ["extra column scratch"]
+    expected = [] if table.other_columns else ["extra column scratch"]
+    assert s.check_table(table, relation) == expected
 
 
 @ALL_TABLES
@@ -68,8 +69,9 @@ def test_a_wrong_type_is_named(table):
 
 @ALL_TABLES
 def test_a_null_in_a_required_column_is_named(table):
-    first = table.all_columns[0]
-    assert first.required and first.name not in table.key
+    required = [column for column in table.all_columns if column.required]
+    others = [column for column in required if column.name not in table.key]
+    first = (others or required)[0]
     frame = sample(table)
     frame.loc[0, first.name] = None
     assert s.check_table(table, s.cast_to_schema(table, frame)) == [
@@ -181,6 +183,8 @@ def test_every_table_has_a_key_and_known_types():
         "provenance.parquet",
         "songs.parquet",
         "artist_names.parquet",
+        "country_year.parquet",
+        "songs.parquet",
     ]
 
 

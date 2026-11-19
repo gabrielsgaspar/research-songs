@@ -9,8 +9,8 @@ It answers one question: what fails when someone breaks a rule? A rule that is "
 | Status | Rules |
 | --- | --- |
 | Checked | 7 |
-| Partly checked | 17 |
-| Not checked | 30 |
+| Partly checked | 19 |
+| Not checked | 28 |
 
 When you add a rule to `AGENTS.md`, add a test for it and name the test in `resources/rules.toml`. If no test can check the rule, it stays not checked.
 
@@ -78,8 +78,8 @@ When you add a rule to `AGENTS.md`, add a test for it and name the test in `reso
 
 | Rule | Checked by |
 | --- | --- |
-| One shared function decides which songs enter an analysis. Do not write a filter of your own. | not checked |
-| Songs collected by hand, and other exceptions, are named in a tracked file with their reason. An analysis reports how many of its songs entered by exception. | not checked |
+| One shared function decides which songs enter an analysis. Do not write a filter of your own. | Partly: a filter on the columns of the rule outside the shared function is found; a filter on other columns, such as the year, is not<br>`tests/test_code_rules.py::test_the_code_follows_the_rule`<br>`tests/test_release.py::test_the_rule_gives_each_song_one_reason` |
+| Songs collected by hand, and other exceptions, are named in a tracked file with their reason. An analysis reports how many of its songs entered by exception. | Partly: the analysis release reports the songs that entered by exception; other analyses are not checked<br>`tests/test_release.py::test_the_tracked_exceptions_file_is_valid`<br>`tests/test_release.py::test_every_country_with_a_manual_review_run_has_an_exception_group`<br>`tests/test_release.py::test_a_bad_exceptions_file_is_refused`<br>`tests/test_release.py::test_the_manifest_counts_songs_in_out_and_left_out` |
 
 ## Figures and tables
 
