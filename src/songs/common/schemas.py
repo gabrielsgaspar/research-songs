@@ -406,7 +406,13 @@ ANALYSIS_SONGS = Table(
         Column("country_iso3", "string", True, "Country"),
         Column("song_id", "string", True, "Id of the song in the country tables"),
         Column("artist_id", "string", True, "Joins to `artists.parquet` of the country"),
-        Column("year", "int32", True, "Release year"),
+        Column(
+            "year",
+            "int32",
+            False,
+            "Release year. Empty when the song has no year; such a song is not in "
+            "`country_year.parquet`",
+        ),
         Column("source", "string", True, "Where the lyrics come from"),
         Column("route", "string", True, "Route of the run that added the song"),
         Column(

@@ -58,20 +58,20 @@ CASES = [
     ("by_hand", {"route": "manual_review"}, "entered_by_hand", False),
     ("year_fixed_by_hand", {"year_source": "manual_review"}, None, False),
     ("by_hand_named", {"route": "manual_review", "country_iso3": "BEN"}, None, True),
-    ("no_year", {"year": None}, "no_year", False),
+    ("no_year", {"year": None}, None, False),
     ("too_old", {"year": 1899}, "year_out_of_range", False),
     ("too_new", {"year": 2027}, "year_out_of_range", False),
     (
         "first_rule_wins",
-        {"quality_status": "quarantine", "year": None},
+        {"quality_status": "quarantine", "year": 1899},
         "quality_quarantine",
         False,
     ),
     (
-        "named_but_no_year",
+        "named_and_no_year",
         {"route": "manual_review", "country_iso3": "BEN", "year": None},
-        "no_year",
-        False,
+        None,
+        True,
     ),
     (
         "named_but_quarantined",
@@ -208,10 +208,11 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
     ]
     assert manifest.counts == {
         "songs": 7,
-        "eligible_songs": 5,
+        "eligible_songs": 6,
         "songs_by_exception": 1,
         "songs_by_exception_BEN": 1,
         "songs_scored": 2,
+        "country_year_left_out_no_year": 1,
         "songs_outside_panel": 1,
         "scores": 5,
         "scores_other_lyrics": 1,
@@ -221,7 +222,6 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         "left_out_suppressed_duplicate": 0,
         "left_out_not_canonical": 0,
         "left_out_entered_by_hand": 0,
-        "left_out_no_year": 1,
         "left_out_year_out_of_range": 0,
         "countries": 2,
         "country_years": 9,
@@ -238,7 +238,9 @@ def test_a_score_joins_on_song_id_and_lyric_hash(built):
         ("t1", True, False, 10),
         ("t2", True, False, 20),
         ("t3", False, False, None),  # the score is of other lyric text
+        ("t5", False, False, None),  # no year: in songs.parquet, not in country_year.parquet
     ]
+    assert songs.filter("song_id = 't5'").project("year").fetchall() == [(None,)]
     assert "lyrics" not in songs.columns and "artist_name" not in songs.columns
 
 

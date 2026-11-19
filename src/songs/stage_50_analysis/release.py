@@ -127,7 +127,7 @@ def _country_year(connection: duckdb.DuckDBPyConnection) -> duckdb.DuckDBPyRelat
                 count(DISTINCT artist_id) AS num_artists,
                 count(*) FILTER (WHERE by_exception) AS num_songs_by_exception,
                 count(*) FILTER (WHERE scored) AS num_songs_scored, {means}
-            FROM release_songs GROUP BY country_iso3, year
+            FROM release_songs WHERE year IS NOT NULL GROUP BY country_iso3, year
         )
         SELECT p.country_iso3, CAST(p.year AS INTEGER) AS year, {covered},
             {", ".join(f'a."{topic}"' for topic in TOPIC_IDS)},
@@ -145,9 +145,13 @@ def _counts(connection: duckdb.DuckDBPyConnection) -> dict[str, int]:
         "eligible_songs": _one(connection, "SELECT count(*) FROM release_songs"),
         "songs_by_exception": _one(connection, "SELECT count_if(by_exception) FROM release_songs"),
         "songs_scored": _one(connection, "SELECT count_if(scored) FROM release_songs"),
+        "country_year_left_out_no_year": _one(
+            connection, "SELECT count(*) FROM release_songs WHERE year IS NULL"
+        ),
         "songs_outside_panel": _one(
             connection,
-            "SELECT count(*) FROM release_songs ANTI JOIN panel USING (country_iso3, year)",
+            "SELECT count(*) FROM release_songs ANTI JOIN panel USING (country_iso3, year) "
+            "WHERE year IS NOT NULL",
         ),
         "scores": _one(connection, "SELECT count(*) FROM scores"),
         "scores_other_lyrics": _one(

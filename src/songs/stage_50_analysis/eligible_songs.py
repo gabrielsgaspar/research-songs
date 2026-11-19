@@ -12,13 +12,16 @@ filter. The rules, in the order that they are checked:
    is not the `song_id` of the row): a duplicate or a re-release.
 4. `entered_by_hand`: a person collected the song (route `manual_review`), and its
    country has no group in the exceptions file.
-5. `no_year`: the song has no release year.
-6. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
+5. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
+
+A song with no year is eligible. An analysis by year cannot use it, and reports
+how many such songs it leaves out.
 
 A song collected by hand whose country has a group in the exceptions file is
 eligible by exception (`by_exception` is true). The file is
 `resources/lyrics/eligibility_exceptions.csv`: one row per country, with the
-reason and the date of the decision.
+reason and the date of the decision. On 2026-11-19 no country has a
+`manual_review` run, so the file has no rows.
 """
 
 import csv
@@ -40,7 +43,6 @@ RULES = {
     "suppressed_duplicate": "duplicate_decision = 'suppress_duplicate'",
     "not_canonical": "canonical_song_id IS NOT NULL AND canonical_song_id <> song_id",
     "entered_by_hand": "{manual} AND NOT {named}",
-    "no_year": "year IS NULL",
     "year_out_of_range": f"year NOT BETWEEN {MIN_SONG_YEAR} AND {MAX_SONG_YEAR}",
 }
 REASONS = tuple(RULES)
