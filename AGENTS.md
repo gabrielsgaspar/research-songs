@@ -31,7 +31,7 @@ src/songs/        importable, tested code
 tests/            tests and small fixtures (tests/fixtures/)
 docs/decisions/   one file per decision, numbered
 docs/status/      generated pages; never edit by hand
-docs/standards/   figure and topic standards
+docs/standards/   figure, topic, data source and data layout standards
 countries/        one folder per country (ISO3 code) with its run records and campaign records
 resources/        small tracked files that code reads (data_sources.toml)
 exhibits/         figures and tables for the paper and the presentation
@@ -50,6 +50,7 @@ This file holds the rules. The details live in the files below. Read the one tha
 | --- | --- |
 | Where does a variable come from (GDP, democracy, fertility, ...)? | `docs/standards/data_sources.md`, generated from `resources/data_sources.toml` |
 | Which topics and families exist? | `docs/standards/topics.md`, generated from `songs.stage_30_topics.topic_ids` |
+| Where does a data file go, and which columns does a table have? | `docs/standards/data_layout.md`, column tables generated from `songs.common.schemas` |
 | How must a figure look? | `docs/standards/figures.md` |
 | Where do figures and tables go? | `exhibits/README.md` |
 | Which model and prompt score songs? | `prompts/scoring/README.md` |
