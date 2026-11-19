@@ -7,9 +7,15 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from songs.cli import app
-from songs.common import paths, schemas
+from songs.common import manifests, paths, run_records, schemas
 from songs.common.paths import DATA_ROOT_ENV
-from songs.stage_00_ingest.dump_match import loose_key, match_discogs, match_dump, name_key
+from songs.stage_00_ingest.dump_match import (
+    import_dump,
+    loose_key,
+    match_discogs,
+    match_dump,
+    name_key,
+)
 
 RUN = "20260101T000000Z"
 
@@ -60,22 +66,25 @@ def artist(artist_id: str, name: str) -> dict:
     }
 
 
-def make_folders(data: Path) -> tuple[Path, Path]:
-    dump = paths.clean_dump_dir(data, "example", "20260102")
+def make_folders(data: Path, source: str = "example") -> tuple[Path, Path]:
+    dump = paths.clean_dump_dir(data, source, "20260102")
     country = paths.country_songs_dir(data, "ISL", RUN)
     write(
         schemas.DUMP_SONGS,
         dump,
         [
-            credit("d1", "Someone Else", "Any Title", "h1"),
-            credit("d2", "ÁNNA Jóns", "Sól, sól!", "h2"),
-            credit("d3", "Anna Jons", "A New Song", "h3"),
-            credit("d4", "AJ", "Another New Song", "h4", artist_id="x4"),
-            credit("d5", "Unknown Band", "Far Away", "h5"),
-            credit("d6", "Anna Jons", "!!!", "h6"),
-            credit("d7", "Unknown Band", "Duet", "h7", 1),
-            credit("d7", "Anna Jons", "Duet", "h7", 2),
-            credit("d8", "...", "Lost Title", "h8"),
+            row | {"source": source}
+            for row in [
+                credit("d1", "Someone Else", "Any Title", "h1"),
+                credit("d2", "ÁNNA Jóns", "Sól, sól!", "h2"),
+                credit("d3", "Anna Jons", "A New Song", "h3"),
+                credit("d4", "AJ", "Another New Song", "h4", artist_id="x4"),
+                credit("d5", "Unknown Band", "Far Away", "h5"),
+                credit("d6", "Anna Jons", "!!!", "h6"),
+                credit("d7", "Unknown Band", "Duet", "h7", 1),
+                credit("d7", "Anna Jons", "Duet", "h7", 2),
+                credit("d8", "...", "Lost Title", "h8"),
+            ]
         ],
     )
     write(
@@ -83,13 +92,13 @@ def make_folders(data: Path) -> tuple[Path, Path]:
         dump,
         [
             {
-                "source": "example",
+                "source": source,
                 "source_artist_id": "x4",
                 "artist_name": "AJ",
                 "name_type": "primary",
             },
             {
-                "source": "example",
+                "source": source,
                 "source_artist_id": "x4",
                 "artist_name": "Anna Jóns",
                 "name_type": "alias",
@@ -162,7 +171,8 @@ def write_discogs(folder: Path) -> None:
         "AS t(release_id, track_index, artist_id)",
         "release_tracklist": "SELECT * FROM (VALUES (100, 1, 'Sól Sól'), "
         "(100, 2, 'Morning Light (Remix)'), (200, 1, 'Sól, sól!'), (200, 2, 'Riverside'), "
-        "(300, 1, 'Other Artist Song'), (300, 2, 'Night Train'), (900, 1, 'Old Song')) "
+        "(300, 1, 'Other Artist Song'), (300, 2, 'Night Train'), (900, 1, 'Old Song'), "
+        "(200, 3, 'A New Song'), (100, 3, 'Duet (Radio Edit)')) "
         "AS t(release_id, track_index, title)",
         "releases": "SELECT * FROM (VALUES (100, 50, '1999-05-00'), (200, NULL, '1995'), "
         "(300, NULL, '2001'), (900, NULL, '1990')) AS t(release_id, master_id, released)",
@@ -251,3 +261,45 @@ def test_cli_prints_discogs_matches(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "roster_new songs looked up in Discogs: 3" in result.output
     assert "invented line" not in result.output
+
+
+def test_import_dump_adds_exact_and_loose_matches_with_links_and_a_run_record(tmp_path):
+    data, countries = tmp_path / "data", tmp_path / "countries"
+    dump, country = make_folders(data, "kasilyrics")
+    manifests.write_manifest(
+        data, dump, "clean_dump", source="kasilyrics", inputs=["raw/x/20260101/"]
+    )
+    manifests.write_manifest(
+        data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
+    )
+    write_discogs(tmp_path / "discogs")
+
+    result = import_dump(
+        data, "kasilyrics", "ISL", tmp_path / "discogs", discogs_label="test", countries=countries
+    )
+
+    out = result["path"]
+    assert (result["songs_added"], result["songs"], result["links"]) == (2, 4, 2)
+    added = duckdb.sql(
+        f"SELECT source_song_id, artist_id, artist_name, year, year_source, route "
+        f"FROM '{(out / 'songs.parquet').as_posix()}' WHERE route = 'dump_name' ORDER BY 1"
+    ).fetchall()
+    assert added == [
+        ("d3", "a1", "Anna Jóns", 1995, "discogs", "dump_name"),
+        ("d7", "a1", "Anna Jóns", 1997, "discogs", "dump_name"),
+    ]
+    links = duckdb.sql(
+        f"SELECT source_song_id, discogs_release_id, discogs_track_index, match_method "
+        f"FROM '{(out / 'links.parquet').as_posix()}' ORDER BY 1"
+    ).fetchall()
+    assert links == [
+        ("d3", "200", "3", "dump_discogs_exact_title"),
+        ("d7", "100", "3", "dump_discogs_loose_title"),
+    ]
+    manifests.read_manifest(out)
+    (record,) = run_records.read_run_records("ISL", countries)
+    assert (record.route, record.source, record.rows_added) == ("dump_name", "kasilyrics", 2)
+    assert record.bulk_file == "clean/dumps/kasilyrics/20260102/"
+    assert record.songs_attempted == 8
+    assert record.songs_accepted + sum(record.songs_rejected.values()) == record.songs_attempted
+    assert record.songs_rejected["no_track"] == 1

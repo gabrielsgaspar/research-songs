@@ -171,17 +171,25 @@ def read_added_songs(book: Path, iso3: str) -> tuple[pd.DataFrame, list[str]]:
 
 
 def write_country_songs(
-    reviewed: pd.DataFrame, earlier: Path | None, out: Path, run_id: str, collected_utc: str
+    reviewed: pd.DataFrame,
+    earlier: Path | None,
+    out: Path,
+    run_id: str,
+    collected_utc: str,
+    links: pd.DataFrame | None = None,
 ) -> dict[str, int]:
     """Write the three tables of a country after the import to `out`. Return the counts.
 
     `earlier` is the newest songs folder of the country, or None. Its rows stay,
-    except a song that the review gives again. The artists of the reviewed songs
-    count as attempted at `collected_utc`. The links are carried over as they are:
-    a hand-collected song has no catalog track, so it has no link.
+    except a song that the import gives again. The artists of the added songs
+    count as attempted at `collected_utc`. The earlier links are carried over as
+    they are. `links` holds the links of the added songs: a hand-collected song has
+    no catalog track, so a review import gives none.
     """
     with duckdb.connect() as connection:
-        return _write_country_songs(connection, reviewed, earlier, out, run_id, collected_utc)
+        return _write_country_songs(
+            connection, reviewed, earlier, out, run_id, collected_utc, links
+        )
 
 
 def _write_country_songs(
@@ -191,6 +199,7 @@ def _write_country_songs(
     out: Path,
     run_id: str,
     collected_utc: str,
+    links: pd.DataFrame | None,
 ) -> dict[str, int]:
     for name, table in (
         ("old_artists", schemas.COUNTRY_ARTISTS),
@@ -249,12 +258,22 @@ def _write_country_songs(
         out,
     )
     schemas.write_table(schemas.COUNTRY_SONGS, connection.sql("SELECT * FROM new_songs"), out)
-    schemas.write_table(schemas.COUNTRY_LINKS, connection.sql("SELECT * FROM old_links"), out)
+    added_links = (
+        schemas.cast_to_schema(schemas.COUNTRY_LINKS, links.assign(run_id=run_id), connection)
+        if links is not None and len(links)
+        else schemas.empty_table(schemas.COUNTRY_LINKS, connection)
+    )
+    added_links.create_view("added_links")
+    connection.sql(
+        "SELECT * FROM old_links ANTI JOIN added_links USING (song_id) "
+        "UNION ALL BY NAME SELECT * FROM added_links"
+    ).create_view("new_links")
+    schemas.write_table(schemas.COUNTRY_LINKS, connection.sql("SELECT * FROM new_links"), out)
     replaced = len(connection.sql("SELECT 1 FROM old_songs SEMI JOIN added_songs USING (song_id)"))
     return {
         "songs": len(connection.sql("SELECT 1 FROM new_songs")),
         "artists": len(artists),
-        "links": len(connection.sql("SELECT 1 FROM old_links")),
+        "links": len(connection.sql("SELECT 1 FROM new_links")),
         "songs_added": len(reviewed) - replaced,
         "songs_replaced": replaced,
     }

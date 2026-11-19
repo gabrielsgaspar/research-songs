@@ -67,7 +67,7 @@ A run record may name only a source on this page. To use a new source, add its e
 | `lingala_cd` | [Lingala.cd](https://lingala.cd) | Countries: COD, COG | archive | unknown | - | yes | - |
 | `ndombolo` | [Ndombolo](https://ndombolo.co) | Countries: COD, COG | archive | unknown | - | yes | - |
 | `howwe` | [Howwe](https://howwe.ug) | Countries: UGA | archive | unknown | - | yes | - |
-| `kasilyrics` | [Kasi Lyrics](https://kasilyrics.co.za) | Countries: ZAF | archive | unknown | - | yes | - |
+| `kasilyrics` | [Kasi Lyrics](https://kasilyrics.co.za) | Countries: ZAF | archive, dump_name | unknown | - | yes | - |
 | `zedlyric` | [Zed Lyric](https://zedlyric.com) | Countries: ZMB | archive | unknown | - | yes | - |
 | `aama` | [AAMA](https://www.aama.sa) | Languages: Arabic | local_source | allowed, 1 s between requests | - | yes | A site archive dated 2026-09-13 exists. |
 | `fnanen` | [Fnanen](https://fnanen.com) | Languages: Arabic | archive, live, roster_update, recover | allowed, 1 s between requests | - | yes | A site archive dated 2026-09-13 exists. |
