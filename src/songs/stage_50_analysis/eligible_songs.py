@@ -10,8 +10,8 @@ filter. The rules, in the order that they are checked:
    (`duplicate_decision` is `suppress_duplicate`).
 3. `not_canonical`: another row represents the song (`canonical_song_id` is set and
    is not the `song_id` of the row): a duplicate or a re-release.
-4. `entered_by_hand`: a person collected the song (route or year source
-   `manual_review`), and its country has no group in the exceptions file.
+4. `entered_by_hand`: a person collected the song (route `manual_review`), and its
+   country has no group in the exceptions file.
 5. `no_year`: the song has no release year.
 6. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
 
@@ -47,7 +47,6 @@ REASONS = tuple(RULES)
 COLUMNS = (
     "song_id",
     "route",
-    "year_source",
     "quality_status",
     "duplicate_decision",
     "canonical_song_id",
@@ -97,7 +96,7 @@ def classify(
     through a group of the exceptions file. The songs need `country_iso3` and the
     columns in `COLUMNS`.
     """
-    manual = f"coalesce(route = '{MANUAL_ROUTE}' OR year_source = '{MANUAL_ROUTE}', false)"
+    manual = f"coalesce(route = '{MANUAL_ROUTE}', false)"
     codes = ", ".join(f"'{check_iso3(group.country_iso3)}'" for group in exceptions)
     named = f"country_iso3 IN ({codes})" if codes else "false"
     cases = " ".join(

@@ -389,8 +389,8 @@ ANALYSIS_COUNTRY_YEAR = Table(
         "",
         "float64",
         False,
-        "One column per topic id: the mean score of the scored songs. Null when no song "
-        "of the country and year has a score",
+        "One column per topic id: the mean of the scores on that topic that are not null. "
+        "Null when no song of the country and year has a score on the topic",
     ),
     other_columns="every column of `countries.parquet` (`COUNTRY_COLUMNS` in "
     "`countries_panel.py`), except `num_songs`, `num_artists` and `artist_count_method`, "

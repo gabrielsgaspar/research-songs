@@ -9,6 +9,7 @@ not count. The manifest counts the songs read, the songs that enter, and the son
 left out for each reason.
 """
 
+import hashlib
 from datetime import date
 from pathlib import Path
 
@@ -29,7 +30,8 @@ def country_folders(data: Path) -> list[tuple[str, Path, Path | None]]:
     """Return each country that has a complete songs folder.
 
     Each item is the country code, the newest complete songs folder, and the newest
-    complete scores folder or None.
+    complete scores folder or None. Raise FileNotFoundError for a country that has
+    scores and no complete songs folder, so that no score is left out without a count.
     """
     found = []
     for folder in sorted((data / "lyrics").glob("*")):
@@ -38,12 +40,15 @@ def country_folders(data: Path) -> list[tuple[str, Path, Path | None]]:
         except ValueError:
             continue
         songs = paths.latest_country_songs_dir(data, code)
+        scores = paths.latest_country_scores_dir(data, code)
         if songs is not None:
-            found.append((code, songs, paths.latest_country_scores_dir(data, code)))
+            found.append((code, songs, scores))
+        elif scores is not None:
+            raise FileNotFoundError(f"{code} has scores and no complete songs folder")
     return found
 
 
-def _stack(connection: duckdb.DuckDBPyConnection, name: str, parts: list) -> None:
+def _stack(name: str, parts: list) -> None:
     """Create one table from relations that have the same columns in the same order."""
     first, *rest = parts
     first.create(name)
@@ -55,23 +60,33 @@ def _one(connection: duckdb.DuckDBPyConnection, query: str) -> int:
     return connection.sql(query).fetchall()[0][0]
 
 
+def _of_country(
+    table: schemas.Table, folder: Path, code: str, connection: duckdb.DuckDBPyConnection
+) -> duckdb.DuckDBPyRelation:
+    """Read a table of a country folder. Raise ValueError when a row names another country."""
+    relation = schemas.read_table(table, folder, connection)
+    if relation.filter(f"country_iso3 <> '{code}'").aggregate("count(*)").fetchall()[0][0]:
+        raise ValueError(f"{folder / table.file} holds rows of another country")
+    return relation
+
+
 def _read_inputs(
     connection: duckdb.DuckDBPyConnection, countries: list[tuple[str, Path, Path | None]]
 ) -> None:
     """Load the songs (no lyric text) and the scores of every country into two tables."""
     songs = [
-        schemas.read_table(schemas.COUNTRY_SONGS, folder, connection).project(
+        _of_country(schemas.COUNTRY_SONGS, folder, code, connection).project(
             ", ".join(SONG_COLUMNS)
         )
-        for _, folder, _ in countries
+        for code, folder, _ in countries
     ]
-    _stack(connection, "songs", songs)
+    _stack("songs", songs)
     scores = [
-        schemas.read_table(schemas.SCORE_TOPICS, folder, connection)
-        for _, _, folder in countries
+        _of_country(schemas.SCORE_TOPICS, folder, code, connection)
+        for code, _, folder in countries
         if folder is not None
     ]
-    _stack(connection, "scores", scores or [schemas.empty_table(schemas.SCORE_TOPICS, connection)])
+    _stack("scores", scores or [schemas.empty_table(schemas.SCORE_TOPICS, connection)])
 
 
 def _release_songs(connection: duckdb.DuckDBPyConnection) -> duckdb.DuckDBPyRelation:
@@ -143,6 +158,11 @@ def _counts(connection: duckdb.DuckDBPyConnection) -> dict[str, int]:
         "scores_no_song": _one(
             connection, "SELECT count(*) FROM scores ANTI JOIN songs USING (country_iso3, song_id)"
         ),
+        "scores_ineligible_song": _one(
+            connection,
+            "SELECT count(*) FROM scores AS s JOIN classified AS c USING (country_iso3, song_id) "
+            "WHERE s.lyrics_sha256 = c.lyrics_sha256 AND c.ineligible_reason IS NOT NULL",
+        ),
     }
     left_out = dict(
         connection.sql(
@@ -158,6 +178,9 @@ def _counts(connection: duckdb.DuckDBPyConnection) -> dict[str, int]:
     left = sum(counts[f"left_out_{reason}"] for reason in eligible_songs.REASONS)
     if counts["eligible_songs"] + left != counts["songs"]:
         raise ValueError("the eligible songs and the songs left out do not add up to the songs")
+    parts = ("songs_scored", "scores_other_lyrics", "scores_no_song", "scores_ineligible_song")
+    if sum(counts[name] for name in parts) != counts["scores"]:
+        raise ValueError(f"the scores do not add up: {parts} must sum to the scores read")
     return counts
 
 
@@ -179,6 +202,9 @@ def build(data: Path, *, today: date | None = None, exceptions_file: Path | None
     countries = country_folders(data)
     if not countries:
         raise FileNotFoundError("no country has a complete lyrics/<ISO3>/songs/<run id>/ folder")
+    exceptions_file = (
+        exceptions_file or paths.resolve_project_root() / eligible_songs.EXCEPTIONS_FILE
+    )
     exceptions = eligible_songs.load_exceptions(exceptions_file)
 
     connection = duckdb.connect()
@@ -193,6 +219,10 @@ def build(data: Path, *, today: date | None = None, exceptions_file: Path | None
     _release_songs(connection).create("release_songs")
     counts = _counts(connection)
     country_year = _country_year(connection)
+    declared = [column.name for column in schemas.ANALYSIS_COUNTRY_YEAR.all_columns]
+    passed = [name for name in COUNTRY_COLUMNS if name not in (*declared, *REPLACED_PANEL_COLUMNS)]
+    if country_year.columns != declared + passed:
+        raise ValueError("the columns of country_year.parquet differ from the contract")
     counts |= {
         "countries": len(countries),
         "country_years": len(country_year),
@@ -211,8 +241,8 @@ def build(data: Path, *, today: date | None = None, exceptions_file: Path | None
         "analysis",
         inputs=inputs,
         counts=counts,
-        notes=f"Exception groups: {len(exceptions)}. "
-        "The tracked file resources/lyrics/eligibility_exceptions.csv is an input too; "
-        "code_commit names its version.",
+        notes=f"Exception groups: {len(exceptions)}. The exceptions file "
+        f"{eligible_songs.EXCEPTIONS_FILE.as_posix()} is an input too; its SHA-256 was "
+        f"{hashlib.sha256(exceptions_file.read_bytes()).hexdigest()}.",
     )
     return {"folder": folder, "counts": counts}

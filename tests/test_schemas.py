@@ -69,7 +69,9 @@ def test_a_wrong_type_is_named(table):
 
 @ALL_TABLES
 def test_a_null_in_a_required_column_is_named(table):
-    first = next(column for column in table.all_columns if column.required)
+    required = [column for column in table.all_columns if column.required]
+    others = [column for column in required if column.name not in table.key]
+    first = (others or required)[0]
     frame = sample(table)
     frame.loc[0, first.name] = None
     assert s.check_table(table, s.cast_to_schema(table, frame)) == [

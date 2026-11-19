@@ -56,7 +56,7 @@ CASES = [
     ("other_row", {"canonical_song_id": "eligible"}, "not_canonical", False),
     ("own_row", {"canonical_song_id": "own_row"}, None, False),
     ("by_hand", {"route": "manual_review"}, "entered_by_hand", False),
-    ("by_hand_old", {"year_source": "manual_review"}, "entered_by_hand", False),
+    ("year_fixed_by_hand", {"year_source": "manual_review"}, None, False),
     ("by_hand_named", {"route": "manual_review", "country_iso3": "BEN"}, None, True),
     ("no_year", {"year": None}, "no_year", False),
     ("too_old", {"year": 1899}, "year_out_of_range", False),
@@ -68,9 +68,15 @@ CASES = [
         False,
     ),
     (
-        "named_but_quarantined",
+        "named_but_no_year",
         {"route": "manual_review", "country_iso3": "BEN", "year": None},
         "no_year",
+        False,
+    ),
+    (
+        "named_but_quarantined",
+        {"route": "manual_review", "country_iso3": "BEN", "quality_status": "quarantine"},
+        "quality_quarantine",
         False,
     ),
 ]
@@ -171,7 +177,7 @@ def built(tmp_path):
             song("t4", quality_status="quarantine"),
             song("t5", year=None),
         ],
-        [score("t1", 10), score("t2", 20), score("t3", 30), score("gone", 40)],
+        [score("t1", 10), score("t2", 20), score("t3", 30), score("gone", 40), score("t4", 50)],
     )
     write_country(
         data,
@@ -207,9 +213,10 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         "songs_by_exception_BEN": 1,
         "songs_scored": 2,
         "songs_outside_panel": 1,
-        "scores": 4,
+        "scores": 5,
         "scores_other_lyrics": 1,
         "scores_no_song": 1,
+        "scores_ineligible_song": 1,
         "left_out_quality_quarantine": 1,
         "left_out_suppressed_duplicate": 0,
         "left_out_not_canonical": 0,
@@ -262,3 +269,50 @@ def test_a_release_is_never_written_over_and_needs_its_inputs(built, tmp_path):
         release.build(data, today=date(2026, 11, 19), exceptions_file=exceptions_file(tmp_path))
     with pytest.raises(FileNotFoundError, match="clean/countries"):
         release.build(tmp_path / "empty", today=date(2026, 11, 19))
+
+
+def test_a_release_with_no_scores_keeps_its_songs(tmp_path):
+    data = tmp_path / "data"
+    write_panel(data, ["TGO"])
+    write_country(data, "TGO", [song("t1")], None)
+    result = release.build(
+        data, today=date(2026, 11, 19), exceptions_file=exceptions_file(tmp_path)
+    )
+    assert result["counts"]["eligible_songs"] == 1 and result["counts"]["scores"] == 0
+    songs = schemas.read_table(schemas.ANALYSIS_SONGS, result["folder"])
+    assert songs.project(f"song_id, scored, {FIRST}").fetchall() == [("t1", False, None)]
+
+
+def test_inputs_that_would_lose_rows_are_refused(tmp_path):
+    data = tmp_path / "data"
+    write_panel(data, ["TGO"])
+    with pytest.raises(FileNotFoundError, match="no country"):
+        release.build(data, today=date(2026, 11, 19), exceptions_file=exceptions_file(tmp_path))
+    write_country(data, "TGO", [song("t1", country_iso3="BEN")], None)
+    with pytest.raises(ValueError, match="another country"):
+        release.build(data, today=date(2026, 11, 19), exceptions_file=exceptions_file(tmp_path))
+
+
+def test_scores_with_no_songs_folder_are_refused(tmp_path):
+    data = tmp_path / "data"
+    write_panel(data, ["TGO"])
+    write_country(data, "TGO", [song("t1")], None)
+    (data / "lyrics" / "BEN" / "songs").mkdir(parents=True)
+    folder = paths.country_scores_dir(data, "BEN", SCORES_RUN)
+    folder.mkdir(parents=True)
+    (folder / paths.MANIFEST_NAME).write_text("{}", encoding="utf-8")
+    with pytest.raises(FileNotFoundError, match="BEN has scores"):
+        release.country_folders(data)
+
+
+def test_a_panel_with_other_columns_is_refused(tmp_path):
+    data = tmp_path / "data"
+    folder = paths.clean_countries_dir(data, "20260101")
+    folder.mkdir(parents=True)
+    duckdb.sql("SELECT 'TGO' AS country_iso3, 1990 AS year").write_parquet(
+        str(folder / manifests.COUNTRIES_FILE)
+    )
+    manifests.write_manifest(data, folder, "clean_countries", inputs=["z"])
+    write_country(data, "TGO", [song("t1")], None)
+    with pytest.raises(ValueError, match="COUNTRY_COLUMNS"):
+        release.build(data, today=date(2026, 11, 19), exceptions_file=exceptions_file(tmp_path))
