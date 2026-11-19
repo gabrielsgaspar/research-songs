@@ -27,7 +27,7 @@ def test_the_file_loads_and_names_the_chosen_sources():
         ),
         ('id = "gdp_pwt"', 'id = "gdp_maddison"', "appears twice"),
         ('version = "11.0"\n', "", "missing"),
-        ('raw_path = "raw/un_wpp/2024/"', 'raw_path = "C:/data/un_wpp"', "raw_path"),
+        ('raw_path = "raw/population_un_wpp/20260920/"', 'raw_path = "C:/data/un_wpp"', "raw_path"),
     ],
 )
 def test_a_bad_file_is_refused(tmp_path, old, new, message):
