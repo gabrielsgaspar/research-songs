@@ -48,6 +48,7 @@ The import reads the lyric text of the added songs from the dump; lyric text nev
 goes to Git, to a manifest or to a run record.
 """
 
+import csv
 import difflib
 import hashlib
 import re
@@ -83,6 +84,19 @@ CLOSE_CUTOFF = 0.9
 # The Discogs classes that the import adds, and the route of its run.
 ADDED = ("exact", "loose")
 ROUTE = "dump_name"
+# A person's decision on each close match: accept adds the song, reject leaves it out.
+REVIEWED_FILE = Path("resources") / "lyrics" / "reviewed_close_matches.csv"
+REVIEW_COLUMNS = (
+    "source",
+    "country_iso3",
+    "source_song_id",
+    "discogs_release_id",
+    "discogs_track_index",
+    "decision",
+    "decided",
+    "reason",
+)
+DECISIONS = ("accept", "reject")
 DISCOGS_TABLES = (
     "release_artists",
     "release_track_artists",
@@ -399,6 +413,28 @@ def _added_frames(
     return added.astype({"year": "Int64"}), links.drop(columns=["run_id"])
 
 
+def load_reviewed_matches(root: Path | None = None) -> dict[tuple[str, ...], str]:
+    """Return the decision on each reviewed close match.
+
+    The key is source, country, source song id, Discogs release id and track index,
+    so a decision holds only for the track that the person saw.
+    """
+    path = (root or paths.resolve_project_root()) / REVIEWED_FILE
+    decisions: dict[tuple[str, ...], str] = {}
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if tuple(reader.fieldnames or ()) != REVIEW_COLUMNS:
+            raise ValueError(f"{path.name} must have the columns {', '.join(REVIEW_COLUMNS)}")
+        for line in reader:
+            key = tuple(line[name].strip() for name in REVIEW_COLUMNS[:5])
+            if line["decision"] not in DECISIONS or not line["decided"] or not line["reason"]:
+                raise ValueError(f"{path.name}: {key} needs a decision, a date and a reason")
+            if key in decisions:
+                raise ValueError(f"{path.name} lists {key} twice")
+            decisions[key] = line["decision"]
+    return decisions
+
+
 def import_dump(
     data: Path,
     source: str,
@@ -407,13 +443,16 @@ def import_dump(
     *,
     discogs_label: str,
     countries: Path | None = None,
+    reviewed: dict[tuple[str, ...], str] | None = None,
 ) -> dict:
     """Add the songs of the newest dump that match a Discogs track of their roster artist.
 
-    Only the `exact` and `loose` songs of `match_discogs` are added. The command
+    The `exact` and `loose` songs of `match_discogs` are added, and the `close`
+    songs that `REVIEWED_FILE` accepts for the same Discogs track. The command
     writes a new folder `lyrics/<ISO3>/songs/<run id>/` with the earlier rows and
     the added songs and links, its manifest, and the run record. `discogs_label`
-    names the Discogs folder in the manifest notes, since that folder is outside
+    names the Discogs folder in the manifest notes, and `reviewed` replaces the
+    decisions of `REVIEWED_FILE` (for tests), since that folder is outside
     the data folder. Every other song of the dump is counted in the run record with
     its class.
     """
@@ -432,7 +471,18 @@ def import_dump(
         manifests.read_manifest(earlier)
         result = match_dump(dump, earlier)
         found = match_discogs(result["songs"], earlier, discogs)
-        chosen = {row["source_song_id"]: row for row in found if row["discogs_class"] in ADDED}
+        reviewed = load_reviewed_matches() if reviewed is None else reviewed
+
+        def accepted(row: dict) -> bool:
+            key = (source, iso3, row["source_song_id"], row.get("discogs_release_id", ""))
+            return reviewed.get((*key, row.get("discogs_track_index", ""))) == "accept"
+
+        close_accepted = sum(row["discogs_class"] == "close" and accepted(row) for row in found)
+        chosen = {
+            row["source_song_id"]: row
+            for row in found
+            if row["discogs_class"] in ADDED or (row["discogs_class"] == "close" and accepted(row))
+        }
         songs = {song["source_song_id"]: song for song in result["songs"]}
         added, links = _added_frames(dump, earlier, iso3, source, chosen, songs)
         out = paths.country_songs_dir(data, iso3, record.run_id)
@@ -441,6 +491,7 @@ def import_dump(
             added, earlier, out, record.run_id, record.started_utc, links
         )
         discogs_counts = Counter(row["discogs_class"] for row in found)
+        discogs_counts["close"] -= close_accepted
         rejected = {
             **{name: result["counts"][name] for name in CLASSES if name != "roster_new"},
             **result["left_out"],
@@ -453,7 +504,9 @@ def import_dump(
             country_iso3=iso3,
             run_id=record.run_id,
             inputs=[bulk_file, paths.data_relative(data, earlier)],
-            counts=counts | {f"dump_songs_{name}": value for name, value in rejected.items()},
+            counts=counts
+            | {f"dump_songs_{name}": value for name, value in rejected.items()}
+            | {"dump_songs_close_accepted": close_accepted},
             notes=(
                 f"Songs of {bulk_file} that match a Discogs track of their roster artist. "
                 f"Discogs tables: {discogs_label}."
@@ -470,4 +523,9 @@ def import_dump(
                 f"close: {discogs_counts['close']} songs match a Discogs title by close "
                 "spelling and wait for review"
             )
+        if close_accepted:
+            record.notes = (
+                f"{record.notes} {close_accepted} close matches added after review "
+                f"({REVIEWED_FILE.as_posix()})."
+            ).strip()
     return {"path": out, "songs_attempted": result["songs_in"], "rejected": rejected, **counts}

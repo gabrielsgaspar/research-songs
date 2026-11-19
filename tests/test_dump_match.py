@@ -4,6 +4,7 @@ from pathlib import Path
 
 import duckdb
 import pandas as pd
+import pytest
 from typer.testing import CliRunner
 
 from songs.cli import app
@@ -11,6 +12,7 @@ from songs.common import manifests, paths, run_records, schemas
 from songs.common.paths import DATA_ROOT_ENV
 from songs.stage_00_ingest.dump_match import (
     import_dump,
+    load_reviewed_matches,
     loose_key,
     match_discogs,
     match_dump,
@@ -172,7 +174,7 @@ def write_discogs(folder: Path) -> None:
         "release_tracklist": "SELECT * FROM (VALUES (100, 1, 'Sól Sól'), "
         "(100, 2, 'Morning Light (Remix)'), (200, 1, 'Sól, sól!'), (200, 2, 'Riverside'), "
         "(300, 1, 'Other Artist Song'), (300, 2, 'Night Train'), (900, 1, 'Old Song'), "
-        "(200, 3, 'A New Song'), (100, 3, 'Duet (Radio Edit)')) "
+        "(200, 3, 'A New Song'), (100, 3, 'Duet (Radio Edit)'), (200, 4, 'Another New Sng')) "
         "AS t(release_id, track_index, title)",
         "releases": "SELECT * FROM (VALUES (100, 50, '1999-05-00'), (200, NULL, '1995'), "
         "(300, NULL, '2001'), (900, NULL, '1990')) AS t(release_id, master_id, released)",
@@ -302,4 +304,57 @@ def test_import_dump_adds_exact_and_loose_matches_with_links_and_a_run_record(tm
     assert record.bulk_file == "clean/dumps/kasilyrics/20260102/"
     assert record.songs_attempted == 8
     assert record.songs_accepted + sum(record.songs_rejected.values()) == record.songs_attempted
-    assert record.songs_rejected["no_track"] == 1
+    assert record.songs_rejected["close"] == 1
+
+
+def import_with_review(root: Path, reviewed: dict) -> dict:
+    data = root / "data"
+    dump, country = make_folders(data, "kasilyrics")
+    manifests.write_manifest(
+        data, dump, "clean_dump", source="kasilyrics", inputs=["raw/x/20260101/"]
+    )
+    manifests.write_manifest(
+        data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
+    )
+    write_discogs(root / "discogs")
+    return import_dump(
+        data,
+        "kasilyrics",
+        "ISL",
+        root / "discogs",
+        discogs_label="test",
+        countries=root / "countries",
+        reviewed=reviewed,
+    )
+
+
+def test_import_dump_adds_a_close_match_only_for_the_reviewed_track(tmp_path):
+    other_track = import_with_review(
+        tmp_path / "a", {("kasilyrics", "ISL", "d4", "200", "3"): "accept"}
+    )
+    assert other_track["songs_added"] == 2
+    rejected = import_with_review(
+        tmp_path / "b", {("kasilyrics", "ISL", "d4", "200", "4"): "reject"}
+    )
+    assert rejected["songs_added"] == 2
+    result = import_with_review(tmp_path / "c", {("kasilyrics", "ISL", "d4", "200", "4"): "accept"})
+    assert result["songs_added"] == 3
+    method = duckdb.sql(
+        f"SELECT match_method FROM '{(result['path'] / 'links.parquet').as_posix()}' "
+        "WHERE source_song_id = 'd4'"
+    ).fetchall()
+    assert method == [("dump_discogs_close_title",)]
+    assert manifests.read_manifest(result["path"]).counts["dump_songs_close_accepted"] == 1
+
+
+def test_the_tracked_review_file_loads(tmp_path):
+    assert set(load_reviewed_matches().values()) <= {"accept", "reject"}
+    bad = tmp_path / "resources" / "lyrics"
+    bad.mkdir(parents=True)
+    (bad / "reviewed_close_matches.csv").write_text(
+        "source,country_iso3,source_song_id,discogs_release_id,discogs_track_index,"
+        "decision,decided,reason\nx,ISL,1,2,3,maybe,2026-01-01,why\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="needs a decision"):
+        load_reviewed_matches(tmp_path)
