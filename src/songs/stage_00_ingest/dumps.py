@@ -79,6 +79,7 @@ class Family:
     page_artist_url: tuple[str, ...] = ("artist_url",)
     page_artist_id: tuple[str, ...] = ()
     text_kind: bool = False
+    lyric_kinds: tuple[str, ...] = ("lyrics",)
     song_page: bool = False
     parsed: bool = False
     eligible: bool = False
@@ -105,7 +106,7 @@ FAMILIES: tuple[Family, ...] = (
         song_key=("provider_song_id",),
         song_name=("song_name",),
         language=("language_label",),
-        year=("release_year_raw",),
+        year=("release_year_raw", "album_release_year_raw", "release_date_raw"),
         album=("album_name",),
         fetched=("retrieved_at_utc",),
         text_kind=True,
@@ -119,6 +120,7 @@ FAMILIES: tuple[Family, ...] = (
         fetched=("fetched_at_utc",),
         page_artist_id=("source_artist_key",),
         text_kind=True,
+        lyric_kinds=("lyrics", "original"),
         credits="page",
     ),
     Family(
@@ -376,6 +378,7 @@ def _skipped(source: str, reason: str, **extra: object) -> dict:
         "rows_out": 0,
         "artists_out": 0,
         "dropped": {},
+        "not_lyrics_kinds": {},
         "credits_not_performer": 0,
     }
     result.update(extra)
@@ -416,13 +419,23 @@ def _build(
     )
     if no_artist:
         dropped["no_artist"] = no_artist
+    not_lyrics_kinds = {
+        re.sub(r"[^a-z0-9]+", "_", kind).strip("_") or "other": count
+        for kind, count in connection.execute(
+            "SELECT lower(text_kind), count(*) FROM lyric_fate"
+            " WHERE drop_reason = 'not_lyrics' GROUP BY 1 ORDER BY 1"
+        ).fetchall()
+    }
     credits_skipped = _count(
         connection,
         f"""
-        SELECT count(*) FROM credit_raw credit
-        JOIN lyric_kept kept ON credit.song_key = kept.song_key
-            OR (credit.song_key IS NULL AND credit.song_url IS NOT NULL
-                AND credit.song_url = kept.song_url)
+        SELECT count(*) FROM (
+          SELECT credit.role FROM ({_CREDIT_BY_KEY}) credit
+          JOIN lyric_kept kept ON credit.kept_key = kept.song_key
+          UNION ALL
+          SELECT credit.role FROM ({_CREDIT_BY_URL}) credit
+          JOIN lyric_kept kept ON credit.kept_url = kept.song_url
+        ) credit
         WHERE credit.role IS NOT NULL AND credit.role NOT IN ({_ROLE_LIST})
         """,
     )
@@ -437,6 +450,7 @@ def _build(
             incomplete=incomplete,
             rows_in=rows_in,
             dropped=dropped,
+            not_lyrics_kinds=not_lyrics_kinds,
             credits_not_performer=credits_skipped,
         )
     out.mkdir(parents=True, exist_ok=True)
@@ -459,6 +473,8 @@ def _build(
     for reason in DROP_REASONS:
         if dropped.get(reason):
             counts[f"dropped_{reason}"] = dropped[reason]
+    for kind, count in not_lyrics_kinds.items():
+        counts[f"dropped_not_lyrics_{kind}"] = count
     if credits_skipped:
         counts["credits_not_performer"] = credits_skipped
     manifests.write_manifest(
@@ -481,6 +497,7 @@ def _build(
         "rows_out": rows_out,
         "artists_out": artists_out,
         "dropped": dropped,
+        "not_lyrics_kinds": not_lyrics_kinds,
         "credits_not_performer": credits_skipped,
     }
 
@@ -498,12 +515,13 @@ def _prepare(connection, folder, source, family: Family, lyric: Path, columns: s
         + " FROM "
         + _prepare_from(family, columns, lyric)
     )
+    kinds = ", ".join(f"'{kind}'" for kind in family.lyric_kinds)
     connection.execute(
-        """
+        f"""
         CREATE VIEW lyric_checked AS
         SELECT *,
           CASE
-            WHEN text_kind IS NOT NULL AND lower(text_kind) <> 'lyrics' THEN 'not_lyrics'
+            WHEN text_kind IS NOT NULL AND lower(text_kind) NOT IN ({kinds}) THEN 'not_lyrics'
             WHEN is_not_song THEN 'not_song'
             WHEN is_not_parsed THEN 'not_parsed'
             WHEN is_not_eligible THEN 'not_eligible'
@@ -557,7 +575,8 @@ def _prepare(connection, folder, source, family: Family, lyric: Path, columns: s
     connection.execute(
         """
         CREATE VIEW songs_ready AS
-        SELECT source_song_id, song_url, song_name, lyrics, language, year, album, fetched_utc,
+        SELECT source_song_id, song_url, song_name, lyrics, language, year, year_source, album,
+          fetched_utc,
           raw_ref, artist_name, source_artist_id, artist_url,
           CAST(row_number() OVER (
             PARTITION BY source_song_id
@@ -582,6 +601,7 @@ def _prepare(connection, folder, source, family: Family, lyric: Path, columns: s
           sha256(CAST(lyrics AS VARCHAR)) AS lyrics_sha256,
           CAST(language AS VARCHAR) AS language,
           CAST(year AS INTEGER) AS year,
+          CAST(year_source AS VARCHAR) AS year_source,
           CAST(album AS VARCHAR) AS album,
           CAST(fetched_utc AS VARCHAR) AS fetched_utc,
           CAST(raw_ref AS VARCHAR) AS raw_ref
@@ -645,6 +665,7 @@ def _src_select(family: Family, columns: set[str]) -> str:
             f"{_coalesce(columns, family.lyrics)} AS lyrics",
             f"{_coalesce(columns, family.language)} AS language",
             f"{_year(columns, family.year)} AS year",
+            f"{_year_source(columns, family.year)} AS year_source",
             f"{album} AS album",
             f"{_utc(fetched_value)} AS fetched_utc",
             f"{_raw_ref(columns)} AS raw_ref",
@@ -716,6 +737,10 @@ def _load_credit_file(connection, path: Path, *, force_performer: bool) -> None:
 
 
 _CREDIT_ARTIST_ID = _ARTIST_ID_COLUMNS
+_CREDIT_BY_KEY = "SELECT *, song_key AS kept_key FROM credit_raw WHERE song_key IS NOT NULL"
+_CREDIT_BY_URL = (
+    "SELECT *, song_url AS kept_url FROM credit_raw WHERE song_key IS NULL AND song_url IS NOT NULL"
+)
 
 
 def _credits_from_roles(connection, *, page_fallback: bool, list_column: str = "") -> None:
@@ -723,15 +748,24 @@ def _credits_from_roles(connection, *, page_fallback: bool, list_column: str = "
         f"""
         CREATE VIEW role_line AS
         SELECT kept.source_song_id, kept.song_url, kept.song_name, kept.lyrics, kept.language,
-          kept.year, kept.album, kept.fetched_utc, kept.raw_ref,
+          kept.year, kept.year_source, kept.album, kept.fetched_utc, kept.raw_ref,
           coalesce(dim.artist_name, credit.credit_name) AS artist_name,
           coalesce(credit.artist_id, dim.artist_id, credit.credit_name) AS source_artist_id,
           coalesce(dim.artist_url, credit.artist_url) AS artist_url,
           credit.position_raw
         FROM lyric_kept kept
-        JOIN credit_raw credit ON credit.song_key = kept.song_key
-          OR (credit.song_key IS NULL AND credit.song_url IS NOT NULL
-              AND credit.song_url = kept.song_url)
+        JOIN ({_CREDIT_BY_KEY}) credit ON credit.kept_key = kept.song_key
+        LEFT JOIN artist_dim dim ON dim.artist_id = credit.artist_id
+        WHERE credit.role IN ({_ROLE_LIST})
+        UNION ALL
+        SELECT kept.source_song_id, kept.song_url, kept.song_name, kept.lyrics, kept.language,
+          kept.year, kept.year_source, kept.album, kept.fetched_utc, kept.raw_ref,
+          coalesce(dim.artist_name, credit.credit_name) AS artist_name,
+          coalesce(credit.artist_id, dim.artist_id, credit.credit_name) AS source_artist_id,
+          coalesce(dim.artist_url, credit.artist_url) AS artist_url,
+          credit.position_raw
+        FROM lyric_kept kept
+        JOIN ({_CREDIT_BY_URL}) credit ON credit.kept_url = kept.song_url
         LEFT JOIN artist_dim dim ON dim.artist_id = credit.artist_id
         WHERE credit.role IN ({_ROLE_LIST})
         """
@@ -741,7 +775,7 @@ def _credits_from_roles(connection, *, page_fallback: bool, list_column: str = "
         page = """
         UNION ALL
         SELECT kept.source_song_id, kept.song_url, kept.song_name, kept.lyrics, kept.language,
-          kept.year, kept.album, kept.fetched_utc, kept.raw_ref,
+          kept.year, kept.year_source, kept.album, kept.fetched_utc, kept.raw_ref,
           kept.page_artist AS artist_name,
           coalesce(kept.page_artist_id, by_url.artist_id, kept.page_artist) AS source_artist_id,
           coalesce(by_url.artist_url, kept.page_artist_url) AS artist_url,
@@ -758,7 +792,7 @@ def _credits_from_roles(connection, *, page_fallback: bool, list_column: str = "
         listed = f"""
         UNION ALL
         SELECT kept.source_song_id, kept.song_url, kept.song_name, kept.lyrics, kept.language,
-          kept.year, kept.album, kept.fetched_utc, kept.raw_ref,
+          kept.year, kept.year_source, kept.album, kept.fetched_utc, kept.raw_ref,
           names.name AS artist_name,
           names.name AS source_artist_id,
           CAST(NULL AS VARCHAR) AS artist_url,
@@ -782,7 +816,7 @@ def _page_select() -> str:
     """SQL of one credit from the printed artist on the lyric row."""
     return """
         SELECT kept.source_song_id, kept.song_url, kept.song_name, kept.lyrics, kept.language,
-          kept.year, kept.album, kept.fetched_utc, kept.raw_ref,
+          kept.year, kept.year_source, kept.album, kept.fetched_utc, kept.raw_ref,
           kept.page_artist AS artist_name,
           coalesce(kept.page_artist_id, by_url.artist_id, kept.page_artist) AS source_artist_id,
           coalesce(by_url.artist_url, kept.page_artist_url) AS artist_url,
@@ -799,7 +833,7 @@ def _credits_from_page(connection, *, list_column: str) -> None:
         extra = f"""
         UNION ALL
         SELECT kept.source_song_id, kept.song_url, kept.song_name, kept.lyrics, kept.language,
-          kept.year, kept.album, kept.fetched_utc, kept.raw_ref,
+          kept.year, kept.year_source, kept.album, kept.fetched_utc, kept.raw_ref,
           names.name AS artist_name,
           names.name AS source_artist_id,
           CAST(NULL AS VARCHAR) AS artist_url,
@@ -814,7 +848,8 @@ def _credits_from_page(connection, *, list_column: str) -> None:
     connection.execute(
         f"""
         CREATE VIEW credit_line AS
-        SELECT source_song_id, song_url, song_name, lyrics, language, year, album, fetched_utc,
+        SELECT source_song_id, song_url, song_name, lyrics, language, year, year_source, album,
+          fetched_utc,
           raw_ref, artist_name, source_artist_id, artist_url, position_raw
         FROM (
           {_page_select()}
@@ -829,7 +864,7 @@ def _credits_from_lists(connection, ids: str, labels: str) -> None:
         f"""
         CREATE VIEW credit_line AS
         SELECT kept.source_song_id, kept.song_url, kept.song_name, kept.lyrics, kept.language,
-          kept.year, kept.album, kept.fetched_utc, kept.raw_ref,
+          kept.year, kept.year_source, kept.album, kept.fetched_utc, kept.raw_ref,
           pair.label AS artist_name,
           coalesce(nullif(trim(pair.artist_id), ''), pair.label) AS source_artist_id,
           dim.artist_url AS artist_url,
@@ -1068,6 +1103,14 @@ def _side(folder: Path, source: str, kind: str) -> Path | None:
 
 
 def _crawl_is_incomplete(folder: Path) -> bool:
+    """True when the folder, or the crawl folder above a `snapshots/<stamp>/` folder, says so."""
+    folders = [folder]
+    if folder.parent.name == "snapshots":
+        folders.append(folder.parent.parent)
+    return any(_folder_is_incomplete(item) for item in folders)
+
+
+def _folder_is_incomplete(folder: Path) -> bool:
     if (folder / "STOP").is_file():
         return True
     for name in ("latest.json", "manifest.json"):
@@ -1140,15 +1183,48 @@ def _raw_time(columns: set[str], names: tuple[str, ...]) -> str:
     return "CAST(NULL AS VARCHAR)"
 
 
+def _one_year(columns: set[str], name: str) -> str:
+    """SQL of an admissible year from one column, or NULL.
+
+    A number is rounded. A date text gives a year only when it holds exactly one
+    four-digit number, so a text with two years gives none.
+    """
+    text = _text(columns, name)
+    if "date" in name:
+        found = f"regexp_extract_all({text}, '(?:^|[^0-9])([0-9]{{4}})(?:[^0-9]|$)', 1)"
+        value = f"CASE WHEN len({found}) = 1 THEN TRY_CAST({found}[1] AS DOUBLE) END"
+    else:
+        value = f"TRY_CAST({text} AS DOUBLE)"
+    return (
+        f"CASE WHEN {value} IS NOT NULL AND round({value}) BETWEEN {MIN_SONG_YEAR} "
+        f"AND {MAX_SONG_YEAR} THEN CAST(round({value}) AS INTEGER) ELSE NULL END"
+    )
+
+
 def _year(columns: set[str], names: tuple[str, ...]) -> str:
-    for name in names:
-        if name in columns:
-            value = f"TRY_CAST({_text(columns, name)} AS DOUBLE)"
-            return (
-                f"CASE WHEN {value} IS NOT NULL AND round({value}) BETWEEN {MIN_SONG_YEAR} "
-                f"AND {MAX_SONG_YEAR} THEN CAST(round({value}) AS INTEGER) ELSE NULL END"
-            )
-    return "CAST(NULL AS INTEGER)"
+    """SQL of the first admissible year of the columns, in the order of the family."""
+    present = [_one_year(columns, name) for name in names if name in columns]
+    if not present:
+        return "CAST(NULL AS INTEGER)"
+    if len(present) == 1:
+        return present[0]
+    return "coalesce(" + ", ".join(present) + ")"
+
+
+def year_label(name: str) -> str:
+    """Return the `year_source` value of a year that comes from the old column `name`."""
+    return name.removesuffix("_raw")
+
+
+def _year_source(columns: set[str], names: tuple[str, ...]) -> str:
+    cases = [
+        f"WHEN {_one_year(columns, name)} IS NOT NULL THEN '{year_label(name)}'"
+        for name in names
+        if name in columns
+    ]
+    if not cases:
+        return "CAST(NULL AS VARCHAR)"
+    return "CASE " + " ".join(cases) + " END"
 
 
 def _utc(value: str) -> str:
