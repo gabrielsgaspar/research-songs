@@ -37,7 +37,7 @@ source = "Maddison Project Database, through Our World in Data"
 version = "2023"
 unit = "2011 international dollars"
 url = "https://ourworldindata.org/grapher/gdp-per-capita-maddison-project-database"
-raw_path = "raw/owid_maddison_gdp/20261013/"
+raw_path = "raw/gdp_maddison/20261013/"
 checked = true
 notes = "This is the GDP series in the country-year panel."
 
@@ -76,7 +76,7 @@ source = "World Bank, World Development Indicators, SI.POV.GINI"
 version = "downloaded 2026-11-10"
 unit = "index, 0 to 100"
 url = "https://data.worldbank.org/indicator/SI.POV.GINI"
-raw_path = "raw/crisis_review_20261110/"
+raw_path = "raw/gini_wdi/20261110/"
 checked = true
 notes = "Coverage is thin before 1980 and for low-income countries."
 
@@ -101,7 +101,7 @@ columns = ["world_bank_income_group"]
 source = "World Bank country classification by income"
 version = "fiscal year 2027"
 url = "https://datahelpdesk.worldbank.org/knowledgebase/articles/906519"
-raw_path = "raw/world_bank_income/20260907/"
+raw_path = "raw/income_group_world_bank/20260907/"
 checked = true
 notes = ""
 
@@ -116,7 +116,7 @@ source = "United Nations, World Population Prospects"
 version = "2024, medium variant"
 unit = "persons"
 url = "https://population.un.org/wpp/"
-raw_path = "raw/un_wpp/2024/"
+raw_path = "raw/population_un_wpp/20260920/"
 checked = true
 notes = "Years after the last estimate are projections; `population_is_projected` marks them."
 
@@ -129,7 +129,7 @@ source = "Human Fertility Database"
 version = "downloaded 2026-09-21"
 unit = "children per woman, and related rates"
 url = "https://www.humanfertility.org/"
-raw_path = "raw/hfd/20260921/"
+raw_path = "raw/fertility_hfd/20260921/"
 checked = true
 notes = "14 columns with the prefix `hfd_`. The database covers a limited set of countries, mostly high-income."
 
@@ -142,7 +142,7 @@ source = "Our World in Data, children born per woman (from UN World Population P
 version = "downloaded 2026-09-21"
 unit = "children per woman"
 url = "https://ourworldindata.org/grapher/children-born-per-woman"
-raw_path = "raw/owid_fertility/20260921/"
+raw_path = "raw/fertility_owid/20260921/"
 checked = true
 notes = "Covers more countries than the Human Fertility Database. Retired so that every analysis uses one fertility source."
 
@@ -155,7 +155,7 @@ source = "United Nations Statistics Division, Demographic Yearbook, table 16"
 version = "not stated"
 unit = "divorces per 1,000 persons"
 url = "https://unstats.un.org/unsd/demographic-social/products/dyb/"
-raw_path = "raw/unsd_divorces/undata_pop_table16/"
+raw_path = "raw/divorce_unsd/20260921/"
 checked = true
 notes = "Divorce counts divided by the population from `population_un_wpp`."
 
@@ -168,7 +168,7 @@ source = "World Bank, World Development Indicators, SL.TLF.CACT.FE.ZS (ILO model
 version = "downloaded 2026-09-21"
 unit = "percent of women aged 15 and over"
 url = "https://data.worldbank.org/indicator/SL.TLF.CACT.FE.ZS"
-raw_path = "raw/world_bank_wdi/20260921/"
+raw_path = "raw/female_labor_force_wdi/20260921/"
 checked = true
 notes = ""
 
@@ -183,7 +183,7 @@ source = "Acemoglu, Naidu, Restrepo and Robinson (2019), Democracy Does Cause Gr
 version = "Journal of Political Economy 2019"
 unit = "0 or 1"
 url = "https://www.journals.uchicago.edu/doi/10.1086/700936"
-raw_path = ""
+raw_path = "raw/democracy_anrr/20260921/"
 checked = false
 notes = "The series as published, 1960 to 2010, with no extension. The raw file was not found on the workstation when this entry was written."
 
@@ -209,7 +209,7 @@ source = "V-Dem electoral democracy and freedom of expression indices, through O
 version = "not stated"
 unit = "index, 0 to 1"
 url = "https://ourworldindata.org/grapher/electoral-democracy-index"
-raw_path = "raw/crisis_review_20261110/"
+raw_path = "raw/democracy_vdem/20261110/"
 checked = false
 notes = "Used only in the review of crisis events, as context."
 
@@ -247,7 +247,7 @@ columns = ["sovereign_default_*"]
 source = "Bank of Canada and Bank of England, Sovereign Default Database"
 version = "2024"
 url = ""
-raw_path = "raw/crisis_review_20261109/"
+raw_path = "raw/sovereign_default_boc_boe/20261109/"
 checked = true
 notes = ""
 
@@ -271,7 +271,7 @@ columns = ["currency_crisis_*"]
 source = "Culiuc and Park, Large Depreciations, IMF Working Paper 25/221"
 version = "November 2025"
 url = ""
-raw_path = "raw/crisis_review_20261109/"
+raw_path = "raw/currency_crises_culiuc_park/20261112/"
 checked = true
 notes = ""
 
@@ -283,7 +283,7 @@ columns = []
 source = "National Bureau of Economic Research, business cycle dates"
 version = "not stated"
 url = "https://www.nber.org/research/business-cycle-dating"
-raw_path = "raw/crisis_review_20261110/"
+raw_path = "raw/us_recessions_nber/20261110/"
 checked = true
 notes = "Used only for shading in time-series figures."
 
@@ -296,7 +296,7 @@ source = "World Bank, World Development Indicators, FP.CPI.TOTL.ZG"
 version = "downloaded 2026-11-10"
 unit = "percent per year"
 url = "https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG"
-raw_path = "raw/crisis_review_20261110/"
+raw_path = "raw/inflation_wdi/20261110/"
 checked = true
 notes = "Used only in the review of crisis events."
 
@@ -309,7 +309,7 @@ source = "World Bank, World Development Indicators, SL.UEM.1524.ZS"
 version = "downloaded 2026-11-10"
 unit = "percent of the labor force aged 15 to 24"
 url = "https://data.worldbank.org/indicator/SL.UEM.1524.ZS"
-raw_path = "raw/crisis_review_20261110/"
+raw_path = "raw/youth_unemployment_wdi/20261110/"
 checked = true
 notes = "Used only in the review of crisis events."
 

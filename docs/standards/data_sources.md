@@ -45,7 +45,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Unit: 2011 international dollars
 - Columns: `gdp_per_capita`
 - Link: <https://ourworldindata.org/grapher/gdp-per-capita-maddison-project-database>
-- Raw files: `raw/owid_maddison_gdp/20261013/`
+- Raw files: `raw/gdp_maddison/20261013/`
 - Checked: yes
 - Notes: This is the GDP series in the country-year panel.
 
@@ -77,7 +77,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Unit: index, 0 to 100
 - Columns: `gini`
 - Link: <https://data.worldbank.org/indicator/SI.POV.GINI>
-- Raw files: `raw/crisis_review_20261110/`
+- Raw files: `raw/gini_wdi/20261110/`
 - Checked: yes
 - Notes: Coverage is thin before 1980 and for low-income countries.
 
@@ -98,7 +98,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Version: fiscal year 2027
 - Columns: `world_bank_income_group`
 - Link: <https://datahelpdesk.worldbank.org/knowledgebase/articles/906519>
-- Raw files: `raw/world_bank_income/20260907/`
+- Raw files: `raw/income_group_world_bank/20260907/`
 - Checked: yes
 
 ## Population
@@ -110,7 +110,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Unit: persons
 - Columns: `population_total`, `population_is_projected`, `log_population`
 - Link: <https://population.un.org/wpp/>
-- Raw files: `raw/un_wpp/2024/`
+- Raw files: `raw/population_un_wpp/20260920/`
 - Checked: yes
 - Notes: Years after the last estimate are projections; `population_is_projected` marks them.
 
@@ -123,7 +123,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Unit: children per woman, and related rates
 - Columns: `hfd_*`
 - Link: <https://www.humanfertility.org/>
-- Raw files: `raw/hfd/20260921/`
+- Raw files: `raw/fertility_hfd/20260921/`
 - Checked: yes
 - Notes: 14 columns with the prefix `hfd_`. The database covers a limited set of countries, mostly high-income.
 
@@ -133,7 +133,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Version: downloaded 2026-09-21
 - Unit: children per woman
 - Link: <https://ourworldindata.org/grapher/children-born-per-woman>
-- Raw files: `raw/owid_fertility/20260921/`
+- Raw files: `raw/fertility_owid/20260921/`
 - Checked: yes
 - Notes: Covers more countries than the Human Fertility Database. Retired so that every analysis uses one fertility source.
 
@@ -146,7 +146,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Unit: divorces per 1,000 persons
 - Columns: `divorce_rate_per_1000`
 - Link: <https://unstats.un.org/unsd/demographic-social/products/dyb/>
-- Raw files: `raw/unsd_divorces/undata_pop_table16/`
+- Raw files: `raw/divorce_unsd/20260921/`
 - Checked: yes
 - Notes: Divorce counts divided by the population from `population_un_wpp`.
 
@@ -159,7 +159,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Unit: percent of women aged 15 and over
 - Columns: `female_labor_force_participation_rate`
 - Link: <https://data.worldbank.org/indicator/SL.TLF.CACT.FE.ZS>
-- Raw files: `raw/world_bank_wdi/20260921/`
+- Raw files: `raw/female_labor_force_wdi/20260921/`
 - Checked: yes
 
 ## Democracy
@@ -171,6 +171,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Unit: 0 or 1
 - Columns: `anrr_democracy`
 - Link: <https://www.journals.uchicago.edu/doi/10.1086/700936>
+- Raw files: `raw/democracy_anrr/20260921/`
 - Checked: no
 - Notes: The series as published, 1960 to 2010, with no extension. The raw file was not found on the workstation when this entry was written.
 
@@ -181,7 +182,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Unit: index, 0 to 1
 - Columns: `democracy`, `expression`
 - Link: <https://ourworldindata.org/grapher/electoral-democracy-index>
-- Raw files: `raw/crisis_review_20261110/`
+- Raw files: `raw/democracy_vdem/20261110/`
 - Checked: no
 - Notes: Used only in the review of crisis events, as context.
 
@@ -221,7 +222,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Source: Bank of Canada and Bank of England, Sovereign Default Database
 - Version: 2024
 - Columns: `sovereign_default_*`
-- Raw files: `raw/crisis_review_20261109/`
+- Raw files: `raw/sovereign_default_boc_boe/20261109/`
 - Checked: yes
 
 ## Hyperinflations
@@ -241,7 +242,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Source: Culiuc and Park, Large Depreciations, IMF Working Paper 25/221
 - Version: November 2025
 - Columns: `currency_crisis_*`
-- Raw files: `raw/crisis_review_20261109/`
+- Raw files: `raw/currency_crises_culiuc_park/20261112/`
 - Checked: yes
 
 ## United States recessions
@@ -251,7 +252,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Source: National Bureau of Economic Research, business cycle dates
 - Version: not stated
 - Link: <https://www.nber.org/research/business-cycle-dating>
-- Raw files: `raw/crisis_review_20261110/`
+- Raw files: `raw/us_recessions_nber/20261110/`
 - Checked: yes
 - Notes: Used only for shading in time-series figures.
 
@@ -264,7 +265,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Unit: percent per year
 - Columns: `inflation`
 - Link: <https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG>
-- Raw files: `raw/crisis_review_20261110/`
+- Raw files: `raw/inflation_wdi/20261110/`
 - Checked: yes
 - Notes: Used only in the review of crisis events.
 
@@ -277,7 +278,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Unit: percent of the labor force aged 15 to 24
 - Columns: `youth_unemployment`
 - Link: <https://data.worldbank.org/indicator/SL.UEM.1524.ZS>
-- Raw files: `raw/crisis_review_20261110/`
+- Raw files: `raw/youth_unemployment_wdi/20261110/`
 - Checked: yes
 - Notes: Used only in the review of crisis events.
 
