@@ -147,6 +147,7 @@ part = "a filter on the columns of the rule outside the shared function is found
 rule = "Songs collected by hand, and other exceptions"
 tests = [
     "tests/test_release.py::test_the_tracked_exceptions_file_is_valid",
+    "tests/test_release.py::test_every_country_with_a_manual_review_run_has_an_exception_group",
     "tests/test_release.py::test_a_bad_exceptions_file_is_refused",
     "tests/test_release.py::test_the_manifest_counts_songs_in_out_and_left_out",
 ]

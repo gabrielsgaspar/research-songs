@@ -7,7 +7,7 @@ import duckdb
 import pandas as pd
 import pytest
 
-from songs.common import manifests, paths, schemas
+from songs.common import manifests, paths, run_records, schemas
 from songs.stage_30_topics.topic_ids import TOPIC_IDS
 from songs.stage_50_analysis import eligible_songs, release
 from songs.stage_50_analysis.countries_panel import COUNTRY_COLUMNS
@@ -118,6 +118,16 @@ def test_the_tracked_exceptions_file_is_valid():
     eligible_songs.load_exceptions()
 
 
+def test_every_country_with_a_manual_review_run_has_an_exception_group():
+    named = {group.country_iso3 for group in eligible_songs.load_exceptions()}
+    by_hand = {
+        record.iso3
+        for record in run_records.read_run_records()
+        if record.route == eligible_songs.MANUAL_ROUTE
+    }
+    assert by_hand <= named, f"add a row to the exceptions file for {sorted(by_hand - named)}"
+
+
 def write_country(data: Path, iso3: str, songs: list[dict], scores: list[dict] | None) -> None:
     """Write a complete songs folder, and a scores folder when `scores` is given."""
     folder = paths.country_songs_dir(data, iso3, SONGS_RUN)
@@ -212,6 +222,7 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         "songs_by_exception": 1,
         "songs_by_exception_BEN": 1,
         "songs_scored": 2,
+        "songs_in_country_year": 4,
         "country_year_left_out_no_year": 1,
         "songs_outside_panel": 1,
         "scores": 5,

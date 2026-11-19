@@ -230,7 +230,13 @@ def build(data: Path, *, today: date | None = None, exceptions_file: Path | None
     counts |= {
         "countries": len(countries),
         "country_years": len(country_year),
+        "songs_in_country_year": int(
+            country_year.aggregate("coalesce(sum(num_songs), 0)").fetchall()[0][0]
+        ),
     }
+    parts = ("songs_in_country_year", "country_year_left_out_no_year", "songs_outside_panel")
+    if sum(counts[name] for name in parts) != counts["eligible_songs"]:
+        raise ValueError(f"the eligible songs do not add up: {parts} must sum to them")
 
     folder.mkdir(parents=True)
     schemas.write_table(schemas.ANALYSIS_SONGS, connection.table("release_songs"), folder)

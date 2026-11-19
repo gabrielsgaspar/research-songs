@@ -20,8 +20,9 @@ how many such songs it leaves out.
 A song collected by hand whose country has a group in the exceptions file is
 eligible by exception (`by_exception` is true). The file is
 `resources/lyrics/eligibility_exceptions.csv`: one row per country, with the
-reason and the date of the decision. On 2026-11-19 no country has a
-`manual_review` run, so the file has no rows.
+reason and the date of the decision. The file has no rows while no country has a
+`manual_review` run; a test fails when a run record names that route and the file
+has no row for its country.
 """
 
 import csv
