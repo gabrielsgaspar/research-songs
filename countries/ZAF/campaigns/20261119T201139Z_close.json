@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261119T201139Z",
+  "closed_utc": "2026-11-19T20:12:25Z",
+  "iso3": "ZAF",
+  "next_time": "Kasilyrics dump clean/dumps/kasilyrics/20261119/ gave 61 songs with a Discogs track. Try next: (1) find Discogs ids for the 157 roster artists with no Discogs id (706 roster_new songs), with a check of the country of their releases before any id is set; (2) split featuring credits in dump artist names (1,467 names such as 'Artist (ft Other)'), so that songs now in not_roster (7,694) can match roster artists; (3) decide on the 439 roster_new songs that match more than one roster artist; (4) 268 songs of artists with a Discogs id found no Discogs track; check a newer Discogs dump.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 15067
+}
