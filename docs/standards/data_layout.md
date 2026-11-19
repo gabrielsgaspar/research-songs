@@ -453,6 +453,7 @@ Folder: `clean/dumps/<source>/<YYYYMMDD>/`. Key: `source_song_id`, `credit_posit
 | `lyrics_sha256` | string | yes | SHA-256 of `lyrics` as UTF-8, hex |
 | `language` | string | no | Language as the source states it |
 | `year` | int32 | no | Release year as the source states it, when it is a plausible year (`songs.common.years.is_admissible_year`) |
+| `year_source` | string | no | Old column that gave `year`, without `_raw`: `release_year` is the song, `album_release_year` is the album of the song (a fallback), `release_date` is a printed date. Null when `year` is null |
 | `album` | string | no | Album name |
 | `fetched_utc` | string | no | When the page or the record was fetched |
 | `raw_ref` | string | no | Where the raw page is under `raw/`, relative to the data folder |
@@ -479,7 +480,9 @@ Folder: `clean/dumps/<source>/<YYYYMMDD>/`. Key: `source_artist_id`, `artist_nam
 - Crawl state is not clean data. Queues, attempts, HTTP status, parser versions, receipts and logs stay in `raw/`.
 - A source that is held back from matching is a list in tracked code or in `resources/`, with the reason. It is not a missing dump. The list is `resources/lyrics/held_back_from_matching.csv`.
 - `year` and `language` are null for most rows of Letras, AAMA, Fnanen, Kugeci and the text-only sources. That is correct. Do not invent values.
-- A crawl that did not finish has the manifest note `The crawl is incomplete.` A result with no songs is not written.
+- A crawl that did not finish has the manifest note `The crawl is incomplete.` The builder reads `STOP`, `latest.json` and `manifest.json` in the folder it gets and, for a `snapshots/<stamp>/` folder, in the crawl folder two levels up. A result with no songs is not written.
+- `year_source` names the old column that gave `year`, without `_raw`. `album_release_year` is the year of the album of the song, a fallback when the song has no year of its own. A date text gives a year only when it holds exactly one four-digit number.
+- A row whose `text_kind` is not a lyric kind is dropped as `not_lyrics`. The manifest also counts these rows for each kind, as `dropped_not_lyrics_<kind>` (for example `dropped_not_lyrics_lyrics_or_poem`, `dropped_not_lyrics_chord_sheet`).
 
 ### Where each uniform column comes from
 
@@ -493,7 +496,7 @@ This table is guidance for the builder of the dumps. It gives the column of each
 | `song_name` | `song_name` | `song_name` | `title` | `provider_title` | `song_name`, or `provider_title` | `song_name` | `name` |
 | `lyrics` | `lyrics`, rows with `text_kind` = `lyrics` | `lyrics` | `lyrics` | `lyrics_text` | `lyrics`, or `lyrics_text` when `lyrics` is empty | `lyrics` | `plain_lyrics` |
 | `language` | `language_label` | none | `language` | none | `language` when the column exists | `language_cld3` | none |
-| `year` | `release_year_raw` | none | `release_year` | none | none | `year` | none |
+| `year` | `release_year_raw`, then `album_release_year_raw`, then the year in `release_date_raw` | none | `release_year` | none | none | `year` | none |
 | `album` | `album_name` | none | through `song_albums`, when the song has one album | none | none | none | `album_name` |
 | `fetched_utc` | `retrieved_at_utc` | `retrieved_at_utc` | `parsed_at_utc` | `last_attempt_at_utc` | `fetched_at_utc` | none | `updated_at` |
 
@@ -507,7 +510,7 @@ These shapes are not in the table above. The same uniform columns come from them
 | `song_url` | `song_url` | `song_url` | `song_url` | `song_url`, or `source_url` | `song_url` |
 | `artist_name` | `artist_name` | `artist_name`, or rows of `artist_songs` | performer credits, or `artist_name`, or `source_singer_credit` | `artist_name`, or `artist` | performer credits, then `featured_artists` |
 | `song_name` | `song_name` | `song_name`, or `provider_title` | `song_name` | `song_name`, or `song_title` | `song_name` |
-| `lyrics` | `lyrics`, rows with `text_kind` = `lyrics` | `lyrics`, or `lyrics_text` when `lyrics` is empty | `lyrics` | `lyrics` | `lyrics` |
+| `lyrics` | `lyrics`, rows with `text_kind` = `lyrics` or `original` | `lyrics`, or `lyrics_text` when `lyrics` is empty | `lyrics` | `lyrics` | `lyrics` |
 | `language` | none | none | none | none | `verified_language` |
 | `year` | none | none | `source_year` | none | `release_year` |
 | `album` | none | none | none | none | none |

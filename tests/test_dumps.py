@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import duckdb
@@ -1012,6 +1013,182 @@ def test_the_command_writes_a_dump(tmp_path, monkeypatch):
     assert "wrote clean/dumps/example/20261118/" in result.output
     assert "invented" not in result.output
     assert manifests.read_manifest(data / "clean" / "dumps" / "example" / DAY).source == "example"
+
+
+def test_balkan_engine_keeps_original_text_and_drops_the_rest(tmp_path):
+    folder = tmp_path / "in"
+    row = {
+        "provider": "parolesnet",
+        "source_song_key": "b1",
+        "song_url": "https://songs.example/b1",
+        "song_name": "Original Song",
+        "artist_name": "Band",
+        "lyrics": "invented original line",
+        "translation_text": None,
+        "text_kind": "original",
+        "fetched_at_utc": "2026-06-07T08:09:10Z",
+    }
+    write_parquet(
+        folder / "parolesnet_lyrics.parquet",
+        [
+            row,
+            row | {"source_song_key": "b2", "text_kind": "translation", "lyrics": "invented t"},
+            row | {"source_song_key": "b3", "text_kind": "missing", "lyrics": "invented m"},
+        ],
+    )
+    data = tmp_path / "data"
+    result = build(data, "parolesnet", folder)
+    out = _out(data, "parolesnet")
+    songs = table(schemas.DUMP_SONGS, out, "source_song_id")
+    assert [song["source_song_id"] for song in songs] == ["b1"]
+    assert result["dropped"] == {"not_lyrics": 2}
+    assert result["not_lyrics_kinds"] == {"missing": 1, "translation": 1}
+    counts = manifests.read_manifest(out).counts
+    assert counts["dropped_not_lyrics_missing"] == 1
+    assert counts["dropped_not_lyrics_translation"] == 1
+
+
+def test_lyrics_or_poem_rows_are_dropped_with_their_own_count(tmp_path):
+    folder = tmp_path / "in"
+    write_parquet(
+        folder / "tarab_hf_lyrics.parquet",
+        [
+            _lyric("s1"),
+            _lyric("s2", text_kind="lyrics_or_poem"),
+            _lyric("s3", text_kind="Chord Sheet"),
+        ],
+    )
+    data = tmp_path / "data"
+    result = build(data, "tarab_hf", folder)
+    counts = manifests.read_manifest(_out(data, "tarab_hf")).counts
+    assert result["rows_out"] == 1
+    assert counts["dropped_not_lyrics"] == 2
+    assert counts["dropped_not_lyrics_lyrics_or_poem"] == 1
+    assert counts["dropped_not_lyrics_chord_sheet"] == 1
+
+
+def test_site_snapshot_year_falls_back_to_album_year_then_date(tmp_path):
+    folder = tmp_path / "in"
+    plain = {"release_year_raw": None, "album_release_year_raw": None, "release_date_raw": None}
+    write_parquet(
+        folder / "example_lyrics.parquet",
+        [
+            _lyric("s1") | plain | {"release_year_raw": "1999", "album_release_year_raw": "2001"},
+            _lyric("s2") | plain | {"release_year_raw": "1200", "album_release_year_raw": "2001"},
+            _lyric("s3") | plain | {"album_release_year_raw": "1987.0"},
+            _lyric("s4") | plain | {"release_date_raw": "12 May 1975"},
+            _lyric("s5") | plain | {"release_date_raw": "words: 1950, music: 1952"},
+            _lyric("s6") | plain | {"release_date_raw": "3/4/19750"},
+            _lyric("s7") | plain,
+        ],
+    )
+    data = tmp_path / "data"
+    build(data, "example", folder)
+    songs = table(schemas.DUMP_SONGS, _out(data, "example"), "source_song_id")
+    found = {song["source_song_id"]: (song["year"], song["year_source"]) for song in songs}
+    assert found == {
+        "s1": (1999, "release_year"),
+        "s2": (2001, "album_release_year"),
+        "s3": (1987, "album_release_year"),
+        "s4": (1975, "release_date"),
+        "s5": (None, None),
+        "s6": (None, None),
+        "s7": (None, None),
+    }
+
+
+def test_a_family_with_one_year_column_names_it(tmp_path):
+    folder = tmp_path / "in"
+    write_parquet(
+        folder / "example_lyrics.parquet",
+        [
+            {
+                "source_record_id": "r1",
+                "provider_song_id": "c1",
+                "artist_name": "Singer",
+                "song_name": "Corpus Song",
+                "lyrics": "invented corpus line",
+                "source_year": 1970,
+                "source_singer_credit": "Singer",
+            }
+        ],
+    )
+    data = tmp_path / "data"
+    build(data, "example", folder)
+    songs = table(schemas.DUMP_SONGS, _out(data, "example"), "source_song_id")
+    assert (songs[0]["year"], songs[0]["year_source"]) == (1970, "source_year")
+
+
+def test_a_stop_file_in_the_crawl_folder_marks_a_snapshot_incomplete(tmp_path):
+    crawl = tmp_path / "lyrics_dump" / "20261001"
+    snapshot = crawl / "snapshots" / "20261002T000000Z"
+    write_parquet(snapshot / "example_lyrics.parquet", [_lyric("s1")])
+    (crawl / "STOP").write_text("stop\n", encoding="utf-8")
+    data = tmp_path / "data"
+    result = build(data, "example", snapshot)
+    assert result["incomplete"]
+    assert "The crawl is incomplete." in manifests.read_manifest(_out(data, "example")).notes
+
+
+def test_a_credit_with_no_song_key_joins_by_the_song_page(tmp_path):
+    folder = tmp_path / "in"
+    write_parquet(folder / "example_lyrics.parquet", [_lyric("s1"), _lyric("s2")])
+    write_parquet(
+        folder / "example_artist_songs.parquet",
+        [
+            {
+                "artist_key": "k1",
+                "provider_song_id": "s1",
+                "song_url": "https://songs.example/s1",
+                "credit_role": "performer",
+                "credit_raw": "By Key",
+            },
+            {
+                "artist_key": "k2",
+                "provider_song_id": None,
+                "song_url": "https://songs.example/s2",
+                "credit_role": "performer",
+                "credit_raw": "By Page",
+            },
+            {
+                "artist_key": "k3",
+                "provider_song_id": None,
+                "song_url": "https://songs.example/s2",
+                "credit_role": "composer",
+                "credit_raw": "Writer",
+            },
+        ],
+    )
+    data = tmp_path / "data"
+    result = build(data, "example", folder)
+    songs = table(schemas.DUMP_SONGS, _out(data, "example"), "source_song_id")
+    assert {(song["source_song_id"], song["artist_name"]) for song in songs} == {
+        ("s1", "By Key"),
+        ("s2", "By Page"),
+    }
+    assert result["credits_not_performer"] == 1
+
+
+def test_no_builder_view_joins_on_a_condition_with_or(tmp_path):
+    folder = tmp_path / "in"
+    write_parquet(folder / "example_lyrics.parquet", [_lyric("s1")])
+    write_parquet(
+        folder / "example_artist_songs.parquet",
+        [{"artist_key": "k1", "provider_song_id": "s1", "credit_role": "performer"}],
+    )
+    connection = duckdb.connect()
+    lyric = folder / "example_lyrics.parquet"
+    columns = set(dumps._columns(connection, lyric))
+    family = dumps.FAMILY_BY_NAME[dumps.detect_family(columns)]
+    dumps._prepare(connection, folder, "example", family, lyric, columns)
+    views = connection.execute(
+        "SELECT view_name, sql FROM duckdb_views() WHERE NOT internal"
+    ).fetchall()
+    on_with_or = re.compile(
+        r"\bON\b(?:(?!\b(?:WHERE|JOIN|UNION|GROUP|SELECT)\b).)*?\bOR\b", re.S | re.I
+    )
+    assert views
+    assert [name for name, sql in views if on_with_or.search(sql)] == []
 
 
 def _out(data: Path, source: str) -> Path:

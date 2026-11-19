@@ -336,6 +336,14 @@ DUMP_SONGS = Table(
             "Release year as the source states it, when it is a plausible year "
             "(`songs.common.years.is_admissible_year`)",
         ),
+        Column(
+            "year_source",
+            "string",
+            False,
+            "Old column that gave `year`, without `_raw`: `release_year` is the song, "
+            "`album_release_year` is the album of the song (a fallback), `release_date` is a "
+            "printed date. Null when `year` is null",
+        ),
         Column("album", "string", False, "Album name"),
         Column("fetched_utc", "string", False, "When the page or the record was fetched"),
         Column(
