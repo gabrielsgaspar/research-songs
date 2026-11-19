@@ -15,8 +15,30 @@ artist. The artists of a song are its credited names and the other names of
 those artists in `artist_names.parquet`. A song that is not held, and whose title
 or whose every artist name has no key, is left out with its reason. The
 comparison reads no lyric text, only its hash.
+
+`match_discogs` then looks for each roster_new song in the Discogs tracks of its
+artist:
+
+    in   <Discogs folder>   release_artists, release_track_artists, release_tracklist,
+                            releases, masters (Parquet, the column names of the Discogs dump)
+
+Only a song with exactly one roster artist, and a Discogs id for that artist, is
+in scope. The tracks of an artist are the tracks of the releases that credit it,
+and the tracks that credit it. The first title step that finds a track wins:
+
+    exact           the title keys are the same
+    loose           the keys are the same without parts in brackets and featuring parts
+    close           the loose keys are similar (`CLOSE_CUTOFF` or more); a person reviews these
+
+A song is `already_linked` when a track with its title already has a link in the
+country, and `track_taken` when an earlier song of the dump took the same track.
+Of the releases that hold the track, the one with the earliest year wins, then the
+lowest release id. The year is the earlier of the release date and the year of
+its master.
 """
 
+import difflib
+import re
 import unicodedata
 from collections import Counter
 from pathlib import Path
@@ -24,10 +46,35 @@ from pathlib import Path
 import duckdb
 
 from songs.common import schemas
+from songs.common.years import is_admissible_year
 
 CLASSES = ("held", "same_title", "roster_new", "not_roster")
 NEW_CLASSES = CLASSES[1:]
 LEFT_OUT = ("no_title_key", "no_artist_key")
+DISCOGS_CLASSES = (
+    "exact",
+    "loose",
+    "close",
+    "already_linked",
+    "track_taken",
+    "no_track",
+    "out_of_scope",
+)
+# match_method and match_score of a link, for each title step that adds a song.
+DISCOGS_METHODS = {
+    "exact": ("dump_discogs_exact_title", 100.0),
+    "loose": ("dump_discogs_loose_title", 95.0),
+}
+CLOSE_CUTOFF = 0.9
+DISCOGS_TABLES = (
+    "release_artists",
+    "release_track_artists",
+    "release_tracklist",
+    "releases",
+    "masters",
+)
+_BRACKETS = re.compile(r"[(\[][^)\]]*[)\]]")
+_FEATURING = re.compile(r"\b(?:ft|feat|featuring)\b.*$", re.IGNORECASE)
 
 
 def name_key(text: str | None) -> str:
@@ -145,3 +192,124 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
         },
         "songs": rows,
     }
+
+
+def loose_key(title: str | None) -> str:
+    """Return the title key without parts in brackets and without a featuring part.
+
+    A title that is only such parts keeps its full key.
+    """
+    text = _FEATURING.sub("", _BRACKETS.sub(" ", title or ""))
+    return name_key(text) or name_key(title)
+
+
+def _discogs_tracks(discogs: Path, artist_ids: list[int]) -> dict[int, list[tuple]]:
+    """Return, for each Discogs artist id, its tracks: (title, release id, track index, year)."""
+    missing = [name for name in DISCOGS_TABLES if not (discogs / f"{name}.parquet").is_file()]
+    if missing:
+        raise FileNotFoundError(f"the Discogs folder lacks {', '.join(missing)}")
+    table = {
+        name: (discogs / f"{name}.parquet").as_posix().replace("'", "''") for name in DISCOGS_TABLES
+    }
+    with duckdb.connect() as connection:
+        connection.execute("CREATE TABLE ids (artist_id BIGINT)")
+        connection.executemany("INSERT INTO ids VALUES (?)", [[number] for number in artist_ids])
+        rows = connection.sql(
+            f"""
+            WITH credited AS (
+                SELECT artist_id, release_id, CAST(NULL AS BIGINT) AS track_index
+                FROM '{table["release_artists"]}' JOIN ids USING (artist_id)
+                UNION
+                SELECT artist_id, release_id, track_index
+                FROM '{table["release_track_artists"]}' JOIN ids USING (artist_id)
+            )
+            SELECT DISTINCT c.artist_id, t.title, t.release_id, t.track_index,
+                least(
+                    nullif(TRY_CAST(left(r.released, 4) AS INTEGER), 0),
+                    nullif(CAST(m.year AS INTEGER), 0)
+                ) AS year
+            FROM credited AS c
+            JOIN '{table["release_tracklist"]}' AS t
+                ON t.release_id = c.release_id
+                AND (c.track_index IS NULL OR c.track_index = t.track_index)
+            LEFT JOIN '{table["releases"]}' AS r ON r.release_id = t.release_id
+            LEFT JOIN '{table["masters"]}' AS m ON m.master_id = r.master_id
+            WHERE t.title IS NOT NULL
+            """
+        ).fetchall()
+    tracks: dict[int, list[tuple]] = {}
+    for artist_id, title, release_id, index, year in rows:
+        year = year if year is not None and is_admissible_year(year) else None
+        tracks.setdefault(artist_id, []).append((title, release_id, index, year))
+    return tracks
+
+
+def _earliest(hits: list[tuple]) -> tuple:
+    return min(hits, key=lambda hit: (hit[3] is None, hit[3] or 0, hit[1], hit[2]))
+
+
+def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]:
+    """Look for each roster_new song of `match_dump` in the Discogs tracks of its artist.
+
+    `songs` is the `songs` list of `match_dump`. Return one row for each roster_new
+    song, in the order of `songs`, with its Discogs class and, for a found track,
+    the release id, track index, Discogs title, year, match method and score.
+    """
+    with duckdb.connect() as connection:
+        discogs_of = dict(
+            schemas.read_table(schemas.COUNTRY_ARTISTS, country, connection)
+            .project("artist_id, discogs_artist_id")
+            .fetchall()
+        )
+        linked = set(
+            schemas.read_table(schemas.COUNTRY_LINKS, country, connection)
+            .filter("discogs_release_id IS NOT NULL")
+            .project("discogs_release_id, discogs_track_index")
+            .fetchall()
+        )
+    candidates = [song for song in songs if song["class"] == "roster_new"]
+    artist_of = {
+        song["source_song_id"]: int(discogs_of[song["roster_artist_ids"][0]])
+        for song in candidates
+        if len(song["roster_artist_ids"]) == 1 and discogs_of.get(song["roster_artist_ids"][0])
+    }
+    tracks = _discogs_tracks(discogs, sorted(set(artist_of.values())))
+    taken: set[tuple] = set()
+    rows = []
+    for song in candidates:
+        row = {"source_song_id": song["source_song_id"], "discogs_class": "out_of_scope"}
+        rows.append(row)
+        artist = artist_of.get(song["source_song_id"])
+        if artist is None:
+            continue
+        row["discogs_artist_id"] = str(artist)
+        found = tracks.get(artist, [])
+        exact, loose = name_key(song["song_name"]), loose_key(song["song_name"])
+        kind, hits, score = "exact", [hit for hit in found if name_key(hit[0]) == exact], None
+        if not hits:
+            kind, hits = "loose", [hit for hit in found if loose_key(hit[0]) == loose]
+        if not hits:
+            keys = sorted({loose_key(hit[0]) for hit in found})
+            close = difflib.get_close_matches(loose, keys, n=1, cutoff=CLOSE_CUTOFF)
+            kind, hits = "close", [hit for hit in found if close and loose_key(hit[0]) == close[0]]
+            if close:
+                score = round(100 * difflib.SequenceMatcher(None, loose, close[0]).ratio(), 1)
+        if not hits:
+            row["discogs_class"] = "no_track"
+            continue
+        if any((str(hit[1]), str(hit[2])) in linked for hit in hits):
+            row["discogs_class"] = "already_linked"
+            continue
+        title, release_id, index, year = _earliest(hits)
+        method, fixed = DISCOGS_METHODS.get(kind, ("dump_discogs_close_title", None))
+        row |= {
+            "discogs_class": "track_taken" if (release_id, index) in taken else kind,
+            "discogs_release_id": str(release_id),
+            "discogs_track_index": str(index),
+            "discogs_title": title,
+            "year": year,
+            "match_method": method,
+            "match_score": fixed if fixed is not None else score,
+        }
+        taken.add((release_id, index))
+    return rows
