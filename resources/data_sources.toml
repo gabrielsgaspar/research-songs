@@ -362,6 +362,6 @@ columns = []
 source = "MusicBrainz JSON data dumps"
 version = "2026-06-24"
 url = "https://metabrainz.org/datasets"
-raw_path = "musicbrainz/clean/20260624-001001/"
+raw_path = "clean/catalog/musicbrainz/20260624/"
 checked = false
 notes = "Used for artist names in other scripts and for country rosters. The version is read from a folder name."
