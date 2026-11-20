@@ -207,7 +207,7 @@ def _write_country_songs(
         ("old_links", schemas.COUNTRY_LINKS),
     ):
         relation = (
-            schemas.read_table(table, earlier, connection)
+            schemas.read_table(table, earlier, connection, fill_absent=True)
             if earlier
             else schemas.empty_table(table, connection)
         )

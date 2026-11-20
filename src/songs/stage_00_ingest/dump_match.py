@@ -163,7 +163,7 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
             "source_artist_id, artist_name",
         )
         held = _rows(
-            schemas.read_table(schemas.COUNTRY_SONGS, country, connection),
+            schemas.read_table(schemas.COUNTRY_SONGS, country, connection, fill_absent=True),
             "artist_id, artist_name, song_name, lyrics_sha256",
         )
         roster = _rows(

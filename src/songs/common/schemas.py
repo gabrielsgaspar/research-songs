@@ -190,6 +190,13 @@ COUNTRY_SONGS = Table(
             "Year of first release when the row is a re-release",
         ),
         Column(
+            "re_release",
+            "boolean",
+            False,
+            "Verdict of the re-release check: true when the row is a re-release (the old "
+            "`tag_re_release`). Empty when no check ran",
+        ),
+        Column(
             "canonical_song_id",
             "string",
             False,
@@ -552,11 +559,27 @@ def write_table(table: Table, relation: duckdb.DuckDBPyRelation, folder: Path) -
 
 
 def read_table(
-    table: Table, folder: Path, connection: duckdb.DuckDBPyConnection | None = None
+    table: Table,
+    folder: Path,
+    connection: duckdb.DuckDBPyConnection | None = None,
+    *,
+    fill_absent: bool = False,
 ) -> duckdb.DuckDBPyRelation:
-    """Open the file of a table in `folder`, and raise ValueError when it breaks the schema."""
+    """Open the file of a table in `folder`, and raise ValueError when it breaks the schema.
+
+    With `fill_absent`, an optional column that the file lacks is read as empty. An
+    importer uses it to read a folder written before the column existed. An analysis
+    does not: for it, an absent column is an error.
+    """
     path = folder / table.file
     relation = (connection or duckdb).read_parquet(str(path))
+    absent = [
+        f'CAST(NULL AS {TYPES[column.type]}) AS "{column.name}"'
+        for column in table.all_columns
+        if fill_absent and not column.required and column.name not in relation.columns
+    ]
+    if absent:
+        relation = relation.project(", ".join(["*", *absent]))
     _fail(table, path, check_table(table, relation))
     return relation
 

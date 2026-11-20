@@ -48,6 +48,7 @@ SONG_COLUMNS = {
     "year_source": TEXT,
     "year_basis": TEXT,
     "first_release_year": "INTEGER",
+    "tag_re_release": "BOOLEAN",
     "canonical_song_id": TEXT,
     "duplicate_decision": TEXT,
     "quality_status": TEXT,
@@ -198,7 +199,7 @@ def _write_country(
         ("earlier_links", schemas.COUNTRY_LINKS),
     ):
         relation = (
-            schemas.read_table(table, earlier, connection)
+            schemas.read_table(table, earlier, connection, fill_absent=True)
             if earlier
             else schemas.empty_table(table, connection)
         )
@@ -325,7 +326,8 @@ def _write_country(
             '{iso3}' AS country_iso3, p.song_id, p.artist_id, p.artist_name, t.song_name,
             NULL AS title_key, p.source, s.provider_song_id AS source_song_id, s.song_url,
             s.lyrics, p.lyrics_sha256, NULL AS language, s.year, s.year_source, s.year_basis,
-            s.first_release_year, s.canonical_song_id, s.duplicate_decision, s.quality_status,
+            s.first_release_year, s.tag_re_release AS re_release, s.canonical_song_id,
+            s.duplicate_decision, s.quality_status,
             '{ROUTE}' AS route, '{run_id}' AS run_id, p.collected_utc
         FROM old_songs AS s
         JOIN picked AS p ON p.filename = s.filename AND p.file_row_number = s.file_row_number
