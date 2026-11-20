@@ -12,7 +12,11 @@ Each song of the dump counts once, in the first class that it fits:
 
 A song of the dump is one `source_song_id`; it can have more than one credited
 artist. The artists of a song are its credited names and the other names of
-those artists in `artist_names.parquet`. A song that is not held, and whose title
+those artists in `artist_names.parquet`. When no artist of a song gives
+same_title or roster_new, the lead part of each credited name is tried next
+(`lead_artist`: "A feat. B", "A x B" and "A & B" give A). A featured part alone
+never makes a match. `matched_by_split` counts the songs that the lead parts
+matched. A song that is not held, and whose title
 or whose every artist name has no key, is left out with its reason. The
 comparison reads no lyric text, only its hash.
 
@@ -106,6 +110,12 @@ DISCOGS_TABLES = (
 )
 _BRACKETS = re.compile(r"[(\[][^)\]]*[)\]]")
 _FEATURING = re.compile(r"\b(?:ft|feat|featuring)\b.*$", re.IGNORECASE)
+# Words that join a lead performer to other performers, in the languages of the dumps.
+_JOINERS = r"x|and|with|vs\.?|e|y|i|et|con|avec|mit|und|og|ja|en|na|le|ve|va|и|і|та|و|/|\+"
+_CREDIT_SPLIT = re.compile(
+    rf"\s*(?:\(?(?<!\w)(?:feat|ft|featuring)(?!\w)\.?|[,&]|(?<=\s)(?:{_JOINERS})(?=\s))\s*",
+    re.IGNORECASE,
+)
 
 
 def name_key(text: str | None) -> str:
@@ -121,6 +131,15 @@ def name_key(text: str | None) -> str:
         char if char.isalnum() else " " for char in folded if not unicodedata.combining(char)
     )
     return " ".join(kept.split())
+
+
+def lead_artist(name: str | None) -> str:
+    """Return the lead performer of a credit such as "A feat. B" or "A & B", or "" for no split.
+
+    A name with no featuring or joining word, or with nothing on one side of it, has no split.
+    """
+    parts = _CREDIT_SPLIT.split(name or "", maxsplit=1)
+    return parts[0].strip() if len(parts) == 2 and name_key(parts[0]) and name_key(parts[1]) else ""
 
 
 def _rows(relation: duckdb.DuckDBPyRelation, columns: str) -> list[tuple]:
@@ -170,16 +189,27 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
     for song_id, _position, artist, artist_id, title, sha in sorted(credits):
         song = songs.setdefault(
             song_id,
-            {"artist_name": artist, "song_name": title, "lyrics_sha256": sha, "keys": set()},
+            {
+                "artist_name": artist,
+                "song_name": title,
+                "lyrics_sha256": sha,
+                "keys": set(),
+                "leads": set(),
+            },
         )
         song["keys"] |= {name_key(artist), *names_of.get(artist_id, ())}
+        song["leads"].add(name_key(lead_artist(artist)))
+
+    def on_roster(keys: set[str]) -> set[str]:
+        return set().union(*(roster_ids.get(key, set()) for key in keys))
 
     counts = Counter({name: 0 for name in CLASSES})
     left_out = Counter({name: 0 for name in LEFT_OUT})
-    ambiguous = 0
+    ambiguous = split = 0
     rows = []
     for song_id, song in songs.items():
         keys = song["keys"] - {""}
+        leads = song["leads"] - keys - {""}
         title = name_key(song["song_name"])
         artist_ids: set[str] = set()
         if song["lyrics_sha256"] in held_hashes:
@@ -192,10 +222,15 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
             continue
         elif any((key, title) in held_pairs for key in keys):
             kind = "same_title"
+        elif artist_ids := on_roster(keys):
+            kind = "roster_new"
+        elif any((key, title) in held_pairs for key in leads):
+            kind, split = "same_title", split + 1
         else:
-            artist_ids = set().union(*(roster_ids.get(key, set()) for key in keys))
+            artist_ids = on_roster(leads)
             kind = "roster_new" if artist_ids else "not_roster"
-            ambiguous += len(artist_ids) > 1
+            split += bool(artist_ids)
+        ambiguous += len(artist_ids) > 1
         counts[kind] += 1
         rows.append(
             {
@@ -213,6 +248,7 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
         "counts": dict(counts),
         "left_out": dict(left_out),
         "roster_new_more_than_one_artist": ambiguous,
+        "matched_by_split": split,
         "examples": {
             kind: [
                 (row["artist_name"], row["song_name"])

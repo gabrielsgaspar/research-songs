@@ -12,6 +12,7 @@ from songs.common import manifests, paths, run_records, schemas
 from songs.common.paths import DATA_ROOT_ENV
 from songs.stage_00_ingest.dump_match import (
     import_dump,
+    lead_artist,
     load_reviewed_matches,
     loose_key,
     match_discogs,
@@ -149,6 +150,48 @@ def test_each_dump_song_counts_once_in_one_class(tmp_path):
     assert result["left_out"] == {"no_title_key": 1, "no_artist_key": 1}
     assert result["songs_out"] + sum(result["left_out"].values()) == result["songs_in"]
     assert result["examples"]["not_roster"] == [("Unknown Band", "Far Away")]
+
+
+def test_lead_artist_splits_featuring_and_joining_words():
+    assert lead_artist("Anna Jons feat. Bára") == "Anna Jons"
+    assert lead_artist("Anna Jons (ft. Bára)") == "Anna Jons"
+    assert lead_artist("Anna Jons FEATURING Bára, Other") == "Anna Jons"
+    assert lead_artist("Anna Jons x Bára") == "Anna Jons"
+    assert lead_artist("Anna Jons&Bára") == "Anna Jons"
+    assert lead_artist("Anna Jons na Bára") == "Anna Jons"
+    assert lead_artist("Anna Jons с Bára") == ""
+    assert lead_artist("Malcolm X") == "" and lead_artist("Aftermath") == ""
+    assert lead_artist("& Bára") == "" and lead_artist(None) == ""
+
+
+def test_the_lead_of_a_featuring_credit_matches_and_is_counted(tmp_path):
+    _, country = make_folders(tmp_path)
+    dump = paths.clean_dump_dir(tmp_path, "example", "20260103")
+    write(schemas.DUMP_ARTIST_NAMES, dump, [])
+    write(
+        schemas.DUMP_SONGS,
+        dump,
+        [
+            credit("f1", "Anna Jons feat. Bára", "Brand New", "g1"),
+            credit("f2", "Someone ft. Anna Jons", "Other", "g2"),
+            credit("f3", "Anna Jons & Unknown", "Sól, sól!", "g3"),
+            credit("f4", "Bára x Anna Jons", "Third", "g4"),
+            credit("f5", "Anna Jons", "Plain", "g5"),
+            credit("f6", "Malcolm X", "Fourth", "g6"),
+        ],
+    )
+    result = match_dump(dump, country)
+    by_id = {row["source_song_id"]: row for row in result["songs"]}
+    assert {song: (row["class"], row["roster_artist_ids"]) for song, row in by_id.items()} == {
+        "f1": ("roster_new", ["a1"]),
+        "f2": ("not_roster", []),
+        "f3": ("same_title", []),
+        "f4": ("roster_new", ["a2"]),
+        "f5": ("roster_new", ["a1"]),
+        "f6": ("not_roster", []),
+    }
+    assert result["matched_by_split"] == 3
+    assert result["roster_new_more_than_one_artist"] == 0
 
 
 def test_cli_prints_counts_and_no_lyrics(tmp_path, monkeypatch):

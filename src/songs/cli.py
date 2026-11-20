@@ -532,6 +532,7 @@ def dumps_match(
     typer.echo(
         f"roster_new with more than one roster artist: {result['roster_new_more_than_one_artist']}"
     )
+    typer.echo(f"matched by the lead of a featuring credit: {result['matched_by_split']}")
     for name, pairs in result["examples"].items():
         typer.echo(f"examples of {name}:")
         for artist, title in pairs:
