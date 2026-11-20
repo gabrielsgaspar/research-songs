@@ -745,7 +745,12 @@ def test_genius_uses_the_original_columns_and_not_a_name_key(tmp_path):
     assert "not-this" not in {row["source_artist_id"] for row in names}
 
 
-def test_lrclib_does_not_copy_keys(tmp_path):
+@pytest.mark.parametrize(
+    "updated_at",
+    ["2026-08-07 12:00:00", pd.Timestamp("2026-08-07 12:00:00")],
+    ids=["text", "timestamp"],
+)
+def test_lrclib_does_not_copy_keys(tmp_path, updated_at):
     folder = tmp_path / "in"
     write_parquet(
         folder / "lrclib_lyrics.parquet",
@@ -756,7 +761,7 @@ def test_lrclib_does_not_copy_keys(tmp_path):
                 "artist_name": "Ada",
                 "album_name": "Album Seven",
                 "plain_lyrics": "invented line lrclib",
-                "updated_at": "2026-08-07 12:00:00",
+                "updated_at": updated_at,
                 "artist_key": "bad-key",
                 "title_key": "bad-title",
             },
@@ -766,7 +771,7 @@ def test_lrclib_does_not_copy_keys(tmp_path):
                 "artist_name": "Ada",
                 "album_name": "Album",
                 "plain_lyrics": " ",
-                "updated_at": "2026-08-07 12:00:00",
+                "updated_at": updated_at,
                 "artist_key": "bad-key",
                 "title_key": "bad-title",
             },

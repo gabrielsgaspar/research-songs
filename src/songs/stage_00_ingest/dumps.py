@@ -1179,7 +1179,7 @@ def _coalesce(columns: set[str], names: tuple[str, ...]) -> str:
 def _raw_time(columns: set[str], names: tuple[str, ...]) -> str:
     for name in names:
         if name in columns:
-            return f"lyric.{_q(name)}"
+            return f"CAST(lyric.{_q(name)} AS VARCHAR)"
     return "CAST(NULL AS VARCHAR)"
 
 
