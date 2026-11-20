@@ -210,3 +210,16 @@ def test_generated_page_is_current():
     assert on_disk == s.render_page(on_disk), (
         f"docs/standards/data_layout.md is out of date. Run: {s.WRITE_COMMAND}"
     )
+
+
+def test_an_importer_reads_an_absent_optional_column_as_empty(tmp_path):
+    table = s.COUNTRY_SONGS
+    frame = sample(table).drop(columns="re_release")
+    s.cast_to_schema(table, frame).write_parquet(str(tmp_path / table.file))
+    with pytest.raises(ValueError, match="missing column re_release"):
+        s.read_table(table, tmp_path)
+    stored = s.read_table(table, tmp_path, fill_absent=True)
+    assert stored.project("re_release").fetchall() == [(None,), (None,)]
+    s.cast_to_schema(table, frame.drop(columns="lyrics")).write_parquet(str(tmp_path / table.file))
+    with pytest.raises(ValueError, match="missing column lyrics"):
+        s.read_table(table, tmp_path, fill_absent=True)

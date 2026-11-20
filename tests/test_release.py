@@ -55,6 +55,8 @@ CASES = [
     ("retained", {"duplicate_decision": "retain"}, None, False),
     ("other_row", {"canonical_song_id": "eligible"}, "not_canonical", False),
     ("own_row", {"canonical_song_id": "own_row"}, None, False),
+    ("re_release", {"re_release": True}, "re_release", False),
+    ("original_release", {"re_release": False}, None, False),
     ("by_hand", {"route": "manual_review"}, "entered_by_hand", False),
     ("year_fixed_by_hand", {"year_source": "manual_review"}, None, False),
     ("by_hand_named", {"route": "manual_review", "country_iso3": "BEN"}, None, True),
@@ -186,6 +188,7 @@ def built(tmp_path):
             song("t3", year=1991, lyrics_sha256="1" * 64),
             song("t4", quality_status="quarantine"),
             song("t5", year=None),
+            song("t6", re_release=True),
         ],
         [score("t1", 10), score("t2", 20), score("t3", 30), score("gone", 40), score("t4", 50)],
     )
@@ -217,7 +220,7 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         f"lyrics/TGO/scores/{SCORES_RUN}/",
     ]
     assert manifest.counts == {
-        "songs": 7,
+        "songs": 8,
         "eligible_songs": 6,
         "songs_by_exception": 1,
         "songs_by_exception_BEN": 1,
@@ -232,6 +235,7 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         "left_out_quality_quarantine": 1,
         "left_out_suppressed_duplicate": 0,
         "left_out_not_canonical": 0,
+        "left_out_re_release": 1,
         "left_out_entered_by_hand": 0,
         "left_out_year_out_of_range": 0,
         "countries": 2,

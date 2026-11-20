@@ -10,9 +10,11 @@ filter. The rules, in the order that they are checked:
    (`duplicate_decision` is `suppress_duplicate`).
 3. `not_canonical`: another row represents the song (`canonical_song_id` is set and
    is not the `song_id` of the row): a duplicate or a re-release.
-4. `entered_by_hand`: a person collected the song (route `manual_review`), and its
+4. `re_release`: the re-release check of the old pipeline says that the row is a
+   re-release (`re_release` is true). A row that no check saw is not left out.
+5. `entered_by_hand`: a person collected the song (route `manual_review`), and its
    country has no group in the exceptions file.
-5. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
+6. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
 
 A song with no year is eligible. An analysis by year cannot use it, and reports
 how many such songs it leaves out.
@@ -43,6 +45,7 @@ RULES = {
     "quality_quarantine": "quality_status = 'quarantine'",
     "suppressed_duplicate": "duplicate_decision = 'suppress_duplicate'",
     "not_canonical": "canonical_song_id IS NOT NULL AND canonical_song_id <> song_id",
+    "re_release": "re_release",
     "entered_by_hand": "{manual} AND NOT {named}",
     "year_out_of_range": f"year NOT BETWEEN {MIN_SONG_YEAR} AND {MAX_SONG_YEAR}",
 }
@@ -53,6 +56,7 @@ COLUMNS = (
     "quality_status",
     "duplicate_decision",
     "canonical_song_id",
+    "re_release",
     "year",
 )
 
