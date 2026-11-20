@@ -64,14 +64,61 @@ def list_files(tmp_path: Path, suspect: str = "", quarantine: str = "") -> tuple
     return files
 
 
+ZEROS = "0" * 64
+SUSPECT_ROWS = f"*,{SUSPECT},check_a\nother_site,{OTHER_SITE},check_b\n"
+QUARANTINE_ROWS = (
+    f"quarantined,a1,invented,{ZEROS},check_c\nchanged,a1,invented,{CHANGED},check_c\n"
+    f"other_artist,a9,invented,{ZEROS},check_c\n"
+)
+OLD_COLUMNS = "song_id,country,artist_id,provider,lyrics_text_hash,decision,reason,"
+OLD_COLUMNS += "source_check_id,reviewed_by,reviewed_at\n"
+
+
 def invented_lists(tmp_path: Path) -> tuple[Path, Path]:
-    zeros = "0" * 64
-    return list_files(
+    return list_files(tmp_path, SUSPECT_ROWS, QUARANTINE_ROWS)
+
+
+def old_quarantine(tmp_path: Path, rows: str) -> Path:
+    """Write a list of songs in quarantine in the old format, with invented rows."""
+    path = tmp_path / "old_song_quarantine.csv"
+    path.write_text(OLD_COLUMNS + rows, encoding="utf-8")
+    return path
+
+
+def test_the_import_keeps_the_quarantine_rows_and_the_columns_of_the_rule(tmp_path):
+    data = tmp_path / "data"
+    old = old_quarantine(
         tmp_path,
-        f"*,{SUSPECT},check_a\nother_site,{OTHER_SITE},check_b\n",
-        f"quarantined,a1,invented,{zeros},check_c\nchanged,a1,invented,{CHANGED},check_c\n"
-        f"other_artist,a9,invented,{zeros},check_c\n",
+        f"s2,TGO,a1,Site, {ZEROS.upper()} ,quarantine,a free text,check_a,someone,2026-01-01\n"
+        f"s1,TGO,a1,site,{ZEROS},Quarantine,a free text,,someone,2026-01-01\n"
+        f"s1,TGO,a1,site,{ZEROS},quarantine,again,check_b,someone,2026-01-01\n"
+        f"s3,TGO,a1,site,{ZEROS},accepted,a free text,check_a,someone,2026-01-01\n"
+        f"s4,TGO,,site,{ZEROS},quarantine,a free text,check_a,someone,2026-01-01\n",
     )
+    result = eligible_songs.import_old_song_quarantine(old, data, date(2026, 11, 20))
+    assert result["folder"] == paths.clean_song_quarantine_dir(data, "20261120")
+    assert result["counts"] == {
+        "rows_read": 5,
+        "left_out_not_quarantine": 1,
+        "left_out_empty_key": 1,
+        "left_out_repeated_key": 1,
+        "rows_written": 2,
+    }
+    written = (result["folder"] / manifests.SONG_QUARANTINE_FILE).read_text(encoding="utf-8")
+    assert written == (
+        "song_id,artist_id,source,lyrics_text_hash,check_id\n"
+        f"s1,a1,site,{ZEROS},unrecorded\ns2,a1,site,{ZEROS},check_a\n"
+    )
+    assert "free text" not in written and "someone" not in written
+    assert manifests.read_manifest(result["folder"]).kind == "clean_song_quarantine"
+    assert eligible_songs.quarantine_file(data) == result["folder"] / "song_quarantine.csv"
+    with pytest.raises(FileExistsError, match="never written over"):
+        eligible_songs.import_old_song_quarantine(old, data, date(2026, 11, 20))
+
+
+def test_the_rule_needs_a_complete_quarantine_folder(tmp_path):
+    with pytest.raises(FileNotFoundError, match="song_quarantine"):
+        eligible_songs.quarantine_file(tmp_path)
 
 
 CASES = [
@@ -165,9 +212,10 @@ def test_a_hash_list_with_other_columns_is_refused(tmp_path):
         eligible_songs.load_hash_lists(duckdb.connect(), suspect, quarantine)
 
 
-def test_the_tracked_hash_lists_are_valid():
-    lists = eligible_songs.load_hash_lists(duckdb.connect())
-    assert all(len(relation) for relation in lists.values())
+def test_the_tracked_list_of_suspect_texts_is_valid(tmp_path):
+    _, quarantine = list_files(tmp_path)
+    lists = eligible_songs.load_hash_lists(duckdb.connect(), quarantine=quarantine)
+    assert len(lists["suspect_text"])
 
 
 @pytest.mark.parametrize(
@@ -237,6 +285,8 @@ def write_panel(data: Path, codes: list[str]) -> None:
     ).project(", ".join(COUNTRY_COLUMNS))
     relation.write_parquet(str(folder / manifests.COUNTRIES_FILE))
     manifests.write_manifest(data, folder, "clean_countries", inputs=["z"])
+    # An empty list of songs in quarantine; a test that needs rows writes a newer one.
+    eligible_songs.import_old_song_quarantine(old_quarantine(data, ""), data, date(2026, 1, 1))
 
 
 def score(song_id: str, first: int, sha: str = "0" * 64) -> dict:
@@ -271,13 +321,14 @@ def built(tmp_path):
         ],
         None,
     )
-    suspect, quarantine = invented_lists(tmp_path)
+    old = old_quarantine(tmp_path, f"quarantined,TGO,a1,Invented,{ZEROS},quarantine,x,c,y,z\n")
+    eligible_songs.import_old_song_quarantine(old, data, date(2026, 1, 2))
+    suspect, _ = invented_lists(tmp_path)
     result = release.build(
         data,
         today=date(2026, 11, 19),
         exceptions_file=exceptions_file(tmp_path, "BEN,invented reason,2026-11-19\n"),
         suspect_file=suspect,
-        quarantine_file=quarantine,
     )
     return data, result
 
@@ -288,6 +339,7 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
     assert manifest.kind == "analysis" and manifest.path == "analysis/20261119/"
     assert manifest.inputs == [
         "clean/countries/20260101/",
+        "clean/quality/song_quarantine/20260102/",
         f"lyrics/BEN/songs/{SONGS_RUN}/",
         f"lyrics/TGO/songs/{SONGS_RUN}/",
         f"lyrics/TGO/scores/{SCORES_RUN}/",
@@ -405,6 +457,7 @@ def test_a_panel_with_other_columns_is_refused(tmp_path):
         str(folder / manifests.COUNTRIES_FILE)
     )
     manifests.write_manifest(data, folder, "clean_countries", inputs=["z"])
+    eligible_songs.import_old_song_quarantine(old_quarantine(data, ""), data, date(2026, 1, 1))
     write_country(data, "TGO", [song("t1")], None)
     with pytest.raises(ValueError, match="COUNTRY_COLUMNS"):
         release.build(data, today=date(2026, 11, 19), exceptions_file=exceptions_file(tmp_path))

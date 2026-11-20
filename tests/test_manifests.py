@@ -26,6 +26,11 @@ CASES = {
         ("artists.parquet",),
     ),
     "clean_countries": ((DAY,), {"inputs": ["raw/hfd/20260921/tfrRR.txt"]}, None),
+    "clean_song_quarantine": (
+        (DAY,),
+        {"inputs": ["resources/lyrics/song_quarantine.csv"]},
+        None,
+    ),
     "country_songs": (
         ("BRA", RUN),
         {"country_iso3": "BRA", "run_id": RUN, "inputs": ["clean/dumps/letras/20261105/"]},

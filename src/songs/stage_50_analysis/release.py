@@ -200,7 +200,9 @@ def build(
 ) -> dict:
     """Build the release and write it, with its manifest, to `analysis/<YYYYMMDD>/`.
 
-    The files of the rule default to the tracked files in `resources/lyrics/`.
+    The exceptions file and the list of suspect texts default to the tracked files in
+    `resources/lyrics/`, and the list of songs in quarantine to the newest complete
+    quarantine folder of `data`.
 
     Raise FileNotFoundError when there is no complete country-year table or no
     complete songs folder, and FileExistsError when the folder of the day exists.
@@ -223,7 +225,7 @@ def build(
     exceptions = eligible_songs.load_exceptions(exceptions_file)
     root = paths.resolve_project_root()
     suspect_file = suspect_file or root / eligible_songs.SUSPECT_FILE
-    quarantine_file = quarantine_file or root / eligible_songs.QUARANTINE_FILE
+    quarantine_file = quarantine_file or eligible_songs.quarantine_file(data)
 
     connection = duckdb.connect()
     panel = connection.read_parquet(str(panel_folder / manifests.COUNTRIES_FILE))
@@ -257,6 +259,8 @@ def build(
     schemas.write_table(schemas.ANALYSIS_SONGS, connection.table("release_songs"), folder)
     schemas.write_table(schemas.ANALYSIS_COUNTRY_YEAR, country_year, folder)
     inputs = [paths.data_relative(data, panel_folder)]
+    if quarantine_file.parent.is_relative_to(data):
+        inputs.append(paths.data_relative(data, quarantine_file.parent))
     for _, songs, scores in countries:
         inputs += [paths.data_relative(data, songs)]
         inputs += [paths.data_relative(data, scores)] if scores is not None else []
@@ -272,7 +276,7 @@ def build(
             for name, path in (
                 (eligible_songs.EXCEPTIONS_FILE, exceptions_file),
                 (eligible_songs.SUSPECT_FILE, suspect_file),
-                (eligible_songs.QUARANTINE_FILE, quarantine_file),
+                (Path(manifests.SONG_QUARANTINE_FILE), quarantine_file),
             )
         )
         + ".",

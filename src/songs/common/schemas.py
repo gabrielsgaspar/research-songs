@@ -173,7 +173,7 @@ COUNTRY_SONGS = Table(
             "lyrics_text_hash",
             "string",
             False,
-            "Hash by which the lyric-hash lists in `resources/lyrics/` name the text "
+            "Hash by which the lyric-hash lists of the rule for eligible songs name the text "
             "(`songs.common.lyric_hash`): the hash that the old files store, or the SHA-256 "
             "of the text after whitespace normalization. Empty when the text is blank",
         ),

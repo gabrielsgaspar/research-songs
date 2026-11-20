@@ -174,6 +174,11 @@ def clean_countries_dir(data: Path, day: date | str) -> Path:
     return data / "clean" / "countries" / check_day(day)
 
 
+def clean_song_quarantine_dir(data: Path, day: date | str) -> Path:
+    """Return `clean/quality/song_quarantine/<YYYYMMDD>/`: one list of songs in quarantine."""
+    return data / "clean" / "quality" / "song_quarantine" / check_day(day)
+
+
 def country_songs_dir(data: Path, iso3: str, run_id: str) -> Path:
     """Return `lyrics/<ISO3>/songs/<run id>/`: the full state of a country after a run."""
     return data / "lyrics" / check_iso3(iso3) / "songs" / check_run_id(run_id)
@@ -240,6 +245,11 @@ def latest_clean_catalog_dir(data: Path, source: str) -> Path | None:
 def latest_clean_countries_dir(data: Path) -> Path | None:
     """Return the newest complete `clean/countries/<YYYYMMDD>/`, or None."""
     return _latest(data / "clean" / "countries", DAY)
+
+
+def latest_clean_song_quarantine_dir(data: Path) -> Path | None:
+    """Return the newest complete `clean/quality/song_quarantine/<YYYYMMDD>/`, or None."""
+    return _latest(data / "clean" / "quality" / "song_quarantine", DAY)
 
 
 def latest_country_songs_dir(data: Path, iso3: str) -> Path | None:
