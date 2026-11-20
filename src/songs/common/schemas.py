@@ -169,6 +169,14 @@ COUNTRY_SONGS = Table(
         Column("song_url", "string", False, "Page of the song at the source"),
         Column("lyrics", "string", True, "The lyric text"),
         Column("lyrics_sha256", "string", True, "SHA-256 of `lyrics` as UTF-8, hex"),
+        Column(
+            "lyrics_text_hash",
+            "string",
+            False,
+            "Hash by which the lyric-hash lists of the rule for eligible songs name the text "
+            "(`songs.common.lyric_hash`): the hash that the old files store, or the SHA-256 "
+            "of the text after whitespace normalization. Empty when the text is blank",
+        ),
         Column("language", "string", False, "Language as recorded; no fixed code list yet"),
         Column("year", "int32", False, "Release year used in analysis"),
         Column(

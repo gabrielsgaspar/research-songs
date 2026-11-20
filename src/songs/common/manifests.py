@@ -33,6 +33,7 @@ FILE_KEYS = ("path", "bytes", "sha256", "rows")
 OPTIONAL_FIELDS = ("country_iso3", "source", "run_id", "origin")
 UTC_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 SHA256 = re.compile(r"[0-9a-f]{64}")
+SONG_QUARANTINE_FILE = "song_quarantine.csv"
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,14 @@ KINDS: dict[str, Kind] = {
         "day",
         ("inputs",),
         (COUNTRIES_FILE,),
+    ),
+    "clean_song_quarantine": Kind(
+        "clean/quality/song_quarantine/<YYYYMMDD>/",
+        paths.clean_song_quarantine_dir,
+        None,
+        "day",
+        ("inputs",),
+        (SONG_QUARANTINE_FILE,),
     ),
     "country_songs": Kind(
         schemas.COUNTRY_FOLDER,

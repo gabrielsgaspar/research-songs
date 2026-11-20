@@ -63,12 +63,13 @@ def test_each_version_folder_has_one_path_function(tmp_path):
         paths.clean_dump_dir(tmp_path, "letras", day): "clean/dumps/letras/20261105",
         paths.clean_catalog_dir(tmp_path, "discogs", day): "clean/catalog/discogs/20261105",
         paths.clean_countries_dir(tmp_path, date(2026, 11, 5)): "clean/countries/20261105",
+        paths.clean_song_quarantine_dir(tmp_path, day): "clean/quality/song_quarantine/20261105",
         paths.country_songs_dir(tmp_path, "BRA", run): "lyrics/BRA/songs/20261105T140000Z",
         paths.country_scores_dir(tmp_path, "BRA", run): "lyrics/BRA/scores/20261105T140000Z",
         paths.analysis_dir(tmp_path, day): "analysis/20261105",
     }
     assert {path.relative_to(tmp_path).as_posix() for path in built} == set(built.values())
-    assert len(built) == 8
+    assert len(built) == 9
 
 
 @pytest.mark.parametrize(
@@ -125,6 +126,10 @@ def test_every_kind_of_version_folder_has_a_latest_function(tmp_path):
         ),
         (paths.clean_countries_dir(tmp_path, day), paths.latest_clean_countries_dir(tmp_path)),
         (
+            paths.clean_song_quarantine_dir(tmp_path, day),
+            paths.latest_clean_song_quarantine_dir(tmp_path),
+        ),
+        (
             paths.country_scores_dir(tmp_path, "BRA", run),
             paths.latest_country_scores_dir(tmp_path, "BRA"),
         ),
@@ -138,8 +143,9 @@ def test_every_kind_of_version_folder_has_a_latest_function(tmp_path):
     assert paths.latest_clean_dump_dir(tmp_path, "letras") == pairs[2][0]
     assert paths.latest_clean_catalog_dir(tmp_path, "discogs") == pairs[3][0]
     assert paths.latest_clean_countries_dir(tmp_path) == pairs[4][0]
-    assert paths.latest_country_scores_dir(tmp_path, "BRA") == pairs[5][0]
-    assert paths.latest_analysis_dir(tmp_path) == pairs[6][0]
+    assert paths.latest_clean_song_quarantine_dir(tmp_path) == pairs[5][0]
+    assert paths.latest_country_scores_dir(tmp_path, "BRA") == pairs[6][0]
+    assert paths.latest_analysis_dir(tmp_path) == pairs[7][0]
 
 
 def test_workbook_folders_count_without_a_manifest(tmp_path):

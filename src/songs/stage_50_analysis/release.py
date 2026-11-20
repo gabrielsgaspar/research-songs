@@ -22,7 +22,9 @@ from songs.stage_50_analysis.countries_panel import COUNTRY_COLUMNS
 
 # Columns of the country-year table that the release counts again from the eligible songs.
 REPLACED_PANEL_COLUMNS = ("num_songs", "num_artists", "artist_count_method")
-SONG_COLUMNS = ("country_iso3", "artist_id", "source", "lyrics_sha256", *eligible_songs.COLUMNS)
+SONG_COLUMNS = tuple(
+    dict.fromkeys(("country_iso3", "artist_id", "source", "lyrics_sha256", *eligible_songs.COLUMNS))
+)
 TOPICS = ", ".join(f'"{topic}"' for topic in TOPIC_IDS)
 
 
@@ -188,8 +190,19 @@ def _counts(connection: duckdb.DuckDBPyConnection) -> dict[str, int]:
     return counts
 
 
-def build(data: Path, *, today: date | None = None, exceptions_file: Path | None = None) -> dict:
+def build(
+    data: Path,
+    *,
+    today: date | None = None,
+    exceptions_file: Path | None = None,
+    suspect_file: Path | None = None,
+    quarantine_file: Path | None = None,
+) -> dict:
     """Build the release and write it, with its manifest, to `analysis/<YYYYMMDD>/`.
+
+    The exceptions file and the list of suspect texts default to the tracked files in
+    `resources/lyrics/`, and the list of songs in quarantine to the newest complete
+    quarantine folder of `data`.
 
     Raise FileNotFoundError when there is no complete country-year table or no
     complete songs folder, and FileExistsError when the folder of the day exists.
@@ -210,6 +223,9 @@ def build(data: Path, *, today: date | None = None, exceptions_file: Path | None
         exceptions_file or paths.resolve_project_root() / eligible_songs.EXCEPTIONS_FILE
     )
     exceptions = eligible_songs.load_exceptions(exceptions_file)
+    root = paths.resolve_project_root()
+    suspect_file = suspect_file or root / eligible_songs.SUSPECT_FILE
+    quarantine_file = quarantine_file or eligible_songs.quarantine_file(data)
 
     connection = duckdb.connect()
     panel = connection.read_parquet(str(panel_folder / manifests.COUNTRIES_FILE))
@@ -219,7 +235,8 @@ def build(data: Path, *, today: date | None = None, exceptions_file: Path | None
     _read_inputs(connection, countries)
     connection.sql("CREATE TABLE covered (country_iso3 VARCHAR)")
     connection.executemany("INSERT INTO covered VALUES (?)", [(code,) for code, _, _ in countries])
-    eligible_songs.classify(connection.table("songs"), exceptions).create("classified")
+    hash_lists = eligible_songs.load_hash_lists(connection, suspect_file, quarantine_file)
+    eligible_songs.classify(connection.table("songs"), exceptions, hash_lists).create("classified")
     _release_songs(connection).create("release_songs")
     counts = _counts(connection)
     country_year = _country_year(connection)
@@ -242,6 +259,8 @@ def build(data: Path, *, today: date | None = None, exceptions_file: Path | None
     schemas.write_table(schemas.ANALYSIS_SONGS, connection.table("release_songs"), folder)
     schemas.write_table(schemas.ANALYSIS_COUNTRY_YEAR, country_year, folder)
     inputs = [paths.data_relative(data, panel_folder)]
+    if quarantine_file.parent.is_relative_to(data):
+        inputs.append(paths.data_relative(data, quarantine_file.parent))
     for _, songs, scores in countries:
         inputs += [paths.data_relative(data, songs)]
         inputs += [paths.data_relative(data, scores)] if scores is not None else []
@@ -251,8 +270,15 @@ def build(data: Path, *, today: date | None = None, exceptions_file: Path | None
         "analysis",
         inputs=inputs,
         counts=counts,
-        notes=f"Exception groups: {len(exceptions)}. The exceptions file "
-        f"{eligible_songs.EXCEPTIONS_FILE.as_posix()} is an input too; its SHA-256 was "
-        f"{hashlib.sha256(exceptions_file.read_bytes()).hexdigest()}.",
+        notes=f"Exception groups: {len(exceptions)}. The files of the rule are inputs too: "
+        + "; ".join(
+            f"{name.as_posix()} with SHA-256 {hashlib.sha256(path.read_bytes()).hexdigest()}"
+            for name, path in (
+                (eligible_songs.EXCEPTIONS_FILE, exceptions_file),
+                (eligible_songs.SUSPECT_FILE, suspect_file),
+                (Path(manifests.SONG_QUARANTINE_FILE), quarantine_file),
+            )
+        )
+        + ".",
     )
     return {"folder": folder, "counts": counts}
