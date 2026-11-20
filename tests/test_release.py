@@ -78,6 +78,27 @@ def invented_lists(tmp_path: Path) -> tuple[Path, Path]:
     return list_files(tmp_path, SUSPECT_ROWS, QUARANTINE_ROWS)
 
 
+def artist_files(tmp_path: Path, excluded: str = "", countries: str = "") -> tuple[Path, Path]:
+    """Write a list of excluded artists and a list of artist countries; return both paths."""
+    files = (tmp_path / "excluded_artists.csv", tmp_path / "artist_countries.csv")
+    for path, columns, rows in zip(
+        files,
+        (eligible_songs.EXCLUDED_ARTIST_COLUMNS, eligible_songs.ARTIST_COUNTRY_COLUMNS),
+        (excluded, countries),
+        strict=True,
+    ):
+        path.write_text(",".join(columns) + "\n" + rows, encoding="utf-8")
+    return files
+
+
+def all_lists(tmp_path: Path) -> dict[str, duckdb.DuckDBPyRelation]:
+    """The invented lists of the rule, on the default connection of the test songs."""
+    connection = duckdb.default_connection()
+    hashes = eligible_songs.load_hash_lists(connection, *invented_lists(tmp_path))
+    artists = artist_files(tmp_path, "a_out,spoken_word\n", "a_moved,GHA\n")
+    return hashes | eligible_songs.load_artist_lists(connection, *artists)
+
+
 def old_quarantine(tmp_path: Path, rows: str) -> Path:
     """Write a list of songs in quarantine in the old format, with invented rows."""
     path = tmp_path / "old_song_quarantine.csv"
@@ -134,6 +155,9 @@ CASES = [
     ("quarantined", {}, "quarantined_song", False),
     ("changed", {}, None, False),  # the text changed after the check
     ("other_artist", {}, None, False),  # the list names this song id with another artist
+    ("excluded", {"artist_id": "a_out"}, "excluded_artist", False),
+    ("moved", {"artist_id": "a_moved"}, "artist_country", False),
+    ("moved_home", {"artist_id": "a_moved", "country_iso3": "GHA"}, None, False),
     ("quarantine", {"quality_status": "quarantine"}, "quality_quarantine", False),
     ("unverified", {"quality_status": "source_only_unverified"}, None, False),
     ("suppressed", {"duplicate_decision": "suppress_duplicate"}, "suppressed_duplicate", False),
@@ -177,15 +201,16 @@ def test_the_rule_gives_each_song_one_reason(tmp_path, song_id, over, reason, by
         exceptions_file(tmp_path, "BEN,invented reason,2026-11-19\n")
     )
     songs = frame(schemas.COUNTRY_SONGS, [song(song_id, **over)])
-    lists = eligible_songs.load_hash_lists(duckdb.default_connection(), *invented_lists(tmp_path))
-    result = eligible_songs.classify(songs, groups, lists)
+    result = eligible_songs.classify(songs, groups, all_lists(tmp_path))
     assert result.project("ineligible_reason, by_exception").fetchall() == [(reason, by_exception)]
     assert result.columns == [*songs.columns, "ineligible_reason", "by_exception"]
 
 
 def test_with_no_group_a_song_by_hand_is_left_out(tmp_path):
     songs = frame(schemas.COUNTRY_SONGS, [song("s", route="manual_review", country_iso3="BEN")])
-    lists = eligible_songs.load_hash_lists(duckdb.default_connection(), *list_files(tmp_path))
+    connection = duckdb.default_connection()
+    lists = eligible_songs.load_hash_lists(connection, *list_files(tmp_path))
+    lists |= eligible_songs.load_artist_lists(connection, *artist_files(tmp_path))
     result = eligible_songs.classify(songs, [], lists).project("ineligible_reason, by_exception")
     assert result.fetchall() == [("entered_by_hand", False)]
 
@@ -210,6 +235,27 @@ def test_a_hash_list_with_other_columns_is_refused(tmp_path):
     suspect.write_text("provider,lyrics_text_hash,check_id\n", encoding="utf-8")
     with pytest.raises(ValueError, match="the columns must be"):
         eligible_songs.load_hash_lists(duckdb.connect(), suspect, quarantine)
+
+
+@pytest.mark.parametrize(
+    ("excluded", "countries", "message"),
+    [
+        ("a1,spoken_word\na1,duplicate_entry\n", "", "named twice"),
+        ("a1,\n", "", "a cell is empty"),
+        ("", "a1,Gha\n", "Gha"),
+        ("", "a1,GHA\na1,TGO\n", "named twice"),
+    ],
+)
+def test_a_bad_artist_list_is_refused(tmp_path, excluded, countries, message):
+    with pytest.raises(ValueError, match=message):
+        eligible_songs.load_artist_lists(
+            duckdb.connect(), *artist_files(tmp_path, excluded, countries)
+        )
+
+
+def test_the_tracked_artist_lists_are_valid():
+    lists = eligible_songs.load_artist_lists(duckdb.connect())
+    assert all(len(relation) for relation in lists.values())
 
 
 def test_the_tracked_list_of_suspect_texts_is_valid(tmp_path):
@@ -309,6 +355,8 @@ def built(tmp_path):
             song("t6", re_release=True),
             song("t7", lyrics_text_hash=SUSPECT),
             song("quarantined"),
+            song("t8", artist_id="a_out"),
+            song("t9", artist_id="a_moved"),
         ],
         [score("t1", 10), score("t2", 20), score("t3", 30), score("gone", 40), score("t4", 50)],
     )
@@ -324,11 +372,14 @@ def built(tmp_path):
     old = old_quarantine(tmp_path, f"quarantined,TGO,a1,Invented,{ZEROS},quarantine,x,c,y,z\n")
     eligible_songs.import_old_song_quarantine(old, data, date(2026, 1, 2))
     suspect, _ = invented_lists(tmp_path)
+    excluded, countries = artist_files(tmp_path, "a_out,spoken_word\n", "a_moved,GHA\n")
     result = release.build(
         data,
         today=date(2026, 11, 19),
         exceptions_file=exceptions_file(tmp_path, "BEN,invented reason,2026-11-19\n"),
         suspect_file=suspect,
+        excluded_artists_file=excluded,
+        artist_countries_file=countries,
     )
     return data, result
 
@@ -345,7 +396,7 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         f"lyrics/TGO/scores/{SCORES_RUN}/",
     ]
     assert manifest.counts == {
-        "songs": 10,
+        "songs": 12,
         "eligible_songs": 6,
         "songs_by_exception": 1,
         "songs_by_exception_BEN": 1,
@@ -360,6 +411,8 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         "left_out_quality_quarantine": 1,
         "left_out_suspect_text": 1,
         "left_out_quarantined_song": 1,
+        "left_out_excluded_artist": 1,
+        "left_out_artist_country": 1,
         "left_out_suppressed_duplicate": 0,
         "left_out_not_canonical": 0,
         "left_out_re_release": 1,

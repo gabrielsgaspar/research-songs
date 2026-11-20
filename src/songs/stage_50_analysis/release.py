@@ -197,12 +197,14 @@ def build(
     exceptions_file: Path | None = None,
     suspect_file: Path | None = None,
     quarantine_file: Path | None = None,
+    excluded_artists_file: Path | None = None,
+    artist_countries_file: Path | None = None,
 ) -> dict:
     """Build the release and write it, with its manifest, to `analysis/<YYYYMMDD>/`.
 
-    The exceptions file and the list of suspect texts default to the tracked files in
-    `resources/lyrics/`, and the list of songs in quarantine to the newest complete
-    quarantine folder of `data`.
+    The exceptions file, the list of suspect texts and the two artist lists default to
+    the tracked files in `resources/lyrics/`, and the list of songs in quarantine to
+    the newest complete quarantine folder of `data`.
 
     Raise FileNotFoundError when there is no complete country-year table or no
     complete songs folder, and FileExistsError when the folder of the day exists.
@@ -226,6 +228,8 @@ def build(
     root = paths.resolve_project_root()
     suspect_file = suspect_file or root / eligible_songs.SUSPECT_FILE
     quarantine_file = quarantine_file or eligible_songs.quarantine_file(data)
+    excluded_artists_file = excluded_artists_file or root / eligible_songs.EXCLUDED_ARTISTS_FILE
+    artist_countries_file = artist_countries_file or root / eligible_songs.ARTIST_COUNTRIES_FILE
 
     connection = duckdb.connect()
     panel = connection.read_parquet(str(panel_folder / manifests.COUNTRIES_FILE))
@@ -235,8 +239,10 @@ def build(
     _read_inputs(connection, countries)
     connection.sql("CREATE TABLE covered (country_iso3 VARCHAR)")
     connection.executemany("INSERT INTO covered VALUES (?)", [(code,) for code, _, _ in countries])
-    hash_lists = eligible_songs.load_hash_lists(connection, suspect_file, quarantine_file)
-    eligible_songs.classify(connection.table("songs"), exceptions, hash_lists).create("classified")
+    lists = eligible_songs.load_hash_lists(
+        connection, suspect_file, quarantine_file
+    ) | eligible_songs.load_artist_lists(connection, excluded_artists_file, artist_countries_file)
+    eligible_songs.classify(connection.table("songs"), exceptions, lists).create("classified")
     _release_songs(connection).create("release_songs")
     counts = _counts(connection)
     country_year = _country_year(connection)
@@ -277,6 +283,8 @@ def build(
                 (eligible_songs.EXCEPTIONS_FILE, exceptions_file),
                 (eligible_songs.SUSPECT_FILE, suspect_file),
                 (Path(manifests.SONG_QUARANTINE_FILE), quarantine_file),
+                (eligible_songs.EXCLUDED_ARTISTS_FILE, excluded_artists_file),
+                (eligible_songs.ARTIST_COUNTRIES_FILE, artist_countries_file),
             )
         )
         + ".",
