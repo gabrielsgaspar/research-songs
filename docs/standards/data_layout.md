@@ -515,7 +515,7 @@ These shapes are not in the table above. The same uniform columns come from them
 | `song_url` | `song_url` | `song_url` | `song_url` | `song_url`, or `source_url` | `song_url` |
 | `artist_name` | `artist_name` | `artist_name`, or rows of `artist_songs` | performer credits, or `artist_name`, or `source_singer_credit` | `artist_name`, or `artist` | performer credits, then `featured_artists` |
 | `song_name` | `song_name` | `song_name`, or `provider_title` | `song_name` | `song_name`, or `song_title` | `song_name` |
-| `lyrics` | `lyrics`, rows with `text_kind` = `lyrics` or `original` | `lyrics`, or `lyrics_text` when `lyrics` is empty | `lyrics` | `lyrics` | `lyrics` |
+| `lyrics` | `lyrics`, rows with `text_kind` = `lyrics`, `original` or `source_lyrics_or_poem` | `lyrics`, or `lyrics_text` when `lyrics` is empty | `lyrics` | `lyrics` | `lyrics` |
 | `language` | none | none | none | none | `verified_language` |
 | `year` | none | none | `source_year` | none | `release_year` |
 | `album` | none | none | none | none | none |

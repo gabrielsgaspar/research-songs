@@ -1015,7 +1015,7 @@ def test_the_command_writes_a_dump(tmp_path, monkeypatch):
     assert manifests.read_manifest(data / "clean" / "dumps" / "example" / DAY).source == "example"
 
 
-def test_balkan_engine_keeps_original_text_and_drops_the_rest(tmp_path):
+def test_balkan_engine_keeps_original_and_poem_text_and_drops_the_rest(tmp_path):
     folder = tmp_path / "in"
     row = {
         "provider": "parolesnet",
@@ -1032,6 +1032,7 @@ def test_balkan_engine_keeps_original_text_and_drops_the_rest(tmp_path):
         folder / "parolesnet_lyrics.parquet",
         [
             row,
+            row | {"source_song_key": "b4", "text_kind": "source_lyrics_or_poem"},
             row | {"source_song_key": "b2", "text_kind": "translation", "lyrics": "invented t"},
             row | {"source_song_key": "b3", "text_kind": "missing", "lyrics": "invented m"},
         ],
@@ -1040,7 +1041,7 @@ def test_balkan_engine_keeps_original_text_and_drops_the_rest(tmp_path):
     result = build(data, "parolesnet", folder)
     out = _out(data, "parolesnet")
     songs = table(schemas.DUMP_SONGS, out, "source_song_id")
-    assert [song["source_song_id"] for song in songs] == ["b1"]
+    assert [song["source_song_id"] for song in songs] == ["b1", "b4"]
     assert result["dropped"] == {"not_lyrics": 2}
     assert result["not_lyrics_kinds"] == {"missing": 1, "translation": 1}
     counts = manifests.read_manifest(out).counts

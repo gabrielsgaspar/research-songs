@@ -120,7 +120,7 @@ FAMILIES: tuple[Family, ...] = (
         fetched=("fetched_at_utc",),
         page_artist_id=("source_artist_key",),
         text_kind=True,
-        lyric_kinds=("lyrics", "original"),
+        lyric_kinds=("lyrics", "original", "source_lyrics_or_poem"),
         credits="page",
     ),
     Family(
