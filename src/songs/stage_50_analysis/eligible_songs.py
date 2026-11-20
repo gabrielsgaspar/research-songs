@@ -14,15 +14,21 @@ filter. The rules, in the order that they are checked:
    (`clean/quality/song_quarantine/<YYYYMMDD>/` in the data folder), with the same
    `artist_id`, `source` and `lyrics_text_hash`. A song whose text changed after the
    check is not left out.
-4. `suppressed_duplicate`: the duplicate check suppressed the song
+4. `excluded_artist`: the artist is on the list of excluded artists
+   (`resources/lyrics/excluded_artists.csv`): a poet or a spoken-word artist, a
+   second entry of an artist, or a wrong Discogs artist.
+5. `artist_country`: the list of artist countries
+   (`resources/lyrics/artist_countries.csv`) gives the artist another country than
+   the country of the song. An artist that the list does not name passes.
+6. `suppressed_duplicate`: the duplicate check suppressed the song
    (`duplicate_decision` is `suppress_duplicate`).
-5. `not_canonical`: another row represents the song (`canonical_song_id` is set and
+7. `not_canonical`: another row represents the song (`canonical_song_id` is set and
    is not the `song_id` of the row): a duplicate or a re-release.
-6. `re_release`: the re-release check of the old pipeline says that the row is a
+8. `re_release`: the re-release check of the old pipeline says that the row is a
    re-release (`re_release` is true). A row that no check saw is not left out.
-7. `entered_by_hand`: a person collected the song (route `manual_review`), and its
+9. `entered_by_hand`: a person collected the song (route `manual_review`), and its
    country has no group in the exceptions file.
-8. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
+10. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
 
 A song with no year is eligible. An analysis by year cannot use it, and reports
 how many such songs it leaves out.
@@ -39,6 +45,12 @@ check that put each row on the list, and no lyric text. The list of suspect text
 tracked; the list of songs in quarantine is too large for Git and is a version
 folder of the data folder, written by `import_old_song_quarantine`. `load_hash_lists`
 reads them into the connection of the songs.
+
+The two artist lists come from the master artist table of the old pipeline. The
+list of excluded artists holds the artists with `include` 0 and a short reason code.
+The list of artist countries holds the country of each artist that the old data
+put in the folder of another country. Both are tracked, with ids and codes and no
+names. `load_artist_lists` reads them.
 """
 
 import csv
@@ -66,18 +78,23 @@ MANUAL_ROUTE = "manual_review"
 SUSPECT_FILE = Path("resources") / "lyrics" / "suspect_text_hashes.csv"
 SUSPECT_COLUMNS = ["source", "lyrics_text_hash", "check_id"]
 QUARANTINE_COLUMNS = ["song_id", "artist_id", "source", "lyrics_text_hash", "check_id"]
+EXCLUDED_ARTISTS_FILE = Path("resources") / "lyrics" / "excluded_artists.csv"
+EXCLUDED_ARTIST_COLUMNS = ["artist_id", "reason"]
+ARTIST_COUNTRIES_FILE = Path("resources") / "lyrics" / "artist_countries.csv"
+ARTIST_COUNTRY_COLUMNS = ["artist_id", "country_iso3"]
 # List -> the condition that puts a song (alias s) on a row of the list (alias q).
 MATCHES = {
     "suspect_text": "q.lyrics_text_hash = s.lyrics_text_hash "
     "AND q.source IN ('*', lower(s.source))",
     "quarantined_song": "q.song_id = s.song_id AND q.artist_id = s.artist_id "
     "AND q.source = lower(s.source) AND q.lyrics_text_hash = s.lyrics_text_hash",
+    "excluded_artist": "q.artist_id = s.artist_id",
+    "artist_country": "q.artist_id = s.artist_id AND q.country_iso3 <> s.country_iso3",
 }
 # Reason -> the condition on a song row that leaves it out. The order is the order of the check.
 RULES = {
     "quality_quarantine": "quality_status = 'quarantine'",
-    "suspect_text": "on_suspect_text",
-    "quarantined_song": "on_quarantined_song",
+    **{name: f"on_{name}" for name in MATCHES},
     "suppressed_duplicate": "duplicate_decision = 'suppress_duplicate'",
     "not_canonical": "canonical_song_id IS NOT NULL AND canonical_song_id <> song_id",
     "re_release": "re_release",
@@ -132,19 +149,29 @@ def load_exceptions(path: Path | None = None) -> list[NamedGroup]:
 
 
 def _read_list(path: Path, columns: list[str]) -> pd.DataFrame:
-    """Read a lyric-hash list. Raise ValueError on a bad row or a row named twice."""
+    """Read a list of the rule; all columns but the last are its key.
+
+    Raise ValueError on a bad row or a row named twice.
+    """
     with path.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         if reader.fieldnames != columns:
             raise ValueError(f"{path}: the columns must be {columns}")
         rows = list(reader)
     for number, row in enumerate(rows, start=2):
-        if not all(row[name] for name in columns):
-            raise ValueError(f"{path}:{number}: a cell is empty")
-        if not re.fullmatch("[0-9a-f]{64}", row["lyrics_text_hash"]):
-            raise ValueError(f"{path}:{number}: the hash is not 64 lower-case hex characters")
-        if row["source"] != row["source"].lower():
-            raise ValueError(f"{path}:{number}: the source is not lower case")
+        try:
+            if not all(row[name] for name in columns):
+                raise ValueError("a cell is empty")
+            if "lyrics_text_hash" in row and not re.fullmatch(
+                "[0-9a-f]{64}", row["lyrics_text_hash"]
+            ):
+                raise ValueError("the hash is not 64 lower-case hex characters")
+            if "source" in row and row["source"] != row["source"].lower():
+                raise ValueError("the source is not lower case")
+            if "country_iso3" in row:
+                check_iso3(row["country_iso3"])
+        except ValueError as error:
+            raise ValueError(f"{path}:{number}: {error}") from error
     frame = pd.DataFrame(rows, columns=columns, dtype="string")
     if frame.duplicated(columns[:-1]).any():
         raise ValueError(f"{path}: a row is named twice")
@@ -172,31 +199,55 @@ def load_hash_lists(
     The defaults are the tracked list of suspect texts and the list in the newest
     complete quarantine folder of the data folder (`quarantine_file`).
     """
-    lists = {}
-    for name, path, columns in (
+    return _load(
+        connection,
         ("suspect_text", suspect or resolve_project_root() / SUSPECT_FILE, SUSPECT_COLUMNS),
         ("quarantined_song", quarantine or quarantine_file(data_root()), QUARANTINE_COLUMNS),
-    ):
+    )
+
+
+def load_artist_lists(
+    connection: duckdb.DuckDBPyConnection,
+    excluded: Path | None = None,
+    countries: Path | None = None,
+) -> dict[str, duckdb.DuckDBPyRelation]:
+    """Read the list of excluded artists and the list of artist countries into `connection`.
+
+    The defaults are the tracked files.
+    """
+    root = resolve_project_root()
+    return _load(
+        connection,
+        ("excluded_artist", excluded or root / EXCLUDED_ARTISTS_FILE, EXCLUDED_ARTIST_COLUMNS),
+        ("artist_country", countries or root / ARTIST_COUNTRIES_FILE, ARTIST_COUNTRY_COLUMNS),
+    )
+
+
+def _load(
+    connection: duckdb.DuckDBPyConnection, *lists: tuple[str, Path, list[str]]
+) -> dict[str, duckdb.DuckDBPyRelation]:
+    loaded = {}
+    for name, path, columns in lists:
         text = ", ".join(f'CAST("{column}" AS VARCHAR) AS "{column}"' for column in columns)
-        lists[name] = connection.from_df(_read_list(path, columns)).project(text)
-    return lists
+        loaded[name] = connection.from_df(_read_list(path, columns)).project(text)
+    return loaded
 
 
 def classify(
     songs: duckdb.DuckDBPyRelation,
     exceptions: list[NamedGroup],
-    hash_lists: dict[str, duckdb.DuckDBPyRelation],
+    lists: dict[str, duckdb.DuckDBPyRelation],
 ) -> duckdb.DuckDBPyRelation:
     """Return the songs with two more columns.
 
     `ineligible_reason` is the first rule that leaves the song out, or null when the
     song is eligible. `by_exception` is true for an eligible song that entered
     through a group of the exceptions file. The songs need `country_iso3` and the
-    columns in `COLUMNS`. `hash_lists` comes from `load_hash_lists` on the
-    connection of the songs.
+    columns in `COLUMNS`. `lists` joins the results of `load_hash_lists` and
+    `load_artist_lists` on the connection of the songs.
     """
     for name, condition in MATCHES.items():
-        hits = songs.set_alias("s").join(hash_lists[name].set_alias("q"), condition, how="semi")
+        hits = songs.set_alias("s").join(lists[name].set_alias("q"), condition, how="semi")
         flags = hits.project(f"country_iso3, song_id, true AS on_{name}").distinct()
         songs = songs.join(flags, ["country_iso3", "song_id"], how="left")
     manual = f"coalesce(route = '{MANUAL_ROUTE}', false)"
