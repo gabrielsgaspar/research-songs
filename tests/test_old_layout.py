@@ -95,7 +95,9 @@ SONGS = {
         )
     ],
     LATE: [
-        song("s5", LATE, artist_name="Late Arrival", scraped_at_utc="not a time"),
+        song(
+            "s5", LATE, artist_name="Late Arrival", scraped_at_utc="not a time", lyrics_text_hash=""
+        ),
         song("s6", LATE, artist_name=""),
     ],
 }
@@ -195,6 +197,7 @@ def test_the_command_maps_each_column_and_writes_a_manifest_and_one_run_record(
             "song_url": "https://a.example/s1",
             "lyrics": "invented line s1",
             "lyrics_sha256": sha("invented line s1"),  # computed again, not the old hash
+            "lyrics_text_hash": "stale",  # the old hash, by which the lyric-hash lists name it
             "year": 1990,
             "collected_utc": "2026-09-18T19:47:53Z",
         },
@@ -208,6 +211,7 @@ def test_the_command_maps_each_column_and_writes_a_manifest_and_one_run_record(
             "song_url": "https://a.example/s4",
             "lyrics": "invented line s4",
             "lyrics_sha256": sha("invented line s4"),
+            "lyrics_text_hash": "stale",
             "year": 2001,
             "year_source": "discogs",
             "year_basis": "source_printed_unverified",
@@ -228,6 +232,7 @@ def test_the_command_maps_each_column_and_writes_a_manifest_and_one_run_record(
             "song_url": "https://a.example/s5",
             "lyrics": "invented line s5",
             "lyrics_sha256": sha("invented line s5"),
+            "lyrics_text_hash": sha("invented line s5"),  # no old hash: computed
             "year": 1990,
         },
     ]

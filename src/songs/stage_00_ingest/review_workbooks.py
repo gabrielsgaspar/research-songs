@@ -29,7 +29,7 @@ from urllib.parse import urlsplit
 import duckdb
 import pandas as pd
 
-from songs.common import manifests, paths, run_records, schemas
+from songs.common import lyric_hash, manifests, paths, run_records, schemas
 from songs.common.years import is_admissible_year
 
 ROUTE = paths.MANUAL_REVIEW
@@ -257,7 +257,11 @@ def _write_country_songs(
         schemas.cast_to_schema(schemas.COUNTRY_ARTISTS, artists),
         out,
     )
-    schemas.write_table(schemas.COUNTRY_SONGS, connection.sql("SELECT * FROM new_songs"), out)
+    schemas.write_table(
+        schemas.COUNTRY_SONGS,
+        lyric_hash.fill_text_hash(connection, connection.table("new_songs")),
+        out,
+    )
     added_links = (
         schemas.cast_to_schema(schemas.COUNTRY_LINKS, links.assign(run_id=run_id), connection)
         if links is not None and len(links)

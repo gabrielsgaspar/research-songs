@@ -28,6 +28,7 @@ def song(song_id: str, **over) -> dict:
         "source": "invented",
         "lyrics": LYRIC,
         "lyrics_sha256": "0" * 64,
+        "lyrics_text_hash": "0" * 64,
         "year": 1990,
         "route": "old_layout",
         "run_id": SONGS_RUN,
@@ -47,8 +48,45 @@ def exceptions_file(tmp_path: Path, rows: str = "") -> Path:
     return path
 
 
+SUSPECT, OTHER_SITE, CHANGED = "a" * 64, "b" * 64, "c" * 64
+
+
+def list_files(tmp_path: Path, suspect: str = "", quarantine: str = "") -> tuple[Path, Path]:
+    """Write a list of suspect texts and a list of songs in quarantine; return both paths."""
+    files = (tmp_path / "suspect_text_hashes.csv", tmp_path / "song_quarantine.csv")
+    for path, columns, rows in zip(
+        files,
+        (eligible_songs.SUSPECT_COLUMNS, eligible_songs.QUARANTINE_COLUMNS),
+        (suspect, quarantine),
+        strict=True,
+    ):
+        path.write_text(",".join(columns) + "\n" + rows, encoding="utf-8")
+    return files
+
+
+def invented_lists(tmp_path: Path) -> tuple[Path, Path]:
+    zeros = "0" * 64
+    return list_files(
+        tmp_path,
+        f"*,{SUSPECT},check_a\nother_site,{OTHER_SITE},check_b\n",
+        f"quarantined,a1,invented,{zeros},check_c\nchanged,a1,invented,{CHANGED},check_c\n"
+        f"other_artist,a9,invented,{zeros},check_c\n",
+    )
+
+
 CASES = [
     ("eligible", {}, None, False),
+    ("suspect_text", {"lyrics_text_hash": SUSPECT, "source": "Invented"}, "suspect_text", False),
+    ("suspect_on_other_site", {"lyrics_text_hash": OTHER_SITE}, None, False),
+    (
+        "suspect_on_its_site",
+        {"lyrics_text_hash": OTHER_SITE, "source": "other_site"},
+        "suspect_text",
+        False,
+    ),
+    ("quarantined", {}, "quarantined_song", False),
+    ("changed", {}, None, False),  # the text changed after the check
+    ("other_artist", {}, None, False),  # the list names this song id with another artist
     ("quarantine", {"quality_status": "quarantine"}, "quality_quarantine", False),
     ("unverified", {"quality_status": "source_only_unverified"}, None, False),
     ("suppressed", {"duplicate_decision": "suppress_duplicate"}, "suppressed_duplicate", False),
@@ -92,14 +130,44 @@ def test_the_rule_gives_each_song_one_reason(tmp_path, song_id, over, reason, by
         exceptions_file(tmp_path, "BEN,invented reason,2026-11-19\n")
     )
     songs = frame(schemas.COUNTRY_SONGS, [song(song_id, **over)])
-    result = eligible_songs.classify(songs, groups).project("ineligible_reason, by_exception")
-    assert result.fetchall() == [(reason, by_exception)]
+    lists = eligible_songs.load_hash_lists(duckdb.default_connection(), *invented_lists(tmp_path))
+    result = eligible_songs.classify(songs, groups, lists)
+    assert result.project("ineligible_reason, by_exception").fetchall() == [(reason, by_exception)]
+    assert result.columns == [*songs.columns, "ineligible_reason", "by_exception"]
 
 
 def test_with_no_group_a_song_by_hand_is_left_out(tmp_path):
     songs = frame(schemas.COUNTRY_SONGS, [song("s", route="manual_review", country_iso3="BEN")])
-    result = eligible_songs.classify(songs, []).project("ineligible_reason, by_exception")
+    lists = eligible_songs.load_hash_lists(duckdb.default_connection(), *list_files(tmp_path))
+    result = eligible_songs.classify(songs, [], lists).project("ineligible_reason, by_exception")
     assert result.fetchall() == [("entered_by_hand", False)]
+
+
+@pytest.mark.parametrize(
+    ("suspect", "quarantine", "message"),
+    [
+        (f"*,{SUSPECT},\n", "", "a cell is empty"),
+        (f"*,{SUSPECT.upper()},check\n", "", "64 lower-case hex"),
+        (f"Site,{SUSPECT},check\n", "", "not lower case"),
+        (f"*,{SUSPECT},check\n*,{SUSPECT},another\n", "", "named twice"),
+        ("", f"s,a1,site,{SUSPECT},check\ns,a1,site,{SUSPECT},check\n", "named twice"),
+    ],
+)
+def test_a_bad_hash_list_is_refused(tmp_path, suspect, quarantine, message):
+    with pytest.raises(ValueError, match=message):
+        eligible_songs.load_hash_lists(duckdb.connect(), *list_files(tmp_path, suspect, quarantine))
+
+
+def test_a_hash_list_with_other_columns_is_refused(tmp_path):
+    suspect, quarantine = list_files(tmp_path)
+    suspect.write_text("provider,lyrics_text_hash,check_id\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="the columns must be"):
+        eligible_songs.load_hash_lists(duckdb.connect(), suspect, quarantine)
+
+
+def test_the_tracked_hash_lists_are_valid():
+    lists = eligible_songs.load_hash_lists(duckdb.connect())
+    assert all(len(relation) for relation in lists.values())
 
 
 @pytest.mark.parametrize(
@@ -189,6 +257,8 @@ def built(tmp_path):
             song("t4", quality_status="quarantine"),
             song("t5", year=None),
             song("t6", re_release=True),
+            song("t7", lyrics_text_hash=SUSPECT),
+            song("quarantined"),
         ],
         [score("t1", 10), score("t2", 20), score("t3", 30), score("gone", 40), score("t4", 50)],
     )
@@ -201,10 +271,13 @@ def built(tmp_path):
         ],
         None,
     )
+    suspect, quarantine = invented_lists(tmp_path)
     result = release.build(
         data,
         today=date(2026, 11, 19),
         exceptions_file=exceptions_file(tmp_path, "BEN,invented reason,2026-11-19\n"),
+        suspect_file=suspect,
+        quarantine_file=quarantine,
     )
     return data, result
 
@@ -220,7 +293,7 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         f"lyrics/TGO/scores/{SCORES_RUN}/",
     ]
     assert manifest.counts == {
-        "songs": 8,
+        "songs": 10,
         "eligible_songs": 6,
         "songs_by_exception": 1,
         "songs_by_exception_BEN": 1,
@@ -233,6 +306,8 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         "scores_no_song": 1,
         "scores_ineligible_song": 1,
         "left_out_quality_quarantine": 1,
+        "left_out_suspect_text": 1,
+        "left_out_quarantined_song": 1,
         "left_out_suppressed_duplicate": 0,
         "left_out_not_canonical": 0,
         "left_out_re_release": 1,

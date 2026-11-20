@@ -29,7 +29,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from songs.common import manifests, paths, run_records, schemas
+from songs.common import lyric_hash, manifests, paths, run_records, schemas
 
 ROUTE = "old_layout"
 SOURCE = "old_pipeline"
@@ -44,6 +44,7 @@ SONG_COLUMNS = {
     "provider_song_id": TEXT,
     "song_url": TEXT,
     "lyrics": TEXT,
+    "lyrics_text_hash": TEXT,
     "year": "INTEGER",
     "year_source": TEXT,
     "year_basis": TEXT,
@@ -325,7 +326,10 @@ def _write_country(
         SELECT
             '{iso3}' AS country_iso3, p.song_id, p.artist_id, p.artist_name, t.song_name,
             NULL AS title_key, p.source, s.provider_song_id AS source_song_id, s.song_url,
-            s.lyrics, p.lyrics_sha256, NULL AS language, s.year, s.year_source, s.year_basis,
+            s.lyrics, p.lyrics_sha256,
+            CASE WHEN lower(trim(s.lyrics_text_hash)) NOT IN ('nan', 'none', '<na>')
+                THEN lower(trim(s.lyrics_text_hash)) END AS lyrics_text_hash,
+            NULL AS language, s.year, s.year_source, s.year_basis,
             s.first_release_year, s.tag_re_release AS re_release, s.canonical_song_id,
             s.duplicate_decision, s.quality_status,
             '{ROUTE}' AS route, '{run_id}' AS run_id, p.collected_utc
@@ -340,7 +344,11 @@ def _write_country(
         "CREATE VIEW new_songs AS SELECT * FROM imported_songs "
         "UNION ALL BY NAME SELECT * FROM kept_songs"
     )
-    schemas.write_table(schemas.COUNTRY_SONGS, connection.sql("SELECT * FROM new_songs"), out)
+    schemas.write_table(
+        schemas.COUNTRY_SONGS,
+        lyric_hash.fill_text_hash(connection, connection.table("new_songs")),
+        out,
+    )
     # The artists and the counts read the file just written, so the old lyric files are not
     # read one more time.
     connection.read_parquet(str(out / schemas.COUNTRY_SONGS.file)).create_view("written_songs")
