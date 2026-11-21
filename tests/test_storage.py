@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -44,6 +45,10 @@ class FakeBucket:
 
     def list(self, bucket: str, prefix: str) -> list[RemoteObject]:
         return [self._object(name) for name in sorted(self.objects) if name.startswith(prefix)]
+
+    def glob(self, bucket: str, pattern: str) -> list[RemoteObject]:
+        match = re.compile("[^/]*".join(map(re.escape, pattern.split("*")))).fullmatch
+        return [self._object(name) for name in sorted(self.objects) if match(name)]
 
     def stat(self, bucket: str, name: str) -> RemoteObject | None:
         return self._object(name) if name in self.objects else None
@@ -325,3 +330,104 @@ def test_gcloud_failure_raises(monkeypatch):
         storage.GcloudTransport(program="gcloud").upload(
             BUCKET, Path("first.txt"), "data/x", md5="bWQ1", sha256="ab" * 32
         )
+
+
+def make_raw(data: Path, source: str, day: str, inputs: tuple[str, ...] = ()) -> str:
+    """Write a version folder with one invented file and its manifest. Return its path."""
+    folder = paths.raw_dir(data, source, day)
+    folder.mkdir(parents=True)
+    (folder / "page.txt").write_bytes(f"invented text of {source} {day}\n".encode())
+    manifests.write_manifest(data, folder, "raw", source=source, origin=ORIGIN, inputs=inputs)
+    return paths.data_relative(data, folder)
+
+
+def test_the_newest_folder_in_the_bucket_needs_a_manifest():
+    bucket = FakeBucket()
+    bucket.put("data/raw/example/20261114/" + paths.MANIFEST_NAME, b"{}")
+    bucket.put("data/raw/example/20261120/first.txt", b"an upload that did not end\n")
+    bucket.put("data/raw/example/latest/" + paths.MANIFEST_NAME, b"{}")
+    bucket.put("data/raw/other/20261125/" + paths.MANIFEST_NAME, b"{}")
+    assert storage.newest_in_bucket(bucket, BUCKET, "raw/example") == FOLDER
+    assert storage.newest_in_bucket(bucket, BUCKET, "raw/absent/") is None
+
+
+def test_pull_downloads_only_what_this_disk_lacks(data, tmp_path):
+    bucket = FakeBucket()
+    storage.upload_folder(bucket, BUCKET, data, FOLDER)
+    other = tmp_path / "other"
+    other.mkdir()
+    parents = ["raw/example/", "raw/absent/"]
+    done = storage.pull_newest(bucket, BUCKET, other, parents)
+    assert done == {"raw/example/": ("downloaded", FOLDER), "raw/absent/": ("absent", None)}
+    assert manifests.read_manifest(other / FOLDER).path == FOLDER
+    assert storage.pull_newest(bucket, BUCKET, other, parents)["raw/example/"] == ("local", FOLDER)
+
+
+def test_publish_uploads_inputs_first_and_reports_a_missing_input(tmp_path):
+    bucket = FakeBucket()
+    first = make_raw(tmp_path, "first", "20261101")
+    older = make_raw(tmp_path, "second", "20261102", (first, "raw/gone/20261001/"))
+    newer = make_raw(tmp_path, "second", "20261103", (older,))
+    (tmp_path / "raw" / "second" / "20261104").mkdir()
+
+    done = storage.publish(bucket, BUCKET, tmp_path, ["raw/second"])
+    assert done == {
+        "uploaded": [first, older, newer],
+        "present": [],
+        "missing_inputs": [(older, "raw/gone/20261001/")],
+    }
+    manifest_writes = [name for name in bucket.writes if name.endswith(paths.MANIFEST_NAME)]
+    assert manifest_writes == [f"data/{name}{paths.MANIFEST_NAME}" for name in done["uploaded"]]
+    for folder in done["uploaded"]:
+        assert storage.check_folder(bucket, BUCKET, folder) == []
+
+
+def test_a_second_publish_does_nothing(tmp_path):
+    bucket = FakeBucket()
+    first = make_raw(tmp_path, "first", "20261101")
+    second = make_raw(tmp_path, "second", "20261102", (first,))
+    storage.publish(bucket, BUCKET, tmp_path, ["raw/second/"])
+    writes = list(bucket.writes)
+    done = storage.publish(bucket, BUCKET, tmp_path, ["raw/second/"])
+    assert done == {"uploaded": [], "present": [second], "missing_inputs": []}
+    assert bucket.writes == writes
+
+
+def test_publish_stops_when_versioning_is_off(tmp_path):
+    bucket = FakeBucket(versioning=False)
+    make_raw(tmp_path, "first", "20261101")
+    with pytest.raises(StorageError, match="versioning is off"):
+        storage.publish(bucket, BUCKET, tmp_path, ["raw/first/"])
+    assert bucket.writes == []
+
+
+def test_the_audit_reports_both_directions():
+    bucket = FakeBucket()
+    for folder in (
+        "lyrics/BRA/songs/20261119T070436Z/",
+        "lyrics/ZAF/songs/20261119T130535Z/",
+        "lyrics/bra/songs/20261119T070436Z/",
+        "lyrics/2026-08-30/songs/20261119T070436Z/",
+    ):
+        bucket.put("data/" + folder + paths.MANIFEST_NAME, b"{}")
+    bucket.put("data/lyrics/ZAF/songs/20261119T201142Z/songs.parquet", b"no manifest yet\n")
+    expected = {("BRA", "20261119T070436Z"), ("ZAF", "20261119T201142Z")}
+    assert storage.audit_songs(bucket, BUCKET, expected) == {
+        "not_in_bucket": [("ZAF", "20261119T201142Z")],
+        "no_record": [("ZAF", "20261119T130535Z")],
+    }
+
+
+def test_gcloud_glob_of_nothing_is_empty(monkeypatch):
+    calls = []
+    error = b"ERROR: (gcloud.storage.objects.list) One or more URLs matched no objects.\n"
+
+    def run(args, **_):
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 1, b"", error)
+
+    monkeypatch.setattr(storage.subprocess, "run", run)
+    pattern = "data/lyrics/*/songs/*/" + paths.MANIFEST_NAME
+    assert storage.GcloudTransport(program="gcloud").glob(BUCKET, pattern) == []
+    assert calls[0][:4] == ["gcloud", "storage", "objects", "list"]
+    assert f"gs://{BUCKET}/{pattern}" in calls[0]
