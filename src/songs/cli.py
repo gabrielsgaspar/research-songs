@@ -596,17 +596,6 @@ def _decades(counts: dict[int, int]) -> str:
     return ", ".join(f"{decade}s: {number}" for decade, number in counts.items()) or "none"
 
 
-def pull_parents(codes: list[str], catalog: bool = True) -> list[str]:
-    """Return the folders above the version folders that the countries need, each one time."""
-    parents = []
-    for code in codes:
-        parents += [f"lyrics/{code}/songs/", f"lyrics/{code}/scores/"]
-        parents += [f"clean/dumps/{source.id}/" for source in lyric_sources.sources_for(code)]
-    if catalog:
-        parents.append("clean/catalog/discogs/")
-    return list(dict.fromkeys(parents))
-
-
 @data_app.command("pull")
 def data_pull(
     countries: CountriesArgument,
@@ -621,6 +610,7 @@ def data_pull(
     the Discogs catalog. A folder that is complete on this disk is not downloaded again.
     """
     from songs.common.paths import data_root
+    from songs.stage_00_ingest.campaign_run import pull_parents
 
     parents = pull_parents([_country(code) for code in countries], catalog=not no_catalog)
     storage, transport, bucket = _bucket()
@@ -633,20 +623,13 @@ def data_pull(
         typer.echo(f"{folder or parent}: {outcome}")
 
 
-def old_data_input(name: str) -> bool:
-    """Return True for a manifest input that is no version folder of the data layout."""
-    from songs.common.paths import DAY, RUN_ID
-
-    last = name.rstrip("/").rsplit("/", 1)[-1]
-    return not (DAY.fullmatch(last) or RUN_ID.fullmatch(last))
-
-
 @lyrics_app.command("publish")
 def lyrics_publish(countries: CountriesArgument) -> None:
     """Upload the songs folders of the countries that the bucket lacks, with their inputs.
 
     The inputs of a folder go first. Each uploaded folder is checked against its manifest.
-    The command exits with 1 when an input is neither on this disk nor in the bucket.
+    A folder is not uploaded when one of its inputs is a version folder that is neither on
+    this disk nor in the bucket; the command then exits with 1 after the other uploads.
     """
     from songs.common.paths import data_root
 
@@ -661,32 +644,18 @@ def lyrics_publish(countries: CountriesArgument) -> None:
         typer.echo(f"uploaded: {folder}")
     for folder in result["present"]:
         typer.echo(f"in the bucket already: {folder}")
-    problems = 0
+    for folder, name in result["old_inputs"]:
+        typer.echo(f"note: {folder} has the input {name} from the old data folder")
     for folder, name in result["missing_inputs"]:
-        if old_data_input(name):
-            typer.echo(f"note: {folder} has the input {name} from the old data folder")
-        else:
-            problems += 1
-            typer.echo(f"problem: {folder} names the input {name}; it is not in the bucket")
+        typer.echo(f"problem: {folder} names the input {name}; it is not in the bucket")
+    for folder in result["skipped"]:
+        typer.echo(f"not uploaded: {folder}")
     typer.echo(
         f"{len(result['uploaded'])} uploaded, {len(result['present'])} in the bucket already, "
-        f"{problems} problems"
+        f"{len(result['skipped'])} not uploaded"
     )
-    if problems:
+    if result["skipped"]:
         raise typer.Exit(1)
-
-
-# The routes whose run writes lyrics/<ISO3>/songs/<run id>/.
-SONGS_FOLDER_ROUTES = ("old_layout", "dump_name", "manual_review")
-
-
-def expected_songs_folders(records: list) -> set[tuple[str, str]]:
-    """Return the (country code, run id) of each run that wrote a songs folder."""
-    return {
-        (record.iso3, record.run_id)
-        for record in records
-        if record.route in SONGS_FOLDER_ROUTES and record.state != "failed"
-    }
 
 
 @lyrics_app.command("audit")
@@ -696,6 +665,8 @@ def lyrics_audit() -> None:
     The command prints each run record with no complete songs folder in the bucket, and
     each complete songs folder with no run record. It exits with 1 when it finds one.
     """
+    from songs.stage_00_ingest.campaign_run import expected_songs_folders
+
     storage, transport, bucket = _bucket()
     expected = expected_songs_folders(run_records.read_run_records())
     try:
@@ -797,7 +768,12 @@ def campaign_run_command(
     countries: CountriesArgument,
     goal: Annotated[str, typer.Option(help="What the campaign must reach, in one sentence.")],
     min_songs: Annotated[
-        int, typer.Option("--min-songs", help="Leave out a dump that would add fewer songs.")
+        int,
+        typer.Option(
+            "--min-songs",
+            help="Open no campaign when the estimates of all dumps of the country sum to "
+            "fewer songs. The sum is an upper limit: two dumps can hold the same song.",
+        ),
     ] = 25,
     years: YearsOption = None,
 ) -> None:
@@ -818,31 +794,32 @@ def campaign_run_command(
     for code in [_country(code) for code in countries]:
         try:
             result = campaign_run.run_country(data_root(), code, goal=goal, min_songs=min_songs)
-            typer.echo(
-                f"{code}: campaign {result['campaign_id'] or 'not opened'}, "
-                f"songs {result['songs_before']} -> {result['songs_after']}"
-            )
-            for row in result["imported"]:
-                typer.echo(
-                    f"  imported {row['source']}: {row['songs_added']} songs, "
-                    f"{row['seconds']} s, {row['folder']}"
-                )
-            absent = sum(row["would_add"] is None for row in result["skipped"])
-            for row in result["skipped"]:
-                if row["would_add"] is not None:
-                    typer.echo(
-                        f"  skipped {row['source']}: {row['reason']} (would add {row['would_add']})"
-                    )
-            if absent:
-                typer.echo(f"  sources with no dump on this disk: {absent}")
-            if result["campaign_id"]:
-                typer.echo(
-                    campaign_run.report(data_root(), code, result["campaign_id"], years=span)
-                )
         except Exception as error:
             # One country that fails must not stop the others; the exit code reports it.
             failed.append(code)
             typer.echo(f"error: {code}: {type(error).__name__}: {error}", err=True)
+            result = getattr(error, "ladder", None)
+        if result is None:
+            continue
+        typer.echo(
+            f"{code}: campaign {result['campaign_id'] or 'not opened'}, "
+            f"songs {result['songs_before']} -> {result['songs_after']}"
+        )
+        for row in result["imported"]:
+            typer.echo(
+                f"  imported {row['source']}: {row['songs_added']} songs, "
+                f"{row['seconds']} s, {row['folder']}"
+            )
+        absent = sum(row["would_add"] is None for row in result["skipped"])
+        for row in result["skipped"]:
+            if row["would_add"] is not None:
+                typer.echo(
+                    f"  skipped {row['source']}: {row['reason']} (would add {row['would_add']})"
+                )
+        if absent:
+            typer.echo(f"  sources with no dump on this disk: {absent}")
+        if result["campaign_id"]:
+            typer.echo(campaign_run.report(data_root(), code, result["campaign_id"], years=span))
     if failed:
         typer.echo(f"failed: {', '.join(failed)}", err=True)
         raise typer.Exit(1)

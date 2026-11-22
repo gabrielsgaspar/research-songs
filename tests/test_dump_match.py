@@ -1,5 +1,7 @@
 """The comparison of a dump with the songs of a country, on small invented tables."""
 
+import os
+import unicodedata
 from pathlib import Path
 
 import duckdb
@@ -244,6 +246,8 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
         country,
         [link | {"discogs_release_id": "900", "discogs_track_index": "1", "run_id": RUN}],
     )
+    # The country holds this song with no link; a longer title of it must not enter again.
+    write(schemas.COUNTRY_SONGS, country, [held("h1", "a1", "Anna Jóns", "A New Song", "kh")])
     write_discogs(tmp_path / "discogs")
 
     def song(song_id, title, artists=("a1",), kind="roster_new"):
@@ -265,6 +269,7 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
         song("no_discogs_id", "Sol sol", ("a2",)),
         song("two_artists", "Sol sol", ("a1", "a2")),
         song("held", "Sol sol", kind="held"),
+        song("held_loose", "A New Song (Live)"),
     ]
     rows = {
         row["source_song_id"]: row for row in match_discogs(songs, country, tmp_path / "discogs")
@@ -279,6 +284,7 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
         "none": "no_track",
         "no_discogs_id": "out_of_scope",
         "two_artists": "out_of_scope",
+        "held_loose": "held_loose_title",
     }
     assert (rows["exact"]["discogs_release_id"], rows["exact"]["year"]) == ("200", 1995)
     assert rows["exact"]["match_method"] == "dump_discogs_exact_title"
@@ -575,9 +581,17 @@ def test_the_keys_of_a_dump_are_built_one_time_and_again_when_the_key_code_chang
     assert [path.name for path in folder.parent.iterdir()] == [folder.name]
     assert sorted(path.name for path in dump.iterdir()) == ["artist_names.parquet", "songs.parquet"]
 
-    monkeypatch.setattr(dump_match, "_keys_version", lambda: "other")
+    # A change of the hashed key code gives a new version, so the keys are built again.
+    # The work folder of a build that stopped more than one day ago is removed.
+    stopped = folder.parent / "work-stopped"
+    stopped.mkdir()
+    os.utime(stopped, (0, 0))
+    monkeypatch.setattr(dump_match, "_HOMONYM", dump_match._HOMONYM + "|x")
+    other = dump_match._keys_version()
+    assert other != folder.name
     assert match_dump(dump, country) == first
-    assert sorted(path.name for path in folder.parent.iterdir()) == sorted([folder.name, "other"])
+    assert sorted(path.name for path in folder.parent.iterdir()) == sorted([folder.name, other])
+    assert unicodedata.unidata_version in dump_match._keys_text()
     with pytest.raises(ValueError, match="clean/dumps"):
         dump_keys(tmp_path / "elsewhere")
 
@@ -639,12 +653,16 @@ def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_pat
             artist("a6", "Gunnar"),
             artist("a7", "Gunnar!"),
             artist("a8", "..."),
+            artist("a9", "Νίκος"),
+            artist("a10", "Strasse"),
         ],
     )
+    # The two Greek names differ only in case and in the final sigma, and the two German
+    # names only in ß against SS: `name_key` gives each pair one key, so each pair blocks.
     write_named_discogs(
         tmp_path / "discogs",
         "(21, 'BÁRA (2)'), (31, 'Disa'), (32, 'Dísa (2)'), (11, 'Elin'), (41, 'Gunnar'), "
-        "(51, 'Bára Band')",
+        "(51, 'Bára Band'), (61, 'Νίκος'), (62, 'ΝΙΚΟΣ'), (71, 'Straße'), (72, 'STRASSE')",
     )
 
     found = dump_match.discogs_ids(country, tmp_path / "discogs")
@@ -653,8 +671,15 @@ def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_pat
     assert found["by_name"] == {"a2": (21, "BÁRA (2)")}
     assert found["ids"] == {"a1": 11, "a2": 21}
     # Two homonyms block. An id of another roster artist blocks, and so does a shared name.
-    assert (found["more_than_one"], found["id_taken"]) == (1, 3)
+    assert (found["more_than_one"], found["id_taken"]) == (3, 3)
     assert (found["none_found"], found["no_name_key"]) == (1, 1)
+
+    # For a catalog folder of the data folder, the keys of Discogs are built one time in cache/.
+    catalog = paths.clean_catalog_dir(tmp_path / "data", "discogs", "20260101")
+    write_named_discogs(catalog, "(21, 'BÁRA (2)'), (61, 'Νίκος'), (62, 'ΝΙΚΟΣ')")
+    assert dump_match.discogs_ids(country, catalog)["by_name"] == {"a2": (21, "BÁRA (2)")}
+    cache = tmp_path / "data" / "cache" / "discogs_keys" / "discogs" / "20260101"
+    assert [path.name for path in cache.iterdir()] == [dump_match._keys_version()]
 
     write(schemas.COUNTRY_ARTISTS, tmp_path / "other", [artist("a2", "Bára")])
     write_discogs(tmp_path / "no_artists_table")

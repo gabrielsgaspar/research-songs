@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 from songs import cli
 from songs.common import storage
 from songs.common.paths import DATA_ROOT_ENV
+from songs.stage_00_ingest import campaign_run
 
 
 @pytest.fixture
@@ -36,7 +37,7 @@ def test_pull_asks_for_each_parent_one_time(bucket, monkeypatch):
         "sources_for",
         lambda code: [SimpleNamespace(id=name) for name in sources[code]],
     )
-    assert cli.pull_parents(["MNE", "SRB"]) == [
+    assert campaign_run.pull_parents(["MNE", "SRB"]) == [
         "lyrics/MNE/songs/",
         "lyrics/MNE/scores/",
         "clean/dumps/genius/",
@@ -61,18 +62,26 @@ def test_pull_asks_for_each_parent_one_time(bucket, monkeypatch):
 
 def test_publish_notes_an_old_input_and_fails_on_a_missing_layout_input(bucket, monkeypatch):
     folder = "lyrics/MNE/songs/20261121T162001Z/"
-    answer = {"uploaded": [folder], "present": [], "missing_inputs": [(folder, "lyrics/mne/")]}
+    later = "lyrics/MNE/songs/20261122T185722Z/"
+    answer = {
+        "uploaded": [folder],
+        "present": [],
+        "missing_inputs": [],
+        "skipped": [],
+        "old_inputs": [(folder, "lyrics/mne/")],
+    }
     monkeypatch.setattr(storage, "publish", lambda *args, **kwargs: answer)
     result = CliRunner().invoke(cli.app, ["lyrics", "publish", "MNE"])
     assert result.exit_code == 0, result.output
     assert "note: " in result.output and "old data folder" in result.output
-    assert "1 uploaded, 0 in the bucket already, 0 problems" in result.output
+    assert "1 uploaded, 0 in the bucket already, 0 not uploaded" in result.output
 
-    answer["missing_inputs"].append((folder, "clean/dumps/example/20261120/"))
+    answer["missing_inputs"].append((later, "clean/dumps/example/20261120/"))
+    answer["skipped"].append(later)
     result = CliRunner().invoke(cli.app, ["lyrics", "publish", "MNE"])
     assert result.exit_code == 1
     assert "problem: " in result.output and "clean/dumps/example/20261120/" in result.output
-    assert f"uploaded: {folder}" in result.output
+    assert f"uploaded: {folder}" in result.output and f"not uploaded: {later}" in result.output
 
 
 def test_audit_takes_the_runs_that_wrote_a_songs_folder(bucket, monkeypatch):
@@ -86,7 +95,7 @@ def test_audit_takes_the_runs_that_wrote_a_songs_folder(bucket, monkeypatch):
         record("MNE", "20261121T000004Z", "live"),
     ]
     expected = {("MNE", "20261121T000001Z"), ("MNE", "20261121T000002Z")}
-    assert cli.expected_songs_folders(records) == expected
+    assert campaign_run.expected_songs_folders(records) == expected
 
     monkeypatch.setattr(cli.run_records, "read_run_records", lambda: records)
     seen = {}
@@ -143,6 +152,30 @@ def test_campaign_run_goes_on_after_a_country_fails_and_exits_1(bucket, monkeypa
         calls.append((iso3, goal, min_songs))
         if iso3 == "MNE":
             raise FileNotFoundError("no songs folder of MNE")
+        if iso3 == "PRY":
+            # The second import failed: the error carries what the ladder did before it.
+            error = RuntimeError("invented failure")
+            error.ladder = {
+                "campaign_id": "20261122T110000Z",
+                "songs_before": 5,
+                "songs_after": 9,
+                "survey": [],
+                "imported": [
+                    {"source": "first", "songs_added": 4, "folder": "lyrics/PRY/x/", "seconds": 1}
+                ],
+                "skipped": [],
+            }
+            raise error
+        if iso3 == "MLT":
+            # An open campaign and nothing to import.
+            return {
+                "campaign_id": "20261122T120000Z",
+                "songs_before": 7,
+                "songs_after": 7,
+                "survey": [],
+                "imported": [],
+                "skipped": [],
+            }
         return {
             "campaign_id": "20261122T100000Z",
             "songs_before": 10,
@@ -170,17 +203,22 @@ def test_campaign_run_goes_on_after_a_country_fails_and_exits_1(bucket, monkeypa
 
     result = CliRunner().invoke(
         cli.app,
-        ["lyrics", "campaign", "run", "MNE", "LUX", "--goal", "More songs", "--years", "1965"],
+        ["lyrics", "campaign", "run", "MNE", "PRY", "MLT", "LUX"]
+        + ["--goal", "More songs", "--years", "1965"],
     )
     assert result.exit_code == 1
-    assert calls == [
-        ("MNE", "More songs (years 1965-1965)", 25),
-        ("LUX", "More songs (years 1965-1965)", 25),
-    ]
+    assert [call[0] for call in calls] == ["MNE", "PRY", "MLT", "LUX"]
+    assert calls[-1] == ("LUX", "More songs (years 1965-1965)", 25)
+    assert "error: PRY: RuntimeError: invented failure" in result.output
+    assert "PRY: campaign 20261122T110000Z, songs 5 -> 9" in result.output
+    assert "imported first: 4 songs" in result.output
+    assert "# Report PRY 20261122T110000Z (1965, 1965)" in result.output
+    assert "MLT: campaign 20261122T120000Z, songs 7 -> 7" in result.output
+    assert "not opened" not in result.output
     assert "LUX: campaign 20261122T100000Z, songs 10 -> 40" in result.output
     assert "imported example: 30 songs" in result.output
     assert "skipped small: under 25 songs (would add 3)" in result.output
     assert "sources with no dump on this disk: 2" in result.output
     assert "absent_one" not in result.output
     assert "# Report LUX 20261122T100000Z (1965, 1965)" in result.output
-    assert "failed: MNE" in result.output
+    assert "failed: MNE, PRY" in result.output

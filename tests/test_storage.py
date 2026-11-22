@@ -363,19 +363,24 @@ def test_pull_downloads_only_what_this_disk_lacks(data, tmp_path):
     assert storage.pull_newest(bucket, BUCKET, other, parents)["raw/example/"] == ("local", FOLDER)
 
 
-def test_publish_uploads_inputs_first_and_reports_a_missing_input(tmp_path):
+def test_publish_uploads_inputs_first_and_never_a_folder_with_a_missing_input(tmp_path):
     bucket = FakeBucket()
     first = make_raw(tmp_path, "first", "20261101")
     older = make_raw(tmp_path, "second", "20261102", (first, "raw/gone/20261001/"))
     newer = make_raw(tmp_path, "second", "20261103", (older,))
     (tmp_path / "raw" / "second" / "20261104").mkdir()
+    # An input that is no version folder is a path of the old data folder: it does not block.
+    free = make_raw(tmp_path, "second", "20261105", (first, "lyrics/mne/"))
 
     done = storage.publish(bucket, BUCKET, tmp_path, ["raw/second"])
     assert done == {
-        "uploaded": [first, older, newer],
+        "uploaded": [first, free],
         "present": [],
         "missing_inputs": [(older, "raw/gone/20261001/")],
+        "skipped": [older, newer],
+        "old_inputs": [(free, "lyrics/mne/")],
     }
+    assert not [name for name in bucket.writes if older in name or newer in name]
     manifest_writes = [name for name in bucket.writes if name.endswith(paths.MANIFEST_NAME)]
     assert manifest_writes == [f"data/{name}{paths.MANIFEST_NAME}" for name in done["uploaded"]]
     for folder in done["uploaded"]:
@@ -389,7 +394,13 @@ def test_a_second_publish_does_nothing(tmp_path):
     storage.publish(bucket, BUCKET, tmp_path, ["raw/second/"])
     writes = list(bucket.writes)
     done = storage.publish(bucket, BUCKET, tmp_path, ["raw/second/"])
-    assert done == {"uploaded": [], "present": [second], "missing_inputs": []}
+    assert done == {
+        "uploaded": [],
+        "present": [second],
+        "missing_inputs": [],
+        "skipped": [],
+        "old_inputs": [],
+    }
     assert bucket.writes == writes
 
 

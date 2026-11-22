@@ -182,6 +182,9 @@ def test_no_songs_is_refused_and_an_open_campaign_takes_the_runs(folders):
     opened = campaigns.open_campaign("ISL", "An earlier goal", countries=countries)
     result = run_country(data, "ISL", goal="More songs", min_songs=1, countries=countries)
     assert result["campaign_id"] == opened.campaign_id
+    # With nothing to import, the result still names the open campaign.
+    again = run_country(data, "ISL", goal="More songs", min_songs=10**6, countries=countries)
+    assert (again["campaign_id"], again["imported"]) == (opened.campaign_id, [])
     records = run_records.read_run_records("ISL", countries)
     assert records and {record.campaign_id for record in records} == {opened.campaign_id}
     assert all("The survey estimates" in record.notes for record in records)
@@ -194,9 +197,12 @@ def test_a_failing_import_leaves_the_campaign_open_and_a_failed_run_record(folde
         raise RuntimeError("invented failure")
 
     monkeypatch.setattr(dump_match, "_added_frames", fail)
-    with pytest.raises(RuntimeError, match="invented failure"):
+    with pytest.raises(RuntimeError, match="invented failure") as caught:
         run_country(data, "ISL", goal="More songs", min_songs=1, countries=countries)
 
+    # The error carries the result so far, so the caller can still show it.
+    assert caught.value.ladder["campaign_id"] == run_records.open_campaign_id("ISL", countries)
+    assert caught.value.ladder["imported"] == []
     assert run_records.open_campaign_id("ISL", countries) is not None
     (record,) = run_records.read_run_records("ISL", countries)
     assert (record.source, record.state) == ("lrclib", "failed")
@@ -267,3 +273,6 @@ def test_the_wait_ends_when_the_second_of_the_run_id_is_over(monkeypatch):
     monkeypatch.setattr(campaign_run.time, "sleep", naps.append)
     campaign_run._wait_past("20260101T000000Z")
     assert len(naps) == 2
+    # A folder from a clock that runs ahead is refused; the wait would have no end.
+    with pytest.raises(ValueError, match="ahead of the clock"):
+        campaign_run._wait_past("29990101T000000Z")

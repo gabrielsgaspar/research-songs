@@ -12,17 +12,46 @@ records of the campaign and the songs folders of the country. It holds counts on
 
 import time
 from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
 
 from songs.common import campaigns, lyric_sources, manifests, paths, run_records, schemas
-from songs.stage_00_ingest import dump_match
+from songs.stage_00_ingest import dump_match, old_layout, review_workbooks
 
 MIN_SONGS = 25
 NO_DUMP = "no dump"
 UNDER = "under the threshold"
 NOTHING = "nothing to add"
+# The routes whose run writes lyrics/<ISO3>/songs/<run id>/.
+SONGS_FOLDER_ROUTES = (old_layout.ROUTE, dump_match.ROUTE, review_workbooks.ROUTE)
+# A songs folder whose run id is further ahead than this comes from a wrong clock.
+CLOCK_SECONDS = 5
+
+
+def pull_parents(codes: list[str], catalog: bool = True) -> list[str]:
+    """Return the folders above the version folders that a campaign of the countries needs.
+
+    For each country: its songs, its scores and the dump of each of its sources. Then
+    the Discogs catalog, unless `catalog` is false. Each folder is named one time.
+    """
+    parents = []
+    for code in codes:
+        parents += [f"lyrics/{code}/songs/", f"lyrics/{code}/scores/"]
+        parents += [f"clean/dumps/{source.id}/" for source in lyric_sources.sources_for(code)]
+    if catalog:
+        parents.append("clean/catalog/discogs/")
+    return list(dict.fromkeys(parents))
+
+
+def expected_songs_folders(records: list) -> set[tuple[str, str]]:
+    """Return the (country code, run id) of each run that wrote a songs folder."""
+    return {
+        (record.iso3, record.run_id)
+        for record in records
+        if record.route in SONGS_FOLDER_ROUTES and record.state != "failed"
+    }
 
 
 def _songs(folder: Path) -> int:
@@ -32,7 +61,16 @@ def _songs(folder: Path) -> int:
 
 
 def _wait_past(run_id: str) -> None:
-    """Wait until the UTC second of `run_id` is over, so that the next run id is later."""
+    """Wait until the UTC second of `run_id` is over, so that the next run id is later.
+
+    Raise ValueError when `run_id` is more than `CLOCK_SECONDS` ahead of this clock.
+    """
+    ahead = datetime.strptime(run_id, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC) - datetime.now(UTC)
+    if ahead.total_seconds() > CLOCK_SECONDS:
+        raise ValueError(
+            f"the newest songs folder {run_id} is {int(ahead.total_seconds())} seconds ahead "
+            "of the clock of this computer; a run id must be later than it"
+        )
     while run_records.new_run_id() <= run_id:
         time.sleep(0.05)
 
@@ -49,9 +87,11 @@ def run_country(
     """Run the dump ladder for one country. Return what was estimated, imported and skipped.
 
     The sources are those of `lyric_sources.sources_for`. The threshold is on the
-    country: when the newest dumps of all sources would add fewer than `min_songs`
-    songs in total, the function opens no campaign and writes nothing, and
-    `campaign_id` is None. Otherwise every source that would add 1 song or more is
+    country: when the estimates of the newest dumps of all sources sum to fewer than
+    `min_songs` songs, the function opens no campaign and writes nothing, and
+    `campaign_id` is the open campaign of the country or None. The sum is an upper
+    limit, because two dumps can hold the same song. Otherwise every source that
+    would add 1 song or more is
     imported, the largest estimate first. After the first import, each source is
     estimated again on the new songs folder, because an earlier import can take its
     tracks; a source with nothing left is skipped. The campaign stays open. When
@@ -61,7 +101,7 @@ def run_country(
 
     Raise FileNotFoundError when the country has no songs folder. An import that fails stops the
     ladder: its run record has the state `failed`, the campaign stays open, and
-    the error is raised again.
+    the error is raised again with the result so far in its attribute `ladder`.
     """
     paths.check_iso3(iso3)
     current = run_records.open_campaign_id(iso3, countries)
@@ -89,7 +129,7 @@ def run_country(
         key=lambda row: -row["would_add"],
     )
     result = {
-        "campaign_id": None,
+        "campaign_id": current,
         "songs_before": before,
         "songs_after": before,
         "survey": survey,
@@ -104,6 +144,24 @@ def run_country(
         current
         or campaigns.open_campaign(iso3, goal, songs_before=before, countries=countries).campaign_id
     )
+    try:
+        _import_each(data, iso3, todo, discogs, countries, result)
+    except Exception as error:
+        error.ladder = result
+        raise
+    return result
+
+
+def _import_each(
+    data: Path,
+    iso3: str,
+    todo: list[dict],
+    discogs: Path | None,
+    countries: Path | None,
+    result: dict,
+) -> None:
+    """Import each source of `todo` in turn, and write what happened into `result`."""
+    skipped = result["skipped"]
     for position, row in enumerate(todo):
         source = row["source"]
         estimate = row["would_add"]
@@ -132,7 +190,6 @@ def run_country(
             }
         )
         result["songs_after"] = done["songs"]
-    return result
 
 
 def _by_year(folder: Path) -> Counter:

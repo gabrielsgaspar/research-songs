@@ -456,36 +456,59 @@ def publish(
 
     The folders of a parent go oldest first. Before a folder, its inputs go: each input
     of its manifest that is complete on this disk and absent from the bucket, with its
-    own inputs first. Each uploaded folder must pass `check_folder`. Return three lists:
-    `uploaded` (in upload order), `present` (the bucket had the manifest) and
-    `missing_inputs`, one (folder, input) for each input that is neither complete on
-    this disk nor in the bucket. Such a folder is still uploaded, and the caller reports
-    the gap.
+    own inputs first. Each uploaded folder must pass `check_folder`.
+
+    A folder is not uploaded when one of its inputs is a version folder of the layout
+    that is neither complete on this disk nor in the bucket, or is itself not uploaded
+    for that reason: the bucket never gets a folder that names an input it does not
+    hold. An input that is no version folder (a path of the old data folder) does not
+    stop the upload.
+
+    Return five lists: `uploaded` (in upload order), `present` (the bucket had the
+    manifest), `missing_inputs` (one (folder, input) for each absent version folder),
+    `skipped` (the folders not uploaded because of them) and `old_inputs` (one
+    (folder, input) for each input that is no version folder).
     """
-    result: dict[str, list] = {"uploaded": [], "present": [], "missing_inputs": []}
-    seen: set[str] = set()
+    result: dict[str, list] = {
+        "uploaded": [],
+        "present": [],
+        "missing_inputs": [],
+        "skipped": [],
+        "old_inputs": [],
+    }
+    sent: dict[str, bool] = {}
 
     def in_bucket(name: str) -> bool:
         return transport.stat(bucket, BUCKET_PREFIX + name) is not None
 
-    def send(folder: str) -> None:
-        if folder in seen:
-            return
-        seen.add(folder)
+    def send(folder: str) -> bool:
+        """Upload the folder after its inputs. Return False when it is not in the bucket."""
+        if folder in sent:
+            return sent[folder]
+        sent[folder] = True
         if in_bucket(folder + paths.MANIFEST_NAME):
             result["present"].append(folder)
-            return
+            return True
+        ready = True
         for item in _local_manifest(data, folder).inputs:
             name = item.rstrip("/")
             if (data / name / paths.MANIFEST_NAME).is_file():
-                send(name + "/")
-            elif not in_bucket(f"{name}/{paths.MANIFEST_NAME}") and not in_bucket(name):
+                ready = send(name + "/") and ready
+            elif not _is_version(name.rsplit("/", 1)[-1]):
+                result["old_inputs"].append((folder, item))
+            elif not in_bucket(f"{name}/{paths.MANIFEST_NAME}"):
                 result["missing_inputs"].append((folder, item))
+                ready = False
+        if not ready:
+            result["skipped"].append(folder)
+            sent[folder] = False
+            return False
         upload_folder(transport, bucket, data, folder, echo)
         problems = check_folder(transport, bucket, folder)
         if problems:
             raise StorageError(f"{folder} does not match its manifest after the upload: {problems}")
         result["uploaded"].append(folder)
+        return True
 
     for parent in parents:
         parent = version_folder(parent)

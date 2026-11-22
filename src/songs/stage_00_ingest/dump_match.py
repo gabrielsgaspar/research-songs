@@ -34,7 +34,9 @@ and the tracks that credit it. The first title step that finds a track wins:
     loose           the keys are the same without parts in brackets and featuring parts
     close           the loose keys are similar (`CLOSE_CUTOFF` or more); a person reviews these
 
-A song is `already_linked` when a track with its title already has a link in the
+A song is `held_loose_title` when the country holds a song of the same roster
+artist with the same loose key. A song is `already_linked` when a track with its
+title already has a link in the
 country, and `track_taken` when an earlier song of the dump took the same track.
 Of the releases that hold the track, the one with the earliest year wins, then the
 lowest release id. The year is the earlier of the release date and the year of
@@ -86,6 +88,7 @@ DISCOGS_CLASSES = (
     "exact",
     "loose",
     "close",
+    "held_loose_title",
     "already_linked",
     "track_taken",
     "no_track",
@@ -101,8 +104,6 @@ CLOSE_CUTOFF = 0.9
 BY_NAME = "_artist_by_name"
 # Discogs marks the second artist of one name as "Name (2)".
 _HOMONYM = r"\s\(\d+\)$"
-# Close to `name_key`, in SQL: it selects the few Discogs names that `name_key` then reads.
-_FOLD = "regexp_replace(lower(strip_accents({})), '[^\\p{{L}}\\p{{N}}]+', '', 'g')"
 # The Discogs classes that the import adds, and the route of its run.
 ADDED = ("exact", "loose")
 ROUTE = "dump_name"
@@ -172,10 +173,40 @@ def _table(connection: duckdb.DuckDBPyConnection, name: str, kind: str, values: 
     connection.unregister("frame")
 
 
+def _keys_text() -> str:
+    """Return everything that decides the content of a key cache, as one text."""
+    builders = (name_key, lead_artist, dump_keys, _discogs_keys)
+    return "".join(inspect.getsource(part) for part in builders) + repr(
+        (_CREDIT_SPLIT.pattern, _CREDIT_SPLIT.flags, _HOMONYM, unicodedata.unidata_version)
+    )
+
+
 def _keys_version() -> str:
-    """Return a short hash of the code that makes the keys; a change gives a new key cache."""
-    text = inspect.getsource(name_key) + inspect.getsource(lead_artist) + _CREDIT_SPLIT.pattern
-    return hashlib.sha256(text.encode()).hexdigest()[:12]
+    """Return a short hash of `_keys_text`; a change of the key code gives a new key cache."""
+    return hashlib.sha256(_keys_text().encode()).hexdigest()[:12]
+
+
+def _work_folder(parent: Path) -> Path:
+    """Return a new work folder in a cache folder, and remove the work folders of stopped builds.
+
+    A work folder that is older than one day belongs to no build that still runs.
+    """
+    parent.mkdir(parents=True, exist_ok=True)
+    for old in parent.glob("work-*"):
+        if time.time() - old.stat().st_mtime > 86400:
+            shutil.rmtree(old, ignore_errors=True)
+    return Path(tempfile.mkdtemp(dir=parent, prefix="work-"))
+
+
+def _keep(work: Path, folder: Path) -> None:
+    """Give a finished work folder its final name. A stopped build leaves no such name."""
+    try:
+        work.rename(folder)
+    except OSError:
+        # Another process built the same folder first; its result is the same.
+        shutil.rmtree(work, ignore_errors=True)
+        if not folder.is_dir():
+            raise
 
 
 def _quoted(path: Path) -> str:
@@ -203,8 +234,7 @@ def dump_keys(dump: Path) -> Path:
     folder = folder / _keys_version()
     if folder.is_dir():
         return folder
-    folder.parent.mkdir(parents=True, exist_ok=True)
-    work = Path(tempfile.mkdtemp(dir=folder.parent, prefix="work-"))
+    work = _work_folder(folder.parent)
     with duckdb.connect() as connection:
         connection.execute(f"SET temp_directory = {_quoted(work / 'spill')}")
         connection.execute("SET memory_limit = '4GB'")
@@ -252,14 +282,38 @@ def dump_keys(dump: Path) -> Path:
             f"TO {_quoted(work / 'songs.parquet')}"
         )
     shutil.rmtree(work / "spill", ignore_errors=True)
-    try:
-        work.rename(folder)
-    except OSError:
-        # Another process built the same folder first; its result is the same.
-        shutil.rmtree(work, ignore_errors=True)
-        if not folder.is_dir():
-            raise
+    _keep(work, folder)
     return folder
+
+
+def _discogs_keys(connection: duckdb.DuckDBPyConnection, discogs: Path) -> str:
+    """Return the SQL source of the Discogs artists with their name key: artist_id, name, key.
+
+    The key is `name_key` of the name without the homonym mark, computed by `name_key`
+    itself, so two Discogs names with one key are always seen as two. For a
+    `clean/catalog/<source>/<YYYYMMDD>/` folder the table is built one time under
+    `cache/discogs_keys/` of the data folder, like `dump_keys`. For any other folder
+    it is computed in the query.
+    """
+    connection.create_function(
+        "bare_key",
+        lambda name: name_key(re.sub(_HOMONYM, "", name or "")),
+        ["VARCHAR"],
+        "VARCHAR",
+        null_handling="special",
+    )
+    select = (
+        f"SELECT artist_id, name, bare_key(name) AS key FROM {_quoted(discogs / 'artists.parquet')}"
+    )
+    if discogs.parent.parent.name != "catalog" or discogs.parents[2].name != "clean":
+        return f"({select})"
+    folder = discogs.parents[3] / "cache" / "discogs_keys" / discogs.parent.name / discogs.name
+    folder = folder / _keys_version()
+    if not folder.is_dir():
+        work = _work_folder(folder.parent)
+        connection.execute(f"COPY ({select}) TO {_quoted(work / 'artist_keys.parquet')}")
+        _keep(work, folder)
+    return _quoted(folder / "artist_keys.parquet")
 
 
 def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
@@ -523,19 +577,15 @@ def discogs_ids(country: Path, discogs: Path) -> dict:
         )
         ids = {artist_id: int(number) for artist_id, _, number in roster if number}
         missing = {artist_id: name_key(name) for artist_id, name, number in roster if not number}
-        names = sorted({name for artist_id, name, _ in roster if missing.get(artist_id)})
-        artists = discogs / "artists.parquet"
+        keys = sorted(set(missing.values()) - {""})
         found: dict[str, dict[int, str]] = {}
-        if names and artists.is_file():
-            # shortcut: a homonym that only `name_key` folds to the same key is not seen
-            # (another Unicode form of a letter); build a key table of Discogs when it matters.
-            _table(connection, "names", "str", names)
-            bare = f"regexp_replace(name, '{_HOMONYM}', '')"
-            for number, name in connection.sql(
-                f"SELECT artist_id, name FROM {_quoted(artists)} "
-                f"WHERE {_FOLD.format(bare)} IN (SELECT {_FOLD.format('value')} FROM names)"
+        if keys and (discogs / "artists.parquet").is_file():
+            _table(connection, "names", "str", keys)
+            for number, name, key in connection.sql(
+                f"SELECT artist_id, name, key FROM {_discogs_keys(connection, discogs)} "
+                "WHERE key IN (SELECT value FROM names)"
             ).fetchall():
-                found.setdefault(name_key(re.sub(_HOMONYM, "", name)), {})[number] = name
+                found.setdefault(key, {})[number] = name
     result = {"by_name": {}, "none_found": 0, "more_than_one": 0, "id_taken": 0}
     result["no_name_key"] = sum(not key for key in missing.values())
     shared = Counter(missing.values())
@@ -564,11 +614,21 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]
     the release id, track index, Discogs title, year, match method and score.
     The Discogs id of an artist is the id of the roster, or the id that `discogs_ids`
     finds by name. For such an id the row has `artist_by_name` true, and its match
-    method ends with `BY_NAME`.
+    method ends with `BY_NAME`. A song is `held_loose_title` when the country holds a
+    song of the same roster artist with the same loose title key, with or without a
+    link, so one track never gets a second song under a longer title.
     """
     resolved = discogs_ids(country.resolve(), discogs.resolve())
     discogs_of, by_name = resolved["ids"], resolved["by_name"]
     with duckdb.connect() as connection:
+        held_loose = {
+            (artist_id, loose_key(title))
+            for artist_id, title in schemas.read_table(
+                schemas.COUNTRY_SONGS, country, connection, fill_absent=True
+            )
+            .project("artist_id, song_name")
+            .fetchall()
+        }
         linked = set(
             schemas.read_table(schemas.COUNTRY_LINKS, country, connection)
             .filter("discogs_release_id IS NOT NULL")
@@ -594,6 +654,9 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]
         named = song["roster_artist_ids"][0] in by_name
         found = tracks.get(artist, [])
         exact, loose = name_key(song["song_name"]), loose_key(song["song_name"])
+        if (song["roster_artist_ids"][0], loose) in held_loose:
+            row["discogs_class"] = "held_loose_title"
+            continue
         kind, hits, score = "exact", [hit for hit in found if name_key(hit[0]) == exact], None
         if not hits:
             kind, hits = "loose", [hit for hit in found if loose_key(hit[0]) == loose]
