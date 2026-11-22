@@ -50,12 +50,20 @@ The new folder holds the earlier rows and the added songs, each with one link to
 its Discogs track. Its run record counts every other song of the dump by class.
 The import reads the lyric text of the added songs from the dump; lyric text never
 goes to Git, to a manifest or to a run record.
+
+`would_add` decides which songs an import adds; `import_dump` and `survey` both use
+it. `survey` and `gaps` only read:
+
+    survey   for each source, what an import of its newest dump would add, by year
+    gaps     for each year, the songs that the country holds and the Discogs tracks of
+             its roster artists that have no song yet
 """
 
 import csv
 import difflib
 import hashlib
 import re
+import time
 import unicodedata
 from collections import Counter
 from pathlib import Path
@@ -471,32 +479,222 @@ def load_reviewed_matches(root: Path | None = None) -> dict[tuple[str, ...], str
     return decisions
 
 
+def would_add(
+    dump: Path,
+    country: Path,
+    discogs: Path,
+    source: str,
+    iso3: str,
+    reviewed: dict[tuple[str, ...], str] | None = None,
+) -> dict:
+    """Decide which songs of the dump folder `dump` an import adds to the folder `country`.
+
+    A song is added when `match_discogs` gives it the class `exact` or `loose`, or
+    the class `close` and `REVIEWED_FILE` accepts it for the same Discogs track.
+    `reviewed` replaces the decisions of that file (for tests). Return the songs
+    read (`songs_in`), the chosen songs with their Discogs rows (`chosen`), every
+    other song counted by class (`rejected`), and the chosen songs counted by
+    year (`by_year`, and `no_year` for a song with no year). The chosen songs and
+    the rejected songs add up to `songs_in`.
+    """
+    result = match_dump(dump, country)
+    found = match_discogs(result["songs"], country, discogs)
+    reviewed = load_reviewed_matches() if reviewed is None else reviewed
+
+    def accepted(row: dict) -> bool:
+        key = (source, iso3, row["source_song_id"], row.get("discogs_release_id", ""))
+        return reviewed.get((*key, row.get("discogs_track_index", ""))) == "accept"
+
+    chosen = {
+        row["source_song_id"]: row
+        for row in found
+        if row["discogs_class"] in ADDED or (row["discogs_class"] == "close" and accepted(row))
+    }
+    close_accepted = sum(row["discogs_class"] == "close" for row in chosen.values())
+    discogs_counts = Counter(row["discogs_class"] for row in found)
+    discogs_counts["close"] -= close_accepted
+    years = Counter(row["year"] for row in chosen.values())
+    no_year = years.pop(None, 0)
+    return {
+        "songs_in": result["songs_in"],
+        "songs": {song["source_song_id"]: song for song in result["songs"]},
+        "chosen": chosen,
+        "close_accepted": close_accepted,
+        "rejected": {
+            **{name: result["counts"][name] for name in CLASSES if name != "roster_new"},
+            **result["left_out"],
+            **{name: discogs_counts[name] for name in DISCOGS_CLASSES if name not in ADDED},
+        },
+        "by_year": dict(sorted(years.items())),
+        "no_year": no_year,
+    }
+
+
+def by_decade(by_year: dict[int, int]) -> dict[int, int]:
+    """Return counts by decade from counts by year. The key is the first year of the decade."""
+    decades: Counter = Counter()
+    for year, number in by_year.items():
+        decades[year // 10 * 10] += number
+    return dict(sorted(decades.items()))
+
+
+def _discogs_folder(data: Path, discogs: Path | None) -> Path:
+    """Return the Discogs folder: the one given, or the newest complete catalog folder."""
+    found = discogs or paths.latest_clean_catalog_dir(data, "discogs")
+    if found is None:
+        raise FileNotFoundError(
+            "no Discogs tables: name a folder, or put a complete "
+            "clean/catalog/discogs/<YYYYMMDD>/ in the data folder"
+        )
+    return found
+
+
+def survey(data: Path, iso3: str, sources: list[str], discogs: Path | None = None) -> list[dict]:
+    """Estimate, for each source, what an import of its newest dump adds to a country.
+
+    The function only reads: it writes no folder and no run record. Return one row
+    for each source, in the order given. A source with no complete dump in the data
+    folder has `dump` None and no counts. Every other row has the dump folder, the
+    songs read (`songs_in`), the songs that `import_dump` would add (`would_add`),
+    those songs by year (`by_year`, `no_year`), every other song by class
+    (`rejected`), and the seconds that the estimate took. `discogs` defaults to the
+    newest complete `clean/catalog/discogs/<YYYYMMDD>/`.
+    """
+    country = paths.latest_country_songs_dir(data, iso3)
+    if country is None:
+        raise FileNotFoundError(f"no songs folder of {iso3}")
+    discogs = _discogs_folder(data, discogs)
+    rows = []
+    for source in sources:
+        dump = paths.latest_clean_dump_dir(data, source)
+        if dump is None:
+            rows.append({"source": source, "dump": None})
+            continue
+        start = time.monotonic()
+        plan = would_add(dump, country, discogs, source, iso3)
+        rows.append(
+            {
+                "source": source,
+                "dump": paths.data_relative(data, dump),
+                "songs_in": plan["songs_in"],
+                "would_add": len(plan["chosen"]),
+                "by_year": plan["by_year"],
+                "no_year": plan["no_year"],
+                "rejected": plan["rejected"],
+                "seconds": round(time.monotonic() - start, 1),
+            }
+        )
+    return rows
+
+
+def gaps(data: Path, iso3: str, discogs: Path | None = None) -> dict:
+    """Count, for each year, the songs that a country holds and the tracks that it lacks.
+
+    The function only reads the newest songs folder of the country and the Discogs
+    tables. A wanted pair is one roster artist with a Discogs id and one loose title
+    key of a Discogs track of that artist. A pair is left out as `pairs_linked` when
+    a track of the pair has a link in the country, and as `pairs_held` when the
+    country holds a song of the artist with that title key. The year of a pair is
+    the earliest year of its tracks. Two roster rows with one Discogs id are one
+    artist. `artists_no_discogs_id` counts the roster artists that the dump route
+    cannot serve. A track whose title has no key is counted in `tracks_no_title_key`.
+    """
+    country = paths.latest_country_songs_dir(data, iso3)
+    if country is None:
+        raise FileNotFoundError(f"no songs folder of {iso3}")
+    discogs = _discogs_folder(data, discogs)
+    with duckdb.connect() as connection:
+        songs = schemas.read_table(schemas.COUNTRY_SONGS, country, connection, fill_absent=True)
+        held_years = dict(songs.aggregate("year, count(*)").fetchall())
+        held_titles = songs.project("artist_id, song_name").fetchall()
+        roster = _rows(
+            schemas.read_table(schemas.COUNTRY_ARTISTS, country, connection),
+            "artist_id, discogs_artist_id",
+        )
+        linked = set(
+            schemas.read_table(schemas.COUNTRY_LINKS, country, connection)
+            .filter("discogs_release_id IS NOT NULL")
+            .project("discogs_release_id, discogs_track_index")
+            .fetchall()
+        )
+    discogs_of = {artist_id: int(number) for artist_id, number in roster if number}
+    held = {
+        (discogs_of[artist_id], loose_key(title))
+        for artist_id, title in held_titles
+        if artist_id in discogs_of
+    }
+    tracks = _discogs_tracks(discogs, sorted(set(discogs_of.values())))
+    earliest: dict[tuple[int, str], int | None] = {}
+    with_link: set[tuple[int, str]] = set()
+    tracks_in = no_key = 0
+    for artist, found in tracks.items():
+        for title, release_id, index, year in found:
+            tracks_in += 1
+            pair = (artist, loose_key(title))
+            if not pair[1]:
+                no_key += 1
+                continue
+            years = [value for value in (earliest.get(pair), year) if value is not None]
+            earliest[pair] = min(years, default=None)
+            if (str(release_id), str(index)) in linked:
+                with_link.add(pair)
+    held_pairs = (held & set(earliest)) - with_link
+    wanted = Counter(
+        year for pair, year in earliest.items() if pair not in with_link and pair not in held_pairs
+    )
+    held_no_year = held_years.pop(None, 0)
+    wanted_no_year = wanted.pop(None, 0)
+    return {
+        "songs_folder": paths.data_relative(data, country),
+        "songs": sum(held_years.values()) + held_no_year,
+        "held_by_year": dict(sorted(held_years.items())),
+        "held_no_year": held_no_year,
+        "artists": len(roster),
+        "artists_no_discogs_id": len(roster) - len(discogs_of),
+        "tracks_in": tracks_in,
+        "tracks_no_title_key": no_key,
+        "pairs": len(earliest),
+        "pairs_linked": len(with_link),
+        "pairs_held": len(held_pairs),
+        "wanted": sum(wanted.values()) + wanted_no_year,
+        "wanted_by_year": dict(sorted(wanted.items())),
+        "wanted_no_year": wanted_no_year,
+    }
+
+
 def import_dump(
     data: Path,
     source: str,
     iso3: str,
-    discogs: Path,
+    discogs: Path | None = None,
     *,
-    discogs_label: str,
+    discogs_label: str | None = None,
     countries: Path | None = None,
     reviewed: dict[tuple[str, ...], str] | None = None,
 ) -> dict:
     """Add the songs of the newest dump that match a Discogs track of their roster artist.
 
-    The `exact` and `loose` songs of `match_discogs` are added, and the `close`
-    songs that `REVIEWED_FILE` accepts for the same Discogs track. The command
-    writes a new folder `lyrics/<ISO3>/songs/<run id>/` with the earlier rows and
-    the added songs and links, its manifest, and the run record. `discogs_label`
-    names the Discogs folder in the manifest notes, and `reviewed` replaces the
-    decisions of `REVIEWED_FILE` (for tests), since that folder is outside
-    the data folder. Every other song of the dump is counted in the run record with
-    its class.
+    `would_add` chooses the songs. The command writes a new folder
+    `lyrics/<ISO3>/songs/<run id>/` with the earlier rows and the added songs and
+    links, its manifest, and the run record. `discogs` defaults to the newest
+    complete `clean/catalog/discogs/<YYYYMMDD>/`. A Discogs folder inside the data
+    folder is an input of the manifest. For a folder outside the data folder,
+    `discogs_label` names it in the manifest notes. `reviewed` replaces the
+    decisions of `REVIEWED_FILE` (for tests). Every other song of the dump is
+    counted in the run record with its class.
     """
     paths.check_iso3(iso3)
     dump = paths.latest_clean_dump_dir(data, source)
     earlier = paths.latest_country_songs_dir(data, iso3)
     if dump is None or earlier is None:
         raise FileNotFoundError(f"no dump of {source} or no songs folder of {iso3}")
+    discogs = _discogs_folder(data, discogs).resolve()
+    catalog = (
+        [paths.data_relative(data.resolve(), discogs)]
+        if discogs.is_relative_to(data.resolve())
+        else []
+    )
+    discogs_label = catalog[0] if catalog else discogs_label or discogs.name
     bulk_file = paths.data_relative(data, dump)
     with run_records.record_run(
         iso3, ROUTE, source, countries=countries, bulk_file=bulk_file
@@ -505,41 +703,21 @@ def import_dump(
             raise ValueError(f"{earlier} is not older than this run ({record.run_id})")
         manifests.read_manifest(dump)
         manifests.read_manifest(earlier)
-        result = match_dump(dump, earlier)
-        found = match_discogs(result["songs"], earlier, discogs)
-        reviewed = load_reviewed_matches() if reviewed is None else reviewed
-
-        def accepted(row: dict) -> bool:
-            key = (source, iso3, row["source_song_id"], row.get("discogs_release_id", ""))
-            return reviewed.get((*key, row.get("discogs_track_index", ""))) == "accept"
-
-        close_accepted = sum(row["discogs_class"] == "close" and accepted(row) for row in found)
-        chosen = {
-            row["source_song_id"]: row
-            for row in found
-            if row["discogs_class"] in ADDED or (row["discogs_class"] == "close" and accepted(row))
-        }
-        songs = {song["source_song_id"]: song for song in result["songs"]}
-        added, links = _added_frames(dump, earlier, iso3, source, chosen, songs)
+        plan = would_add(dump, earlier, discogs, source, iso3, reviewed)
+        rejected, close_accepted = plan["rejected"], plan["close_accepted"]
+        added, links = _added_frames(dump, earlier, iso3, source, plan["chosen"], plan["songs"])
         out = paths.country_songs_dir(data, iso3, record.run_id)
         out.mkdir(parents=True, exist_ok=False)
         counts = review_workbooks.write_country_songs(
             added, earlier, out, record.run_id, record.started_utc, links
         )
-        discogs_counts = Counter(row["discogs_class"] for row in found)
-        discogs_counts["close"] -= close_accepted
-        rejected = {
-            **{name: result["counts"][name] for name in CLASSES if name != "roster_new"},
-            **result["left_out"],
-            **{name: discogs_counts[name] for name in DISCOGS_CLASSES if name not in ADDED},
-        }
         manifests.write_manifest(
             data,
             out,
             "country_songs",
             country_iso3=iso3,
             run_id=record.run_id,
-            inputs=[bulk_file, paths.data_relative(data, earlier)],
+            inputs=[bulk_file, paths.data_relative(data, earlier), *catalog],
             counts=counts
             | {f"dump_songs_{name}": value for name, value in rejected.items()}
             | {"dump_songs_close_accepted": close_accepted},
@@ -550,13 +728,13 @@ def import_dump(
         )
         record.rows_added = counts["songs_added"]
         record.requests_sent, record.limits_hit = 0, {}
-        record.songs_attempted = result["songs_in"]
+        record.songs_attempted = plan["songs_in"]
         record.songs_accepted = len(added)
         record.songs_rejected = {name: value for name, value in rejected.items() if value}
         record.artists_attempted = int(added["artist_id"].nunique())
-        if discogs_counts["close"]:
+        if rejected["close"]:
             record.known_gaps.append(
-                f"close: {discogs_counts['close']} songs match a Discogs title by close "
+                f"close: {rejected['close']} songs match a Discogs title by close "
                 "spelling and wait for review"
             )
         if close_accepted:
@@ -564,4 +742,4 @@ def import_dump(
                 f"{record.notes} {close_accepted} close matches added after review "
                 f"({REVIEWED_FILE.as_posix()})."
             ).strip()
-    return {"path": out, "songs_attempted": result["songs_in"], "rejected": rejected, **counts}
+    return {"path": out, "songs_attempted": plan["songs_in"], "rejected": rejected, **counts}

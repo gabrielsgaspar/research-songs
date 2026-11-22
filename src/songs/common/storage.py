@@ -9,6 +9,9 @@ of a folder in the bucket against its manifest then needs only a listing.
 Code reaches the bucket only through a `Transport`. `GcloudTransport` runs the
 `gcloud` program as it is signed in; tests use a fake that keeps objects in memory.
 
+`pull_newest`, `publish` and `audit_songs` work on the newest folders. They find the
+complete folders of the bucket from a listing of the manifests only.
+
 `docs/standards/data_layout.md` is the standard.
 """
 
@@ -70,6 +73,10 @@ class Transport(Protocol):
 
     def list(self, bucket: str, prefix: str) -> list[RemoteObject]: ...
 
+    def glob(self, bucket: str, pattern: str) -> list[RemoteObject]:
+        """Return the objects that match `pattern`. A `*` matches inside one part of a name."""
+        ...
+
     def stat(self, bucket: str, name: str) -> RemoteObject | None: ...
 
     def upload(self, bucket: str, source: Path, name: str, *, md5: str, sha256: str) -> None: ...
@@ -118,6 +125,16 @@ class GcloudTransport:
 
     def list(self, bucket: str, prefix: str) -> list[RemoteObject]:
         output = self._run("objects", "list", f"gs://{bucket}/{prefix}**", "--format=json")
+        return [_remote(record) for record in json.loads(output or b"[]")]
+
+    def glob(self, bucket: str, pattern: str) -> list[RemoteObject]:
+        output = self._run(
+            "objects",
+            "list",
+            f"gs://{bucket}/{pattern}",
+            "--format=json",
+            missing="matched no objects",
+        )
         return [_remote(record) for record in json.loads(output or b"[]")]
 
     def stat(self, bucket: str, name: str) -> RemoteObject | None:
@@ -210,6 +227,13 @@ def _local_names(folder: Path) -> set[str]:
     return {path.relative_to(folder).as_posix() for path in folder.rglob("*") if path.is_file()}
 
 
+def _local_manifest(data: Path, folder: str) -> manifests.Manifest:
+    try:
+        return manifests.read_manifest(data / folder)
+    except (FileNotFoundError, ValueError) as error:
+        raise StorageError(f"{folder} has no valid manifest: {error}") from error
+
+
 def upload_folder(
     transport: Transport, bucket: str, data: Path, folder: str, echo: Echo | None = None
 ) -> list[RemoteObject]:
@@ -224,10 +248,7 @@ def upload_folder(
     """
     folder = version_folder(folder)
     local = data / folder
-    try:
-        manifest = manifests.read_manifest(local)
-    except (FileNotFoundError, ValueError) as error:
-        raise StorageError(f"{folder} has no valid manifest: {error}") from error
+    manifest = _local_manifest(data, folder)
     expected = {entry["path"]: entry for entry in manifest.files}
     found = _local_names(local) - {paths.MANIFEST_NAME}
     if found != set(expected):
@@ -377,3 +398,119 @@ def download_folder(
     if echo:
         echo(done[-1].line())
     return done
+
+
+def _is_version(name: str) -> bool:
+    return bool(paths.DAY.fullmatch(name) or paths.RUN_ID.fullmatch(name))
+
+
+def _complete_in_bucket(transport: Transport, bucket: str, pattern: str) -> list[str]:
+    """Return the version folders that match `pattern` and have a manifest in the bucket, sorted.
+
+    Only the manifests are listed, so the other objects of the bucket cost no time.
+    """
+    found = []
+    for item in transport.glob(bucket, BUCKET_PREFIX + pattern + paths.MANIFEST_NAME):
+        folder = item.name.removeprefix(BUCKET_PREFIX).removesuffix(paths.MANIFEST_NAME)
+        if _is_version(folder.rstrip("/").rsplit("/", 1)[-1]):
+            found.append(folder)
+    return sorted(found)
+
+
+def newest_in_bucket(transport: Transport, bucket: str, parent: str) -> str | None:
+    """Return the newest version folder under `parent` that has a manifest in the bucket, or None.
+
+    `parent` is the folder above the version folders, relative to the data folder, such
+    as `lyrics/BRA/songs/` or `clean/dumps/lrclib/`.
+    """
+    found = _complete_in_bucket(transport, bucket, version_folder(parent) + "*/")
+    return found[-1] if found else None
+
+
+def pull_newest(
+    transport: Transport, bucket: str, data: Path, parents: list[str], echo: Echo | None = None
+) -> dict[str, tuple[str, str | None]]:
+    """Download the newest complete folder of each parent that this disk does not hold complete.
+
+    Return, for each parent, what happened and the folder: `downloaded`, `local` (the
+    folder is complete on this disk) or `absent` (the bucket has no complete folder).
+    The rules of `download_folder` hold: no local file is replaced.
+    """
+    done: dict[str, tuple[str, str | None]] = {}
+    for parent in parents:
+        folder = newest_in_bucket(transport, bucket, parent)
+        if folder is None:
+            done[parent] = ("absent", None)
+        elif (data / folder / paths.MANIFEST_NAME).is_file():
+            done[parent] = ("local", folder)
+        else:
+            download_folder(transport, bucket, data, folder, echo)
+            done[parent] = ("downloaded", folder)
+    return done
+
+
+def publish(
+    transport: Transport, bucket: str, data: Path, parents: list[str], echo: Echo | None = None
+) -> dict[str, list]:
+    """Upload each local complete version folder under `parents` that the bucket lacks.
+
+    The folders of a parent go oldest first. Before a folder, its inputs go: each input
+    of its manifest that is complete on this disk and absent from the bucket, with its
+    own inputs first. Each uploaded folder must pass `check_folder`. Return three lists:
+    `uploaded` (in upload order), `present` (the bucket had the manifest) and
+    `missing_inputs`, one (folder, input) for each input that is neither complete on
+    this disk nor in the bucket. Such a folder is still uploaded, and the caller reports
+    the gap.
+    """
+    result: dict[str, list] = {"uploaded": [], "present": [], "missing_inputs": []}
+    seen: set[str] = set()
+
+    def in_bucket(name: str) -> bool:
+        return transport.stat(bucket, BUCKET_PREFIX + name) is not None
+
+    def send(folder: str) -> None:
+        if folder in seen:
+            return
+        seen.add(folder)
+        if in_bucket(folder + paths.MANIFEST_NAME):
+            result["present"].append(folder)
+            return
+        for item in _local_manifest(data, folder).inputs:
+            name = item.rstrip("/")
+            if (data / name / paths.MANIFEST_NAME).is_file():
+                send(name + "/")
+            elif not in_bucket(f"{name}/{paths.MANIFEST_NAME}") and not in_bucket(name):
+                result["missing_inputs"].append((folder, item))
+        upload_folder(transport, bucket, data, folder, echo)
+        problems = check_folder(transport, bucket, folder)
+        if problems:
+            raise StorageError(f"{folder} does not match its manifest after the upload: {problems}")
+        result["uploaded"].append(folder)
+
+    for parent in parents:
+        parent = version_folder(parent)
+        for path in sorted((data / parent).glob("*")):
+            if _is_version(path.name) and (path / paths.MANIFEST_NAME).is_file():
+                send(f"{parent}{path.name}/")
+    return result
+
+
+def audit_songs(
+    transport: Transport, bucket: str, expected: set[tuple[str, str]]
+) -> dict[str, list[tuple[str, str]]]:
+    """Compare the songs folders that the run records expect with the bucket.
+
+    `expected` holds one (country code, run id) for each run that wrote a songs folder.
+    Return `not_in_bucket`: the pairs with no `lyrics/<ISO3>/songs/<run id>/` that has a
+    manifest in the bucket, and `no_record`: the folders with a manifest and no pair.
+    The audit reads one listing of the manifests. `check_folder` proves one folder.
+    """
+    found = set()
+    for folder in _complete_in_bucket(transport, bucket, "lyrics/*/songs/*/"):
+        _, iso3, _, run_id = folder.rstrip("/").split("/")
+        if paths.ISO3.fullmatch(iso3) and paths.RUN_ID.fullmatch(run_id):
+            found.add((iso3, run_id))
+    return {
+        "not_in_bucket": sorted(set(expected) - found),
+        "no_record": sorted(found - set(expected)),
+    }
