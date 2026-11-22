@@ -62,6 +62,87 @@ A campaign has two files in `countries/<ISO3>/campaigns/`: `<campaign id>_open.j
 | `reason` | close | Why the campaign stopped |
 | `next_time` | close | What the next campaign must try |
 
+## Run a campaign
+
+This is the order of steps for one country or for several. Each step is one command. A command that takes countries accepts a list, for example `BRA NGA`. The examples use `BRA`.
+
+1. Read the plan. It shows the last run of each source and what the last campaign said to try next:
+
+   ```bash
+   uv run songs lyrics plan BRA
+   ```
+
+2. Pull the folders that the campaign needs: the songs of the country, its scores, the dump of each of its sources and the Discogs catalog. A folder that is complete on this disk is not downloaded again:
+
+   ```bash
+   uv run songs data pull BRA
+   ```
+
+3. Look at the thin decades. The command shows, by decade, the songs that the country holds and the Discogs tracks that it lacks. `--years` shows one year or one range of years:
+
+   ```bash
+   uv run songs lyrics gaps BRA --years 1960-1969
+   ```
+
+4. Estimate what each dump on this disk adds. The command writes nothing:
+
+   ```bash
+   uv run songs lyrics survey BRA --years 1960-1969
+   ```
+
+5. Run the campaign. It estimates each dump, opens a campaign, imports the dumps that add songs, and leaves the campaign open:
+
+   ```bash
+   uv run songs lyrics campaign run BRA --goal "Add songs before 1970" --years 1960-1969
+   ```
+
+6. Read the report. It holds counts only: the runs, the songs not added by reason, the songs by decade, and the songs that wait for scoring:
+
+   ```bash
+   uv run songs lyrics campaign report BRA --years 1960-1969
+   ```
+
+7. Close the campaign. Write what the next campaign must try:
+
+   ```bash
+   uv run songs lyrics campaign close BRA --outcome complete --next-time "Raise the Discogs coverage of the 1960s."
+   ```
+
+8. Publish the new songs folder and its inputs to the bucket:
+
+   ```bash
+   uv run songs lyrics publish BRA
+   ```
+
+9. Audit the run records against the bucket. It takes about 3 minutes:
+
+   ```bash
+   uv run songs lyrics audit
+   ```
+
+10. Write the coverage page again:
+
+    ```bash
+    uv run songs lyrics coverage --write
+    ```
+
+11. Open the pull request with the new run records, the campaign records and the coverage page. Use the report of step 6 as the body of the pull request.
+
+What the commands do:
+
+- A campaign run opens no campaign and writes nothing when the estimates of all dumps of the country sum to fewer than `--min-songs` songs. The default is 25 songs.
+- When the country has an open campaign, the runs join it. The goal of the command is not used.
+- A dump that ran before runs again when the estimate says that it adds songs. The estimate is the reason in the run record.
+- A dump run adds every match. It cannot aim at a decade. `--years` changes only what the goal, the report and the survey show.
+- After the first import, each remaining dump is estimated again on the new songs folder, because an earlier import can take its tracks.
+- No command calls a model. A person starts topic scoring.
+- Each import writes the full tables of the country to a new folder.
+- A song is published when it is in the newest complete songs folder of its country, that folder passes `songs data check` in the bucket, and its run record is on `main`.
+
+### Artists with no Discogs id
+
+A roster artist with no Discogs id gets one when exactly one Discogs artist has the same name key. No other roster artist may hold that id or have that key. The songs of the artist still need a title match with a track of that artist. The links of these songs carry a match method that ends with `_artist_by_name`.
+
 ## Run records
 
 A collection command writes one record when it ends, also when it fails. Nobody writes or edits a record by hand, and a record is never overwritten. The file name is `<run id>_<route>_<source>.json`.
