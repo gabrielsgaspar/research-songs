@@ -10,8 +10,10 @@ from typer.testing import CliRunner
 from songs.cli import app
 from songs.common import manifests, paths, run_records, schemas
 from songs.common.paths import DATA_ROOT_ENV
+from songs.stage_00_ingest import dump_match
 from songs.stage_00_ingest.dump_match import (
     by_decade,
+    dump_keys,
     gaps,
     import_dump,
     lead_artist,
@@ -21,6 +23,7 @@ from songs.stage_00_ingest.dump_match import (
     match_dump,
     name_key,
     survey,
+    would_add,
 )
 
 RUN = "20260101T000000Z"
@@ -143,7 +146,6 @@ def test_each_dump_song_counts_once_in_one_class(tmp_path):
         "d2": "same_title",
         "d3": "roster_new",
         "d4": "roster_new",
-        "d5": "not_roster",
         "d7": "roster_new",
     }
     assert by_id["d4"]["roster_artist_ids"] == ["a1"]
@@ -187,12 +189,11 @@ def test_the_lead_of_a_featuring_credit_matches_and_is_counted(tmp_path):
     by_id = {row["source_song_id"]: row for row in result["songs"]}
     assert {song: (row["class"], row["roster_artist_ids"]) for song, row in by_id.items()} == {
         "f1": ("roster_new", ["a1"]),
-        "f2": ("not_roster", []),
         "f3": ("same_title", []),
         "f4": ("roster_new", ["a2"]),
         "f5": ("roster_new", ["a1"]),
-        "f6": ("not_roster", []),
     }
+    assert result["counts"]["not_roster"] == 2
     assert result["matched_by_split"] == 3
     assert result["roster_new_more_than_one_artist"] == 0
 
@@ -419,11 +420,15 @@ def test_the_survey_gives_what_the_import_then_adds_and_writes_nothing(tmp_path)
     data = tmp_path / "data"
     complete_folders(data)
     write_discogs(tmp_path / "discogs")
-    before = sorted(tmp_path.rglob("*"))
+
+    def outside() -> list[Path]:
+        return sorted(path for path in tmp_path.rglob("*") if "cache" not in path.parts)
+
+    before = outside()
 
     found, absent = survey(data, "ISL", ["kasilyrics", "no_dump"], tmp_path / "discogs")
 
-    assert sorted(tmp_path.rglob("*")) == before
+    assert outside() == before
     assert absent == {"source": "no_dump", "dump": None}
     assert (found["dump"], found["songs_in"]) == ("clean/dumps/kasilyrics/20260102/", 8)
     assert (found["by_year"], found["no_year"]) == ({1995: 1, 1997: 1}, 0)
@@ -526,3 +531,77 @@ def test_the_tracked_review_file_loads(tmp_path):
     )
     with pytest.raises(ValueError, match="needs a decision"):
         load_reviewed_matches(tmp_path)
+
+
+def test_songs_with_no_roster_artist_are_counted_and_have_no_row(tmp_path):
+    _, country = make_folders(tmp_path)
+    dump = paths.clean_dump_dir(tmp_path, "example", "20260104")
+    write(schemas.DUMP_ARTIST_NAMES, dump, [])
+    write(
+        schemas.DUMP_SONGS,
+        dump,
+        [
+            credit("n1", "Unknown Band", "Far Away", "k1"),
+            credit("n2", "Unknown Band", "???", "k2"),
+            credit("n3", "!!!", "Lost Title", "k3"),
+            credit("n4", "Other Band", "Far Away", "k4", 1),
+            credit("n4", "Third Band", "Far Away", "k4", 2),
+            credit("n5", "Anna Jons", "A New Song", "k5"),
+        ],
+    )
+    result = match_dump(dump, country)
+    assert [row["source_song_id"] for row in result["songs"]] == ["n5"]
+    assert (result["credit_rows_in"], result["songs_in"]) == (6, 5)
+    assert result["counts"] == {"held": 0, "same_title": 0, "roster_new": 1, "not_roster": 2}
+    assert result["left_out"] == {"no_title_key": 1, "no_artist_key": 1}
+    assert result["songs_out"] + sum(result["left_out"].values()) == result["songs_in"]
+    assert result["examples"]["not_roster"] == [
+        ("Other Band", "Far Away"),
+        ("Unknown Band", "Far Away"),
+    ]
+
+
+def test_the_keys_of_a_dump_are_built_one_time_and_again_when_the_key_code_changes(
+    tmp_path, monkeypatch
+):
+    dump, country = make_folders(tmp_path)
+    first = match_dump(dump, country)
+    folder = dump_keys(dump)
+    assert folder.parent == tmp_path / "cache" / "dump_keys" / "example" / "20260102"
+    stamp = (folder / "credits.parquet").stat().st_mtime_ns
+
+    assert match_dump(dump, country) == first
+    assert (folder / "credits.parquet").stat().st_mtime_ns == stamp
+    assert [path.name for path in folder.parent.iterdir()] == [folder.name]
+    assert sorted(path.name for path in dump.iterdir()) == ["artist_names.parquet", "songs.parquet"]
+
+    monkeypatch.setattr(dump_match, "_keys_version", lambda: "other")
+    assert match_dump(dump, country) == first
+    assert sorted(path.name for path in folder.parent.iterdir()) == sorted([folder.name, "other"])
+    with pytest.raises(ValueError, match="clean/dumps"):
+        dump_keys(tmp_path / "elsewhere")
+
+
+def test_a_country_with_no_match_and_no_discogs_id_gives_zero_counts(tmp_path):
+    data = tmp_path / "data"
+    dump = paths.clean_dump_dir(data, "example", "20260102")
+    write(schemas.DUMP_ARTIST_NAMES, dump, [])
+    write(schemas.DUMP_SONGS, dump, [credit("n1", "Unknown Band", "Far Away", "k1")])
+    manifests.write_manifest(data, dump, "clean_dump", source="example", inputs=["raw/x/20260101/"])
+    country = paths.country_songs_dir(data, "ISL", RUN)
+    write(schemas.COUNTRY_SONGS, country, [])
+    write(schemas.COUNTRY_ARTISTS, country, [artist("a2", "Bára") | {"songs": 0}])
+    write(schemas.COUNTRY_LINKS, country, [])
+    manifests.write_manifest(
+        data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
+    )
+    write_catalog(data)
+
+    (row,) = survey(data, "ISL", ["example"])
+    assert (row["songs_in"], row["would_add"], row["by_year"]) == (1, 0, {})
+    assert row["rejected"]["not_roster"] == 1
+    plan = would_add(dump, country, data / "clean/catalog/discogs/20260101", "example", "ISL", {})
+    assert (plan["chosen"], plan["songs_in"]) == ({}, 1)
+    found = gaps(data, "ISL")
+    assert (found["songs"], found["wanted"], found["tracks_in"]) == (0, 0, 0)
+    assert (found["artists"], found["artists_no_discogs_id"]) == (1, 1)

@@ -118,11 +118,15 @@ def folders(tmp_path: Path) -> tuple[Path, Path]:
 
 def test_under_the_threshold_nothing_is_opened_or_written(folders, tmp_path):
     data, countries = folders
-    before = sorted(tmp_path.rglob("*"))
+
+    def outside() -> list[Path]:
+        return sorted(path for path in tmp_path.rglob("*") if "cache" not in path.parts)
+
+    before = outside()
 
     result = run_country(data, "ISL", goal="More songs", countries=countries)
 
-    assert sorted(tmp_path.rglob("*")) == before
+    assert outside() == before
     assert (result["campaign_id"], result["imported"]) == (None, [])
     assert (result["songs_before"], result["songs_after"]) == (2, 2)
     skipped = {row["source"]: (row["reason"], row["would_add"]) for row in result["skipped"]}

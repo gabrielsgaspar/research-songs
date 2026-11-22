@@ -62,7 +62,10 @@ it. `survey` and `gaps` only read:
 import csv
 import difflib
 import hashlib
+import inspect
 import re
+import shutil
+import tempfile
 import time
 import unicodedata
 from collections import Counter
@@ -154,73 +157,219 @@ def _rows(relation: duckdb.DuckDBPyRelation, columns: str) -> list[tuple]:
     return relation.project(columns).fetchall()
 
 
+def _table(connection: duckdb.DuckDBPyConnection, name: str, kind: str, values: list) -> None:
+    """Create the one-column table `name` (column `value`) from a list, which can be empty."""
+    frame = pd.DataFrame({"value": pd.Series(values, dtype=kind)})
+    connection.register("frame", frame)
+    connection.execute(f"CREATE TEMP TABLE {name} AS SELECT value FROM frame")
+    connection.unregister("frame")
+
+
+def _keys_version() -> str:
+    """Return a short hash of the code that makes the keys; a change gives a new key cache."""
+    text = inspect.getsource(name_key) + inspect.getsource(lead_artist) + _CREDIT_SPLIT.pattern
+    return hashlib.sha256(text.encode()).hexdigest()[:12]
+
+
+def _quoted(path: Path) -> str:
+    return "'" + path.as_posix().replace("'", "''") + "'"
+
+
+def dump_keys(dump: Path) -> Path:
+    """Return the folder of the key tables of a dump, and build it when it is absent.
+
+    The dump stores no key, so the keys of `name_key` and `lead_artist` are computed
+    one time for each dump folder and kept under `cache/dump_keys/` of the data folder,
+    which is never uploaded. The folder name is `_keys_version`, so a change of the
+    key code gives a new folder. The build writes to a work folder and renames it
+    last. DuckDB reads and writes Parquet in streams, so no table is held in Python.
+
+        credits.parquet     one row per credit: song id, source artist id, artist key, lead key
+        alias_keys.parquet  one row per source artist id and key of one of its names
+        songs.parquet       one row per song: artist, title and hash of its first credit,
+                            its title key, and `has_key` (an artist name of it has a key)
+    """
+    dump = dump.resolve()
+    if dump.parent.parent.name != "dumps" or dump.parents[2].name != "clean":
+        raise ValueError(f"{dump} is not a clean/dumps/<source>/<YYYYMMDD>/ folder")
+    folder = dump.parents[3] / "cache" / "dump_keys" / dump.parent.name / dump.name
+    folder = folder / _keys_version()
+    if folder.is_dir():
+        return folder
+    folder.parent.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(dir=folder.parent, prefix="work-"))
+    with duckdb.connect() as connection:
+        connection.execute(f"SET temp_directory = {_quoted(work / 'spill')}")
+        connection.execute("SET memory_limit = '4GB'")
+        connection.execute("SET preserve_insertion_order = false")
+        connection.create_function(
+            "name_key", name_key, ["VARCHAR"], "VARCHAR", null_handling="special"
+        )
+        connection.create_function(
+            "lead_key",
+            lambda name: name_key(lead_artist(name)),
+            ["VARCHAR"],
+            "VARCHAR",
+            null_handling="special",
+        )
+        schemas.read_table(schemas.DUMP_SONGS, dump, connection).create_view("d")
+        schemas.read_table(schemas.DUMP_ARTIST_NAMES, dump, connection).create_view("a")
+        connection.execute(
+            "CREATE TEMP TABLE nk AS SELECT name, name_key(name) AS key, lead_key(name) AS lead "
+            "FROM (SELECT artist_name AS name FROM d UNION SELECT artist_name FROM a)"
+        )
+        connection.execute(
+            "CREATE TEMP TABLE tk AS SELECT title, name_key(title) AS key "
+            "FROM (SELECT DISTINCT song_name AS title FROM d)"
+        )
+        connection.execute(
+            "CREATE TEMP TABLE alias AS SELECT DISTINCT a.source_artist_id, nk.key "
+            "FROM a JOIN nk ON a.artist_name = nk.name WHERE nk.key <> ''"
+        )
+        connection.execute(f"COPY alias TO {_quoted(work / 'alias_keys.parquet')}")
+        connection.execute(
+            "COPY (SELECT d.source_song_id, d.source_artist_id, nk.key AS artist_key, "
+            "nk.lead AS lead_key FROM d JOIN nk ON d.artist_name = nk.name) "
+            f"TO {_quoted(work / 'credits.parquet')}"
+        )
+        connection.execute(
+            "COPY (SELECT d.source_song_id, "
+            "arg_min(d.artist_name, d.credit_position) AS artist_name, "
+            "arg_min(d.song_name, d.credit_position) AS song_name, "
+            "arg_min(d.lyrics_sha256, d.credit_position) AS lyrics_sha256, "
+            "arg_min(tk.key, d.credit_position) AS title_key, "
+            "bool_or(nk.key <> '' OR k.source_artist_id IS NOT NULL) AS has_key "
+            "FROM d JOIN nk ON d.artist_name = nk.name JOIN tk ON d.song_name = tk.title "
+            "LEFT JOIN (SELECT DISTINCT source_artist_id FROM alias) AS k "
+            "ON d.source_artist_id = k.source_artist_id GROUP BY d.source_song_id) "
+            f"TO {_quoted(work / 'songs.parquet')}"
+        )
+    shutil.rmtree(work / "spill", ignore_errors=True)
+    try:
+        work.rename(folder)
+    except OSError:
+        # Another process built the same folder first; its result is the same.
+        shutil.rmtree(work, ignore_errors=True)
+        if not folder.is_dir():
+            raise
+    return folder
+
+
 def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
     """Classify each song of the dump folder `dump` against the country folder `country`.
 
     Return the counts, the songs left out with their reasons, up to `examples`
-    artist and title pairs of each new class, and one row for each classified song.
+    artist and title pairs of each new class, and one row for each candidate song.
+    A candidate is a song whose hash the country holds, or with an artist key or a
+    lead key that is the key of a roster artist or of the artist of a held song.
+    Only the candidates are read into Python. Every other song is counted in SQL as
+    not_roster, no_title_key or no_artist_key, and has no row in `songs`.
     """
+    keys = dump_keys(dump)
+    credits_file, alias_file, songs_file = (
+        _quoted(keys / name) for name in ("credits.parquet", "alias_keys.parquet", "songs.parquet")
+    )
     with duckdb.connect() as connection:
-        credits = _rows(
-            schemas.read_table(schemas.DUMP_SONGS, dump, connection),
-            "source_song_id, credit_position, artist_name, source_artist_id, song_name, "
-            "lyrics_sha256",
+        held_songs = schemas.read_table(
+            schemas.COUNTRY_SONGS, country, connection, fill_absent=True
         )
-        aliases = _rows(
-            schemas.read_table(schemas.DUMP_ARTIST_NAMES, dump, connection),
-            "source_artist_id, artist_name",
-        )
-        held = _rows(
-            schemas.read_table(schemas.COUNTRY_SONGS, country, connection, fill_absent=True),
-            "artist_id, artist_name, song_name, lyrics_sha256",
-        )
+        held = _rows(held_songs, "artist_id, artist_name, song_name")
+        held_songs.project("lyrics_sha256").create_view("held_hashes")
         roster = _rows(
             schemas.read_table(schemas.COUNTRY_ARTISTS, country, connection),
             "artist_id, artist_name",
         )
-
-    names_of: dict[str, set[str]] = {}
-    for artist_id, name in aliases:
-        names_of.setdefault(artist_id, set()).add(name_key(name))
-    roster_ids: dict[str, set[str]] = {}
-    roster_name: dict[str, str] = {}
-    for artist_id, name in roster:
-        roster_ids.setdefault(name_key(name), set()).add(artist_id)
-        roster_name[artist_id] = name
-    held_hashes = {row[3] for row in held}
-    held_pairs = set()
-    for artist_id, artist, title, _ in held:
-        for key in (name_key(artist), name_key(roster_name.get(artist_id))):
-            held_pairs.add((key, name_key(title)))
-
-    songs: dict[str, dict] = {}
-    for song_id, _position, artist, artist_id, title, sha in sorted(credits):
-        song = songs.setdefault(
-            song_id,
-            {
-                "artist_name": artist,
-                "song_name": title,
-                "lyrics_sha256": sha,
+        roster_ids: dict[str, set[str]] = {}
+        roster_name: dict[str, str] = {}
+        for artist_id, name in roster:
+            roster_ids.setdefault(name_key(name), set()).add(artist_id)
+            roster_name[artist_id] = name
+        held_pairs = set()
+        for artist_id, artist, title in held:
+            for key in (name_key(artist), name_key(roster_name.get(artist_id))):
+                held_pairs.add((key, name_key(title)))
+        wanted = sorted(({*roster_ids} | {key for key, _ in held_pairs}) - {""})
+        _table(connection, "wanted", "str", wanted)
+        connection.execute(
+            f"""
+            CREATE TEMP TABLE candidates AS
+            SELECT source_song_id FROM {credits_file}
+            WHERE artist_key IN (SELECT value FROM wanted)
+                OR lead_key IN (SELECT value FROM wanted)
+                OR source_artist_id IN (
+                    SELECT source_artist_id FROM {alias_file}
+                    WHERE key IN (SELECT value FROM wanted)
+                )
+            UNION
+            SELECT source_song_id FROM {songs_file}
+            WHERE lyrics_sha256 IN (SELECT lyrics_sha256 FROM held_hashes)
+            """
+        )
+        credit_rows_in = connection.sql(f"SELECT count(*) FROM {credits_file}").fetchall()[0][0]
+        songs_in, no_title, no_artist, not_roster = connection.sql(
+            f"""
+            SELECT (SELECT count(*) FROM {songs_file}),
+                coalesce(count_if(title_key = ''), 0),
+                coalesce(count_if(title_key <> '' AND NOT has_key), 0),
+                coalesce(count_if(title_key <> '' AND has_key), 0)
+            FROM {songs_file} ANTI JOIN candidates USING (source_song_id)
+            """
+        ).fetchall()[0]
+        other_examples = connection.sql(
+            f"""
+            SELECT artist_name, song_name
+            FROM {songs_file} ANTI JOIN candidates USING (source_song_id)
+            WHERE title_key <> '' AND has_key ORDER BY ALL LIMIT {int(examples)}
+            """
+        ).fetchall()
+        songs = {
+            row[0]: {
+                "artist_name": row[1],
+                "song_name": row[2],
+                "held": row[3],
+                "title": row[4],
                 "keys": set(),
                 "leads": set(),
-            },
+            }
+            for row in connection.sql(
+                f"""
+                SELECT source_song_id, artist_name, song_name,
+                    lyrics_sha256 IN (SELECT lyrics_sha256 FROM held_hashes), title_key
+                FROM {songs_file} SEMI JOIN candidates USING (source_song_id)
+                ORDER BY source_song_id
+                """
+            ).fetchall()
+        }
+        connection.execute(
+            f"CREATE TEMP TABLE chosen AS SELECT * FROM {credits_file} "
+            "SEMI JOIN candidates USING (source_song_id)"
         )
-        song["keys"] |= {name_key(artist), *names_of.get(artist_id, ())}
-        song["leads"].add(name_key(lead_artist(artist)))
+        names_of: dict[str, set[str]] = {}
+        for artist_id, key in connection.sql(
+            f"SELECT source_artist_id, key FROM {alias_file} "
+            "WHERE source_artist_id IN (SELECT source_artist_id FROM chosen)"
+        ).fetchall():
+            names_of.setdefault(artist_id, set()).add(key)
+        for song_id, artist_id, artist_key, lead_key in connection.sql(
+            "SELECT source_song_id, source_artist_id, artist_key, lead_key FROM chosen"
+        ).fetchall():
+            songs[song_id]["keys"] |= {artist_key, *names_of.get(artist_id, ())}
+            songs[song_id]["leads"].add(lead_key)
 
     def on_roster(keys: set[str]) -> set[str]:
         return set().union(*(roster_ids.get(key, set()) for key in keys))
 
     counts = Counter({name: 0 for name in CLASSES})
-    left_out = Counter({name: 0 for name in LEFT_OUT})
+    counts["not_roster"] = not_roster
+    left_out = Counter({"no_title_key": no_title, "no_artist_key": no_artist})
     ambiguous = split = 0
     rows = []
     for song_id, song in songs.items():
         keys = song["keys"] - {""}
         leads = song["leads"] - keys - {""}
-        title = name_key(song["song_name"])
+        title = song["title"]
         artist_ids: set[str] = set()
-        if song["lyrics_sha256"] in held_hashes:
+        if song["held"]:
             kind = "held"
         elif not title:
             left_out["no_title_key"] += 1
@@ -249,22 +398,20 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
                 "roster_artist_ids": sorted(artist_ids),
             }
         )
+    pairs = {
+        kind: sorted((row["artist_name"], row["song_name"]) for row in rows if row["class"] == kind)
+        for kind in NEW_CLASSES
+    }
+    pairs["not_roster"] = sorted(pairs["not_roster"] + other_examples)
     return {
-        "credit_rows_in": len(credits),
-        "songs_in": len(songs),
+        "credit_rows_in": credit_rows_in,
+        "songs_in": songs_in,
         "songs_out": sum(counts.values()),
         "counts": dict(counts),
         "left_out": dict(left_out),
         "roster_new_more_than_one_artist": ambiguous,
         "matched_by_split": split,
-        "examples": {
-            kind: [
-                (row["artist_name"], row["song_name"])
-                for row in sorted(rows, key=lambda row: (row["artist_name"], row["song_name"]))
-                if row["class"] == kind
-            ][:examples]
-            for kind in NEW_CLASSES
-        },
+        "examples": {kind: pairs[kind][:examples] for kind in NEW_CLASSES},
         "songs": rows,
     }
 
@@ -286,30 +433,54 @@ def _discogs_tracks(discogs: Path, artist_ids: list[int]) -> dict[int, list[tupl
     table = {
         name: (discogs / f"{name}.parquet").as_posix().replace("'", "''") for name in DISCOGS_TABLES
     }
+    if not artist_ids:
+        return {}
     with duckdb.connect() as connection:
-        connection.execute("CREATE TABLE ids (artist_id BIGINT)")
-        connection.executemany("INSERT INTO ids VALUES (?)", [[number] for number in artist_ids])
+        # Each step is a small table, so DuckDB never builds a hash table of a whole Discogs table.
+        connection.execute("SET memory_limit = '4GB'")
+        _table(connection, "ids", "int64", artist_ids)
+        connection.execute(
+            f"""
+            CREATE TEMP TABLE credited AS
+            SELECT artist_id, release_id, CAST(NULL AS BIGINT) AS track_index
+            FROM '{table["release_artists"]}' WHERE artist_id IN (SELECT value FROM ids)
+            UNION
+            SELECT artist_id, release_id, track_index
+            FROM '{table["release_track_artists"]}' WHERE artist_id IN (SELECT value FROM ids)
+            """
+        )
+        connection.execute(
+            f"""
+            CREATE TEMP TABLE found AS
+            SELECT DISTINCT c.artist_id, t.title, t.release_id, t.track_index
+            FROM '{table["release_tracklist"]}' AS t
+            JOIN credited AS c
+                ON t.release_id = c.release_id
+                AND (c.track_index IS NULL OR c.track_index = t.track_index)
+            WHERE t.title IS NOT NULL
+                AND t.release_id IN (SELECT release_id FROM credited)
+            """
+        )
+        connection.execute(
+            f"""
+            CREATE TEMP TABLE dated AS
+            SELECT release_id, released, master_id FROM '{table["releases"]}'
+            WHERE release_id IN (SELECT release_id FROM found)
+            """
+        )
         rows = connection.sql(
             f"""
-            WITH credited AS (
-                SELECT artist_id, release_id, CAST(NULL AS BIGINT) AS track_index
-                FROM '{table["release_artists"]}' JOIN ids USING (artist_id)
-                UNION
-                SELECT artist_id, release_id, track_index
-                FROM '{table["release_track_artists"]}' JOIN ids USING (artist_id)
-            )
-            SELECT DISTINCT c.artist_id, t.title, t.release_id, t.track_index,
+            SELECT f.artist_id, f.title, f.release_id, f.track_index,
                 least(
                     nullif(TRY_CAST(left(r.released, 4) AS INTEGER), 0),
                     nullif(CAST(m.year AS INTEGER), 0)
                 ) AS year
-            FROM credited AS c
-            JOIN '{table["release_tracklist"]}' AS t
-                ON t.release_id = c.release_id
-                AND (c.track_index IS NULL OR c.track_index = t.track_index)
-            LEFT JOIN '{table["releases"]}' AS r ON r.release_id = t.release_id
-            LEFT JOIN '{table["masters"]}' AS m ON m.master_id = r.master_id
-            WHERE t.title IS NOT NULL
+            FROM found AS f
+            LEFT JOIN dated AS r ON r.release_id = f.release_id
+            LEFT JOIN (
+                SELECT master_id, year FROM '{table["masters"]}'
+                WHERE master_id IN (SELECT master_id FROM dated)
+            ) AS m ON m.master_id = r.master_id
             """
         ).fetchall()
     tracks: dict[int, list[tuple]] = {}
@@ -401,8 +572,10 @@ def _added_frames(
             .project("artist_id, artist_name, discogs_artist_id, country_tag")
             .fetchall()
         }
-        connection.execute("CREATE TABLE chosen (source_song_id VARCHAR)")
-        connection.executemany("INSERT INTO chosen VALUES (?)", [[key] for key in sorted(chosen)])
+        _table(connection, "chosen_ids", "str", sorted(chosen))
+        connection.execute(
+            "CREATE TEMP TABLE chosen AS SELECT value AS source_song_id FROM chosen_ids"
+        )
         dumped = (
             schemas.read_table(schemas.DUMP_SONGS, dump, connection)
             .filter("credit_position = 1")
