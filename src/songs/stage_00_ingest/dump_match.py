@@ -643,6 +643,19 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]
     }
     tracks = _discogs_tracks(discogs, sorted(set(artist_of.values())))
     taken: set[tuple] = set()
+    indexes: dict[int, tuple[dict, dict, list[str]]] = {}
+
+    def tracks_of(artist: int) -> tuple[dict, dict, list[str]]:
+        """Return the tracks of an artist by exact key and by loose key, and the loose keys."""
+        if artist not in indexes:
+            by_exact: dict[str, list[tuple]] = {}
+            by_loose: dict[str, list[tuple]] = {}
+            for hit in tracks.get(artist, []):
+                by_exact.setdefault(name_key(hit[0]), []).append(hit)
+                by_loose.setdefault(loose_key(hit[0]), []).append(hit)
+            indexes[artist] = (by_exact, by_loose, sorted(by_loose))
+        return indexes[artist]
+
     rows = []
     for song in candidates:
         row = {"source_song_id": song["source_song_id"], "discogs_class": "out_of_scope"}
@@ -652,18 +665,17 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]
             continue
         row["discogs_artist_id"] = str(artist)
         named = song["roster_artist_ids"][0] in by_name
-        found = tracks.get(artist, [])
+        by_exact, by_loose, keys = tracks_of(artist)
         exact, loose = name_key(song["song_name"]), loose_key(song["song_name"])
         if (song["roster_artist_ids"][0], loose) in held_loose:
             row["discogs_class"] = "held_loose_title"
             continue
-        kind, hits, score = "exact", [hit for hit in found if name_key(hit[0]) == exact], None
+        kind, hits, score = "exact", by_exact.get(exact, []), None
         if not hits:
-            kind, hits = "loose", [hit for hit in found if loose_key(hit[0]) == loose]
+            kind, hits = "loose", by_loose.get(loose, [])
         if not hits:
-            keys = sorted({loose_key(hit[0]) for hit in found})
             close = difflib.get_close_matches(loose, keys, n=1, cutoff=CLOSE_CUTOFF)
-            kind, hits = "close", [hit for hit in found if close and loose_key(hit[0]) == close[0]]
+            kind, hits = "close", by_loose[close[0]] if close else []
             if close:
                 score = round(100 * difflib.SequenceMatcher(None, loose, close[0]).ratio(), 1)
         if not hits:
