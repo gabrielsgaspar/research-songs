@@ -257,8 +257,11 @@ def lyrics_import_dump(
     source: Annotated[str, typer.Argument(help="Source key of the dump, lower case.")],
     iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
     discogs: Annotated[
-        Path, typer.Option(help="Folder of Discogs tables. The command only reads it.")
-    ],
+        Path | None,
+        typer.Option(
+            help="Folder of Discogs tables. The default is the newest clean/catalog/discogs/."
+        ),
+    ] = None,
 ) -> None:
     """Add the songs of the newest dump that match a Discogs track of their roster artist.
 
@@ -274,14 +277,20 @@ def lyrics_import_dump(
 
     code = _country(iso3)
     typer.echo(run_records.format_history(run_records.read_run_records(code)))
-    old = os.environ.get("SONGS_OLD_DATA_ROOT", "").strip()
-    folder = discogs.resolve()
-    label = (
-        f"{folder.relative_to(Path(old).resolve()).as_posix()}/ in the old data folder"
-        if old and folder.is_relative_to(Path(old).resolve())
-        else folder.name
-    )
-    result = dump_match.import_dump(data_root(), source, code, discogs, discogs_label=label)
+    label = None
+    if discogs is not None:
+        old = os.environ.get("SONGS_OLD_DATA_ROOT", "").strip()
+        folder = discogs.resolve()
+        label = (
+            f"{folder.relative_to(Path(old).resolve()).as_posix()}/ in the old data folder"
+            if old and folder.is_relative_to(Path(old).resolve())
+            else folder.name
+        )
+    try:
+        result = dump_match.import_dump(data_root(), source, code, discogs, discogs_label=label)
+    except FileNotFoundError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
     typer.echo(
         f"wrote {result['path']} ({result['songs_added']} songs added, "
         f"{result['songs']} songs in the country, {result['links']} links)"
@@ -497,7 +506,9 @@ def dumps_match(
     iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
     discogs: Annotated[
         Path | None,
-        typer.Option(help="Folder of Discogs tables. Also look for the roster_new songs there."),
+        typer.Option(
+            help="Folder of Discogs tables. The default is the newest clean/catalog/discogs/."
+        ),
     ] = None,
 ) -> None:
     """Compare the newest dump of a source with the newest songs folder of a country.
@@ -510,6 +521,7 @@ def dumps_match(
     from songs.common.paths import (
         data_relative,
         data_root,
+        latest_clean_catalog_dir,
         latest_clean_dump_dir,
         latest_country_songs_dir,
     )
@@ -537,6 +549,7 @@ def dumps_match(
         typer.echo(f"examples of {name}:")
         for artist, title in pairs:
             typer.echo(f"  {artist} - {title}")
+    discogs = discogs or latest_clean_catalog_dir(data, "discogs")
     if discogs is None:
         return
     found = match_discogs(result["songs"], country, discogs)
@@ -552,3 +565,299 @@ def dumps_match(
                 f"  {song['artist_name']} | {song['song_name']} | {row['discogs_title']} | "
                 f"{row['discogs_release_id']}"
             )
+
+
+CountriesArgument = Annotated[
+    list[str], typer.Argument(help="Country codes, three capital letters each.")
+]
+YearsOption = Annotated[
+    str | None, typer.Option("--years", help="A year or a range of years: 1965 or 1960-1969.")
+]
+
+
+def _years(text: str | None) -> tuple[int, int] | None:
+    """Return the first and the last year of `1960-1969` or `1965`, or None for no option."""
+    if text is None:
+        return None
+    import re
+
+    found = re.fullmatch(r"(\d{4})(?:-(\d{4}))?", text.strip())
+    first, last = (int(found[1]), int(found[2] or found[1])) if found else (1, 0)
+    if first > last:
+        raise typer.BadParameter(f"--years is a year or a range such as 1960-1969, got {text!r}")
+    return first, last
+
+
+def _in_years(by_year: dict[int, int], years: tuple[int, int]) -> int:
+    return sum(number for year, number in by_year.items() if years[0] <= year <= years[1])
+
+
+def _decades(counts: dict[int, int]) -> str:
+    return ", ".join(f"{decade}s: {number}" for decade, number in counts.items()) or "none"
+
+
+def pull_parents(codes: list[str], catalog: bool = True) -> list[str]:
+    """Return the folders above the version folders that the countries need, each one time."""
+    parents = []
+    for code in codes:
+        parents += [f"lyrics/{code}/songs/", f"lyrics/{code}/scores/"]
+        parents += [f"clean/dumps/{source.id}/" for source in lyric_sources.sources_for(code)]
+    if catalog:
+        parents.append("clean/catalog/discogs/")
+    return list(dict.fromkeys(parents))
+
+
+@data_app.command("pull")
+def data_pull(
+    countries: CountriesArgument,
+    no_catalog: Annotated[
+        bool,
+        typer.Option("--no-catalog", help="Leave out the Discogs catalog (17 GB, about 2 hours)."),
+    ] = False,
+) -> None:
+    """Download the newest folders that a campaign for the countries needs.
+
+    For each country: its songs, its scores and the dump of each of its sources. Then
+    the Discogs catalog. A folder that is complete on this disk is not downloaded again.
+    """
+    from songs.common.paths import data_root
+
+    parents = pull_parents([_country(code) for code in countries], catalog=not no_catalog)
+    storage, transport, bucket = _bucket()
+    try:
+        done = storage.pull_newest(transport, bucket, data_root(), parents)
+    except storage.StorageError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    for parent, (outcome, folder) in done.items():
+        typer.echo(f"{folder or parent}: {outcome}")
+
+
+def old_data_input(name: str) -> bool:
+    """Return True for a manifest input that is no version folder of the data layout."""
+    from songs.common.paths import DAY, RUN_ID
+
+    last = name.rstrip("/").rsplit("/", 1)[-1]
+    return not (DAY.fullmatch(last) or RUN_ID.fullmatch(last))
+
+
+@lyrics_app.command("publish")
+def lyrics_publish(countries: CountriesArgument) -> None:
+    """Upload the songs folders of the countries that the bucket lacks, with their inputs.
+
+    The inputs of a folder go first. Each uploaded folder is checked against its manifest.
+    The command exits with 1 when an input is neither on this disk nor in the bucket.
+    """
+    from songs.common.paths import data_root
+
+    parents = [f"lyrics/{_country(code)}/songs/" for code in countries]
+    storage, transport, bucket = _bucket()
+    try:
+        result = storage.publish(transport, bucket, data_root(), parents)
+    except storage.StorageError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    for folder in result["uploaded"]:
+        typer.echo(f"uploaded: {folder}")
+    for folder in result["present"]:
+        typer.echo(f"in the bucket already: {folder}")
+    problems = 0
+    for folder, name in result["missing_inputs"]:
+        if old_data_input(name):
+            typer.echo(f"note: {folder} has the input {name} from the old data folder")
+        else:
+            problems += 1
+            typer.echo(f"problem: {folder} names the input {name}; it is not in the bucket")
+    typer.echo(
+        f"{len(result['uploaded'])} uploaded, {len(result['present'])} in the bucket already, "
+        f"{problems} problems"
+    )
+    if problems:
+        raise typer.Exit(1)
+
+
+# The routes whose run writes lyrics/<ISO3>/songs/<run id>/.
+SONGS_FOLDER_ROUTES = ("old_layout", "dump_name", "manual_review")
+
+
+def expected_songs_folders(records: list) -> set[tuple[str, str]]:
+    """Return the (country code, run id) of each run that wrote a songs folder."""
+    return {
+        (record.iso3, record.run_id)
+        for record in records
+        if record.route in SONGS_FOLDER_ROUTES and record.state != "failed"
+    }
+
+
+@lyrics_app.command("audit")
+def lyrics_audit() -> None:
+    """Compare the run records with the songs folders of the bucket. It takes about 3 minutes.
+
+    The command prints each run record with no complete songs folder in the bucket, and
+    each complete songs folder with no run record. It exits with 1 when it finds one.
+    """
+    storage, transport, bucket = _bucket()
+    expected = expected_songs_folders(run_records.read_run_records())
+    try:
+        result = storage.audit_songs(transport, bucket, expected)
+    except storage.StorageError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    for code, run_id in result["not_in_bucket"]:
+        typer.echo(f"record with no folder in the bucket: lyrics/{code}/songs/{run_id}/")
+    for code, run_id in result["no_record"]:
+        typer.echo(f"folder in the bucket with no record: lyrics/{code}/songs/{run_id}/")
+    typer.echo(
+        f"{len(expected)} records, {len(result['not_in_bucket'])} with no folder, "
+        f"{len(result['no_record'])} folders with no record"
+    )
+    if result["not_in_bucket"] or result["no_record"]:
+        raise typer.Exit(1)
+
+
+@lyrics_app.command("survey")
+def lyrics_survey(countries: CountriesArgument, years: YearsOption = None) -> None:
+    """Estimate what an import of each dump on this disk adds to each country. Read-only.
+
+    One line for each country and source: the songs that the import would add, the
+    seconds, and the songs by decade. Then one total line.
+    """
+    from songs.common.paths import data_root
+    from songs.stage_00_ingest import dump_match
+
+    span = _years(years)
+    total = inside = 0
+    for code in [_country(code) for code in countries]:
+        sources = [source.id for source in lyric_sources.sources_for(code)]
+        try:
+            rows = dump_match.survey(data_root(), code, sources)
+        except FileNotFoundError as error:
+            typer.echo(f"error: {error}", err=True)
+            raise typer.Exit(1) from error
+        for row in rows:
+            if row["dump"] is None:
+                typer.echo(f"{code} {row['source']}: no dump on this disk")
+                continue
+            total += row["would_add"]
+            line = (
+                f"{code} {row['source']}: would add {row['would_add']} of {row['songs_in']} songs, "
+                f"{row['seconds']} s; {_decades(dump_match.by_decade(row['by_year']))}; "
+                f"no year: {row['no_year']}"
+            )
+            if span:
+                inside += _in_years(row["by_year"], span)
+                line += f"; {span[0]}-{span[1]}: {_in_years(row['by_year'], span)}"
+            typer.echo(line)
+    # A song can be in two dumps, so the total is an upper limit.
+    typer.echo(
+        f"total: would add up to {total} songs"
+        + (f", {inside} in {span[0]}-{span[1]}" if span else "")
+    )
+
+
+@lyrics_app.command("gaps")
+def lyrics_gaps(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+    years: YearsOption = None,
+) -> None:
+    """Show, by decade, the songs that a country holds and the Discogs tracks that it lacks.
+
+    A wanted track is a track of a roster artist with a Discogs id that has no song in
+    the country. Read-only.
+    """
+    from songs.common.paths import data_root
+    from songs.stage_00_ingest import dump_match
+
+    code, span = _country(iso3), _years(years)
+    try:
+        result = dump_match.gaps(data_root(), code)
+    except FileNotFoundError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    held = dump_match.by_decade(result["held_by_year"])
+    wanted = dump_match.by_decade(result["wanted_by_year"])
+    typer.echo(f"{code} {result['songs_folder']}")
+    typer.echo("decade\tsongs held\ttracks wanted")
+    for decade in sorted(set(held) | set(wanted)):
+        typer.echo(f"{decade}s\t{held.get(decade, 0)}\t{wanted.get(decade, 0)}")
+    typer.echo(f"no year\t{result['held_no_year']}\t{result['wanted_no_year']}")
+    typer.echo(f"total\t{result['songs']}\t{result['wanted']}")
+    if span:
+        typer.echo(
+            f"{span[0]}-{span[1]}\t{_in_years(result['held_by_year'], span)}"
+            f"\t{_in_years(result['wanted_by_year'], span)}"
+        )
+    typer.echo(
+        f"artists with no Discogs id: {result['artists_no_discogs_id']} of {result['artists']}"
+    )
+
+
+@campaign_app.command("run")
+def campaign_run_command(
+    countries: CountriesArgument,
+    goal: Annotated[str, typer.Option(help="What the campaign must reach, in one sentence.")],
+    min_songs: Annotated[
+        int, typer.Option("--min-songs", help="Leave out a dump that would add fewer songs.")
+    ] = 25,
+    years: YearsOption = None,
+) -> None:
+    """Run a campaign on the dumps of this disk for each country, one after the other.
+
+    For each country: estimate each dump, import the dumps that reach --min-songs, and
+    print the report. The campaign stays open. --years goes to the goal and the report;
+    it does not limit the import. A country that fails does not stop the others.
+    """
+    from songs.common.paths import data_root
+    from songs.stage_00_ingest import campaign_run
+
+    span = _years(years)
+    if span:
+        goal = f"{goal} (years {span[0]}-{span[1]})"
+    failed = []
+    for code in [_country(code) for code in countries]:
+        try:
+            result = campaign_run.run_country(data_root(), code, goal=goal, min_songs=min_songs)
+            typer.echo(
+                f"{code}: campaign {result['campaign_id'] or 'not opened'}, "
+                f"songs {result['songs_before']} -> {result['songs_after']}"
+            )
+            for row in result["imported"]:
+                typer.echo(
+                    f"  imported {row['source']}: {row['songs_added']} songs, "
+                    f"{row['seconds']} s, {row['folder']}"
+                )
+            for row in result["skipped"]:
+                typer.echo(
+                    f"  skipped {row['source']}: {row['reason']} (would add {row['would_add']})"
+                )
+            if result["campaign_id"]:
+                typer.echo(
+                    campaign_run.report(data_root(), code, result["campaign_id"], years=span)
+                )
+        except Exception as error:
+            # One country that fails must not stop the others; the exit code reports it.
+            failed.append(code)
+            typer.echo(f"error: {code}: {type(error).__name__}: {error}", err=True)
+    if failed:
+        typer.echo(f"failed: {', '.join(failed)}", err=True)
+        raise typer.Exit(1)
+
+
+@campaign_app.command("report")
+def campaign_report(
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+    campaign: Annotated[
+        str | None, typer.Option(help="Campaign id. The default is the newest campaign.")
+    ] = None,
+    years: YearsOption = None,
+) -> None:
+    """Print the report of a campaign of a country as Markdown, built from its records."""
+    from songs.common.paths import data_root
+    from songs.stage_00_ingest import campaign_run
+
+    try:
+        text = campaign_run.report(data_root(), _country(iso3), campaign, years=_years(years))
+    except (FileNotFoundError, ValueError) as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    typer.echo(text)
