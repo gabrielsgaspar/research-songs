@@ -22,6 +22,7 @@ from songs.stage_00_ingest import dump_match
 MIN_SONGS = 25
 NO_DUMP = "no dump"
 UNDER = "under the threshold"
+NOTHING = "nothing to add"
 
 
 def _songs(folder: Path) -> int:
@@ -47,11 +48,13 @@ def run_country(
 ) -> dict:
     """Run the dump ladder for one country. Return what was estimated, imported and skipped.
 
-    The sources are those of `lyric_sources.sources_for`. A source is imported when
-    its newest dump would add `min_songs` songs or more. When no source reaches that
-    number, the function opens no campaign and writes nothing, and `campaign_id` is
-    None. After the first import, each source is estimated again on the new songs
-    folder, because an earlier import can take its tracks. The campaign stays open.
+    The sources are those of `lyric_sources.sources_for`. The threshold is on the
+    country: when the newest dumps of all sources would add fewer than `min_songs`
+    songs in total, the function opens no campaign and writes nothing, and
+    `campaign_id` is None. Otherwise every source that would add 1 song or more is
+    imported, the largest estimate first. After the first import, each source is
+    estimated again on the new songs folder, because an earlier import can take its
+    tracks; a source with nothing left is skipped. The campaign stays open.
 
     Raise FileExistsError when the country has an open campaign, and
     FileNotFoundError when it has no songs folder. An import that fails stops the
@@ -70,16 +73,21 @@ def run_country(
     before = _songs(newest)
     sources = [source.id for source in lyric_sources.sources_for(iso3)]
     survey = dump_match.survey(data, iso3, sources, discogs)
+    opens = sum(row.get("would_add", 0) for row in survey) >= min_songs
     skipped = [
         {"source": row["source"], "reason": NO_DUMP, "would_add": None}
         if row["dump"] is None
-        else {"source": row["source"], "reason": UNDER, "would_add": row["would_add"]}
+        else {
+            "source": row["source"],
+            "reason": NOTHING if opens else UNDER,
+            "would_add": row["would_add"],
+        }
         for row in survey
-        if row["dump"] is None or row["would_add"] < min_songs
+        if row["dump"] is None or not opens or not row["would_add"]
     ]
     # sorted() keeps the order of the survey for equal estimates.
     todo = sorted(
-        (row for row in survey if row["dump"] is not None and row["would_add"] >= min_songs),
+        (row for row in survey if opens and row.get("would_add")),
         key=lambda row: -row["would_add"],
     )
     result = {
@@ -101,8 +109,8 @@ def run_country(
         source = row["source"]
         if position:
             (again,) = dump_match.survey(data, iso3, [source], discogs)
-            if again["would_add"] < min_songs:
-                skipped.append({"source": source, "reason": UNDER, "would_add": again["would_add"]})
+            if not again["would_add"]:
+                skipped.append({"source": source, "reason": NOTHING, "would_add": 0})
                 continue
         _wait_past(paths.latest_country_songs_dir(data, iso3).name)
         start = time.monotonic()

@@ -151,7 +151,11 @@ def test_campaign_run_goes_on_after_a_country_fails_and_exits_1(bucket, monkeypa
             "imported": [
                 {"source": "example", "songs_added": 30, "folder": "lyrics/LUX/x/", "seconds": 1.5}
             ],
-            "skipped": [{"source": "small", "reason": "under 25 songs", "would_add": 3}],
+            "skipped": [
+                {"source": "small", "reason": "under 25 songs", "would_add": 3},
+                {"source": "absent_one", "reason": "no dump", "would_add": None},
+                {"source": "absent_two", "reason": "no dump", "would_add": None},
+            ],
         }
 
     def report(data, iso3, campaign_id=None, *, years=None, countries=None):
@@ -176,5 +180,7 @@ def test_campaign_run_goes_on_after_a_country_fails_and_exits_1(bucket, monkeypa
     assert "LUX: campaign 20261122T100000Z, songs 10 -> 40" in result.output
     assert "imported example: 30 songs" in result.output
     assert "skipped small: under 25 songs (would add 3)" in result.output
+    assert "sources with no dump on this disk: 2" in result.output
+    assert "absent_one" not in result.output
     assert "# Report LUX 20261122T100000Z (1965, 1965)" in result.output
     assert "failed: MNE" in result.output

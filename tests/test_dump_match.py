@@ -605,3 +605,100 @@ def test_a_country_with_no_match_and_no_discogs_id_gives_zero_counts(tmp_path):
     found = gaps(data, "ISL")
     assert (found["songs"], found["wanted"], found["tracks_in"]) == (0, 0, 0)
     assert (found["artists"], found["artists_no_discogs_id"]) == (1, 1)
+
+
+def write_named_discogs(folder: Path, artists: str) -> None:
+    """Invented Discogs tables where artist 21 has one track, and an `artists` table."""
+    folder.mkdir(parents=True)
+    tables = {
+        "artists": f"SELECT * FROM (VALUES {artists}) AS t(artist_id, name)",
+        "release_artists": "SELECT * FROM (VALUES (500, 21)) AS t(release_id, artist_id)",
+        "release_track_artists": "SELECT * FROM (VALUES (500, 1, 21)) "
+        "AS t(release_id, track_index, artist_id) WHERE false",
+        "release_tracklist": "SELECT * FROM (VALUES (500, 1, 'Night Song')) "
+        "AS t(release_id, track_index, title)",
+        "releases": "SELECT * FROM (VALUES (500, NULL::BIGINT, '1988')) "
+        "AS t(release_id, master_id, released)",
+        "masters": "SELECT * FROM (VALUES (50, 1997)) AS t(master_id, year) WHERE false",
+    }
+    for name, sql in tables.items():
+        duckdb.sql(sql).write_parquet(str(folder / f"{name}.parquet"))
+
+
+def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [
+            artist("a1", "Anna Jóns") | {"discogs_artist_id": "11"},
+            artist("a2", "Bára"),
+            artist("a3", "Dísa"),
+            artist("a4", "Elín"),
+            artist("a5", "Finnur"),
+            artist("a6", "Gunnar"),
+            artist("a7", "Gunnar!"),
+            artist("a8", "..."),
+        ],
+    )
+    write_named_discogs(
+        tmp_path / "discogs",
+        "(21, 'BÁRA (2)'), (31, 'Disa'), (32, 'Dísa (2)'), (11, 'Elin'), (41, 'Gunnar'), "
+        "(51, 'Bára Band')",
+    )
+
+    found = dump_match.discogs_ids(country, tmp_path / "discogs")
+
+    # One artist with the name, with or without the homonym mark: the id is used.
+    assert found["by_name"] == {"a2": (21, "BÁRA (2)")}
+    assert found["ids"] == {"a1": 11, "a2": 21}
+    # Two homonyms block. An id of another roster artist blocks, and so does a shared name.
+    assert (found["more_than_one"], found["id_taken"]) == (1, 3)
+    assert (found["none_found"], found["no_name_key"]) == (1, 1)
+
+    write(schemas.COUNTRY_ARTISTS, tmp_path / "other", [artist("a2", "Bára")])
+    write_discogs(tmp_path / "no_artists_table")
+    assert dump_match.discogs_ids(tmp_path / "other", tmp_path / "no_artists_table")["ids"] == {}
+
+
+def test_a_song_of_an_artist_found_by_name_is_added_with_its_own_method_and_count(tmp_path):
+    data, countries = tmp_path / "data", tmp_path / "countries"
+    dump = paths.clean_dump_dir(data, "kasilyrics", "20260102")
+    write(schemas.DUMP_ARTIST_NAMES, dump, [])
+    write(
+        schemas.DUMP_SONGS,
+        dump,
+        [credit("b1", "Bara", "Night Song", "kb"), credit("b2", "Bara", "No Such Track", "kc")],
+    )
+    manifests.write_manifest(
+        data, dump, "clean_dump", source="kasilyrics", inputs=["raw/x/20260101/"]
+    )
+    country = paths.country_songs_dir(data, "ISL", RUN)
+    write(schemas.COUNTRY_SONGS, country, [])
+    write(schemas.COUNTRY_ARTISTS, country, [artist("a2", "Bára") | {"songs": 0}])
+    write(schemas.COUNTRY_LINKS, country, [])
+    manifests.write_manifest(
+        data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
+    )
+    discogs = tmp_path / "discogs"
+    write_named_discogs(discogs, "(21, 'Bára')")
+
+    plan = would_add(dump, country, discogs, "kasilyrics", "ISL", {})
+    assert (len(plan["chosen"]), plan["by_name"], plan["rejected"]["no_track"]) == (1, 1, 1)
+    found = gaps(data, "ISL", discogs)
+    assert (found["artists_by_name"], found["artists_no_discogs_id"], found["wanted"]) == (1, 0, 1)
+
+    result = import_dump(data, "kasilyrics", "ISL", discogs, countries=countries)
+
+    out = result["path"]
+    assert result["songs_added"] == 1
+    assert duckdb.sql(
+        f"SELECT match_method FROM '{(out / 'links.parquet').as_posix()}'"
+    ).fetchall() == [("dump_discogs_exact_title_artist_by_name",)]
+    assert manifests.read_manifest(out).counts["dump_songs_added_artist_by_name"] == 1
+    (record,) = run_records.read_run_records("ISL", countries)
+    assert "1 songs added for artists whose Discogs id was found by name" in record.notes
+    # The roster of the new folder keeps no id: each run finds it again, so each song is marked.
+    assert duckdb.sql(
+        f"SELECT discogs_artist_id FROM '{(out / 'artists.parquet').as_posix()}'"
+    ).fetchall() == [(None,)]

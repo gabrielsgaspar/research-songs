@@ -803,8 +803,9 @@ def campaign_run_command(
 ) -> None:
     """Run a campaign on the dumps of this disk for each country, one after the other.
 
-    For each country: estimate each dump, import the dumps that reach --min-songs, and
-    print the report. The campaign stays open. --years goes to the goal and the report;
+    For each country: estimate each dump. When the dumps together would add --min-songs
+    songs or more, import every dump that adds a song, and print the report. The campaign
+    stays open. --years goes to the goal and the report;
     it does not limit the import. A country that fails does not stop the others.
     """
     from songs.common.paths import data_root
@@ -826,10 +827,14 @@ def campaign_run_command(
                     f"  imported {row['source']}: {row['songs_added']} songs, "
                     f"{row['seconds']} s, {row['folder']}"
                 )
+            absent = sum(row["would_add"] is None for row in result["skipped"])
             for row in result["skipped"]:
-                typer.echo(
-                    f"  skipped {row['source']}: {row['reason']} (would add {row['would_add']})"
-                )
+                if row["would_add"] is not None:
+                    typer.echo(
+                        f"  skipped {row['source']}: {row['reason']} (would add {row['would_add']})"
+                    )
+            if absent:
+                typer.echo(f"  sources with no dump on this disk: {absent}")
             if result["campaign_id"]:
                 typer.echo(
                     campaign_run.report(data_root(), code, result["campaign_id"], years=span)

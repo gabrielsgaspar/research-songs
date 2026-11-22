@@ -159,14 +159,18 @@ def test_two_sources_import_in_estimate_order_and_the_second_is_estimated_again(
     assert all(row["reason"] == NO_DUMP for row in result["skipped"])
 
 
-def test_a_source_that_falls_under_the_threshold_after_an_import_is_skipped(folders):
+def test_the_threshold_is_on_the_sum_of_the_sources_of_the_country(folders):
     data, countries = folders
 
-    result = run_country(data, "ISL", goal="More songs", min_songs=2, countries=countries)
+    # The two dumps would add 3 and 2 songs: 5 in all.
+    closed = run_country(data, "ISL", goal="More songs", min_songs=6, countries=countries)
+    assert (closed["campaign_id"], closed["imported"]) == (None, [])
+    assert {"source": "genius", "reason": UNDER, "would_add": 2} in closed["skipped"]
 
-    assert [row["source"] for row in result["imported"]] == ["lrclib"]
-    assert {"source": "genius", "reason": UNDER, "would_add": 1} in result["skipped"]
-    assert result["songs_after"] == 5
+    result = run_country(data, "ISL", goal="More songs", min_songs=5, countries=countries)
+    assert result["campaign_id"] is not None
+    assert [row["source"] for row in result["imported"]] == ["lrclib", "genius"]
+    assert result["songs_after"] == 6
 
 
 def test_an_open_campaign_or_a_country_with_no_songs_is_refused(folders):
