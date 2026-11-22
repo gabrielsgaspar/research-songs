@@ -173,14 +173,18 @@ def test_the_threshold_is_on_the_sum_of_the_sources_of_the_country(folders):
     assert result["songs_after"] == 6
 
 
-def test_an_open_campaign_or_a_country_with_no_songs_is_refused(folders):
+def test_no_songs_is_refused_and_an_open_campaign_takes_the_runs(folders):
     data, countries = folders
     with pytest.raises(FileNotFoundError, match="no songs folder of NOR"):
         run_country(data, "NOR", goal="More songs", countries=countries)
-    campaigns.open_campaign("ISL", "An earlier goal", countries=countries)
-    with pytest.raises(FileExistsError, match="has an open campaign"):
-        run_country(data, "ISL", goal="More songs", min_songs=1, countries=countries)
-    assert run_records.read_run_records("ISL", countries) == []
+    # The runs of a ladder join the campaign that is open, and a second ladder runs a
+    # dump again with the estimate as its reason.
+    opened = campaigns.open_campaign("ISL", "An earlier goal", countries=countries)
+    result = run_country(data, "ISL", goal="More songs", min_songs=1, countries=countries)
+    assert result["campaign_id"] == opened.campaign_id
+    records = run_records.read_run_records("ISL", countries)
+    assert records and {record.campaign_id for record in records} == {opened.campaign_id}
+    assert all("The survey estimates" in record.notes for record in records)
 
 
 def test_a_failing_import_leaves_the_campaign_open_and_a_failed_run_record(folders, monkeypatch):

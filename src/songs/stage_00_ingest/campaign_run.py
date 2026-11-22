@@ -54,19 +54,17 @@ def run_country(
     `campaign_id` is None. Otherwise every source that would add 1 song or more is
     imported, the largest estimate first. After the first import, each source is
     estimated again on the new songs folder, because an earlier import can take its
-    tracks; a source with nothing left is skipped. The campaign stays open.
+    tracks; a source with nothing left is skipped. The campaign stays open. When
+    the country has an open campaign, the runs join it and `goal` is not used. A
+    dump that ran before runs again, because the estimate says that it adds songs;
+    the estimate is the reason in the run record.
 
-    Raise FileExistsError when the country has an open campaign, and
-    FileNotFoundError when it has no songs folder. An import that fails stops the
+    Raise FileNotFoundError when the country has no songs folder. An import that fails stops the
     ladder: its run record has the state `failed`, the campaign stays open, and
     the error is raised again.
     """
     paths.check_iso3(iso3)
     current = run_records.open_campaign_id(iso3, countries)
-    if current:
-        raise FileExistsError(
-            f"{iso3} has an open campaign, {current}. Close it before a new ladder."
-        )
     newest = paths.latest_country_songs_dir(data, iso3)
     if newest is None:
         raise FileNotFoundError(f"no songs folder of {iso3}")
@@ -102,19 +100,29 @@ def run_country(
         return result
 
     _wait_past(newest.name)
-    result["campaign_id"] = campaigns.open_campaign(
-        iso3, goal, songs_before=before, countries=countries
-    ).campaign_id
+    result["campaign_id"] = (
+        current
+        or campaigns.open_campaign(iso3, goal, songs_before=before, countries=countries).campaign_id
+    )
     for position, row in enumerate(todo):
         source = row["source"]
+        estimate = row["would_add"]
         if position:
             (again,) = dump_match.survey(data, iso3, [source], discogs)
-            if not again["would_add"]:
+            estimate = again["would_add"]
+            if not estimate:
                 skipped.append({"source": source, "reason": NOTHING, "would_add": 0})
                 continue
         _wait_past(paths.latest_country_songs_dir(data, iso3).name)
         start = time.monotonic()
-        done = dump_match.import_dump(data, source, iso3, discogs, countries=countries)
+        done = dump_match.import_dump(
+            data,
+            source,
+            iso3,
+            discogs,
+            countries=countries,
+            repeat_reason=f"The survey estimates {estimate} songs to add.",
+        )
         result["imported"].append(
             {
                 "source": source,

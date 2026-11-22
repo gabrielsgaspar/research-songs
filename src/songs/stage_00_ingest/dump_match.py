@@ -918,6 +918,7 @@ def import_dump(
     discogs_label: str | None = None,
     countries: Path | None = None,
     reviewed: dict[tuple[str, ...], str] | None = None,
+    repeat_reason: str | None = None,
 ) -> dict:
     """Add the songs of the newest dump that match a Discogs track of their roster artist.
 
@@ -928,7 +929,8 @@ def import_dump(
     folder is an input of the manifest. For a folder outside the data folder,
     `discogs_label` names it in the manifest notes. `reviewed` replaces the
     decisions of `REVIEWED_FILE` (for tests). Every other song of the dump is
-    counted in the run record with its class.
+    counted in the run record with its class. A second run of the same dump for the
+    same country needs `repeat_reason`; the reason goes to the notes of the record.
     """
     paths.check_iso3(iso3)
     dump = paths.latest_clean_dump_dir(data, source)
@@ -944,7 +946,12 @@ def import_dump(
     discogs_label = catalog[0] if catalog else discogs_label or discogs.name
     bulk_file = paths.data_relative(data, dump)
     with run_records.record_run(
-        iso3, ROUTE, source, countries=countries, bulk_file=bulk_file
+        iso3,
+        ROUTE,
+        source,
+        countries=countries,
+        bulk_file=bulk_file,
+        repeat_reason=repeat_reason,
     ) as record:
         if earlier.name >= record.run_id:
             raise ValueError(f"{earlier} is not older than this run ({record.run_id})")
