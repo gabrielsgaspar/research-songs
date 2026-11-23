@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261123T222918Z",
+  "closed_utc": "2026-11-23T22:30:25Z",
+  "iso3": "PHL",
+  "next_time": "Check the roster first: 187 of 1006 added songs (18.6%) belong to artists with a Discogs id but no Philippines release. Review and trim those artists, then re-run dumps.",
+  "outcome": "stopped",
+  "reason": "home_check roster_id_no_home_release=187 of 1006 added (18.6%) exceeds 15%; top artists Joshua Morata 45, Eypio 28, Laxx 22, Manila Killa 20, Kepa Junkera 17",
+  "schema_version": 1,
+  "songs_after": 14930
+}

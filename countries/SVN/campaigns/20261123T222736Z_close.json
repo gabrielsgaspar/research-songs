@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261123T222736Z",
+  "closed_utc": "2026-11-23T22:28:43Z",
+  "iso3": "SVN",
+  "next_time": "lrclib added 749 and genius 78; besedilo/pesmi/slolyrics have no dump. By-name sample flagged Alpenoberkrainer (Austria/Germany releases, 2 songs). Build Slovenian lyric dumps and review that artist before the next campaign.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 7631
+}
