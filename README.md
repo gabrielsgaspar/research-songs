@@ -50,16 +50,16 @@ flowchart LR
 | Area | State |
 | --- | --- |
 | Repository rules, CI, templates | Working |
-| Shared library (configuration, paths) | Working; storage helpers arrive with the code that needs them |
-| Data layout (paths, table schemas, manifests) | Working: [data layout](docs/standards/data_layout.md). Old data is not converted yet |
-| Version folders in the bucket | Working: `songs data upload`, `songs data download`, `songs data check` and `songs data pull` |
-| Country folders and run records | Working: `songs lyrics history`, and [coverage by country](docs/status/coverage.md) |
-| Lyric collection and matching | Planned |
+| Shared library (configuration, paths, storage) | Working |
+| Data layout (paths, table schemas, manifests) | Working: [data layout](docs/standards/data_layout.md). The songs of all 226 countries were imported from the old pipeline (`songs lyrics import-old`). The undated inputs of the country-year table still have the old layout |
+| Version folders in the bucket | Working: `songs data upload`, `songs data download`, `songs data check` and `songs data pull`. `songs lyrics publish` and `songs lyrics audit` upload and check the songs folders of the countries. The objects from before the layout wait for a deletion list |
+| Country folders, run records and campaigns | Working: `songs lyrics history`, `songs lyrics plan`, `songs lyrics campaign`, and [coverage by country](docs/status/coverage.md) |
+| Lyric collection and matching | Working for lyric dumps: `songs lyrics survey`, `songs lyrics import-dump`, and the campaign ladder (`songs lyrics campaign run`) in [countries/README.md](countries/README.md). Collection from web sources is not in this repository |
 | Country-year panel | Working in part: `songs panel countries`. Democracy, populism, banking crises and the corpus counts wait for their inputs |
-| Topic scoring | Planned |
+| Topic scoring | Working in part: `songs lyrics import-scores` imports the scores of the old pipeline. No command scores new songs yet |
 | Figure and topic standards | Working: [figures](docs/standards/figures.md), [topics](docs/standards/topics.md) |
-| Analysis and figure registry | Planned |
-| Agent workflows on GitHub (planner, builder, reviewer) | Planned |
+| Analysis release | Working: `songs analysis release` writes `analysis/<YYYYMMDD>/` from the eligible songs. No estimation code and no figure for the paper yet |
+| Agent workflows on GitHub (planner, builder, reviewer) | Workflow files are in `.github/workflows/`. A person starts each stage with a label |
 
 ## Layout
 
@@ -69,7 +69,7 @@ tests/            tests and small fixtures
 docs/decisions/   why the project works the way it does
 docs/status/      generated status pages
 docs/standards/   figure, topic, data source and data layout standards
-countries/        one folder per country (ISO3 code) with its run records
+countries/        one folder per country (ISO3 code) with its run records and campaign records
 resources/        small tracked files that code reads, such as the list of data sources
 exhibits/         figures and tables for the paper and the presentation
 prompts/roles/    instructions for the planner, builder and reviewer agents
