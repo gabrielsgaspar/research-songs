@@ -12,13 +12,15 @@ Each song of the dump counts once, in the first class that it fits:
 
 A song of the dump is one `source_song_id`; it can have more than one credited
 artist. The artists of a song are its credited names and the other names of
-those artists in `artist_names.parquet`. When no artist of a song gives
+those artists in `artist_names.parquet`. A song that is not held, and whose lyric
+text has fewer than `MIN_LYRICS_CHARS` characters, is left out as `short_lyrics`:
+such a text is a placeholder, not a lyric. When no artist of a song gives
 same_title or roster_new, the lead part of each credited name is tried next
 (`lead_artist`: "A feat. B", "A x B" and "A & B" give A). A featured part alone
 never makes a match. `matched_by_split` counts the songs that the lead parts
 matched. A song that is not held, and whose title
 or whose every artist name has no key, is left out with its reason. The
-comparison reads no lyric text, only its hash.
+comparison reads no lyric text, only its hash and its length.
 
 `match_discogs` then looks for each roster_new song in the Discogs tracks of its
 artist:
@@ -86,7 +88,9 @@ from songs.stage_00_ingest import review_workbooks
 
 CLASSES = ("held", "same_title", "roster_new", "not_roster")
 NEW_CLASSES = CLASSES[1:]
-LEFT_OUT = ("no_title_key", "no_artist_key")
+LEFT_OUT = ("no_title_key", "no_artist_key", "short_lyrics")
+# A lyric text with fewer characters, without the spaces around it, is a placeholder.
+MIN_LYRICS_CHARS = 30
 DISCOGS_CLASSES = (
     "exact",
     "loose",
@@ -229,11 +233,15 @@ def dump_keys(dump: Path) -> Path:
     which is never uploaded. The folder name is `_keys_version`, so a change of the
     key code gives a new folder. The build writes to a work folder and renames it
     last. DuckDB reads and writes Parquet in streams, so no table is held in Python.
+    The lyric text is read one time, for its length, on two threads: each thread
+    holds a row group of text, and more threads pass the memory limit on a large dump.
 
         credits.parquet     one row per credit: song id, source artist id, artist key, lead key
         alias_keys.parquet  one row per source artist id and key of one of its names
         songs.parquet       one row per song: artist, title and hash of its first credit,
                             its title key, and `has_key` (an artist name of it has a key)
+        lengths.parquet     one row per song: the length of the lyric text of its first
+                            credit, without the spaces around it
     """
     dump = dump.resolve()
     if dump.parent.parent.name != "dumps" or dump.parents[2].name != "clean":
@@ -272,6 +280,13 @@ def dump_keys(dump: Path) -> Path:
             "FROM a JOIN nk ON a.artist_name = nk.name WHERE nk.key <> ''"
         )
         connection.execute(f"COPY alias TO {_quoted(work / 'alias_keys.parquet')}")
+        connection.execute("SET threads = 2")
+        connection.execute(
+            "COPY (SELECT source_song_id, "
+            "arg_min(coalesce(length(trim(lyrics)), 0), credit_position) AS lyrics_chars "
+            f"FROM d GROUP BY source_song_id) TO {_quoted(work / 'lengths.parquet')}"
+        )
+        connection.execute("RESET threads")
         connection.execute(
             "COPY (SELECT d.source_song_id, d.source_artist_id, nk.key AS artist_key, "
             "nk.lead AS lead_key FROM d JOIN nk ON d.artist_name = nk.name) "
@@ -335,8 +350,8 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
     not_roster, no_title_key or no_artist_key, and has no row in `songs`.
     """
     keys = dump_keys(dump)
-    credits_file, alias_file, songs_file = (
-        _quoted(keys / name) for name in ("credits.parquet", "alias_keys.parquet", "songs.parquet")
+    credits_file, alias_file, songs_file, lengths_file = (
+        _quoted(keys / f"{name}.parquet") for name in ("credits", "alias_keys", "songs", "lengths")
     )
     with duckdb.connect() as connection:
         held_songs = schemas.read_table(
@@ -397,14 +412,17 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
                 "song_name": row[2],
                 "held": row[3],
                 "title": row[4],
+                "chars": row[5],
                 "keys": set(),
                 "leads": set(),
             }
             for row in connection.sql(
                 f"""
                 SELECT source_song_id, artist_name, song_name,
-                    lyrics_sha256 IN (SELECT lyrics_sha256 FROM held_hashes), title_key
+                    lyrics_sha256 IN (SELECT lyrics_sha256 FROM held_hashes), title_key,
+                    lyrics_chars
                 FROM {songs_file} SEMI JOIN candidates USING (source_song_id)
+                JOIN {lengths_file} USING (source_song_id)
                 ORDER BY source_song_id
                 """
             ).fetchall()
@@ -430,7 +448,7 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
 
     counts = Counter({name: 0 for name in CLASSES})
     counts["not_roster"] = not_roster
-    left_out = Counter({"no_title_key": no_title, "no_artist_key": no_artist})
+    left_out = Counter({"no_title_key": no_title, "no_artist_key": no_artist, "short_lyrics": 0})
     ambiguous = split = 0
     rows = []
     for song_id, song in songs.items():
@@ -445,6 +463,9 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
             continue
         elif not keys:
             left_out["no_artist_key"] += 1
+            continue
+        elif song["chars"] < MIN_LYRICS_CHARS:
+            left_out["short_lyrics"] += 1
             continue
         elif any((key, title) in held_pairs for key in keys):
             kind = "same_title"
