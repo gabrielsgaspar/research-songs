@@ -41,6 +41,14 @@ uv run pytest
 6. Gabriel reviews it. Push more commits to the same branch when he asks for changes. Do not force-push.
 7. Delete the branch after the merge.
 
+## Comments and folders
+
+- Write a comment only when the code cannot show the reason. A later reader, person or agent, takes a comment as true, so a wrong comment spreads.
+- A comment has at most 3 lines. Put a longer explanation in the module docstring or in `docs/`.
+- A comment never tells the history of the code or who wrote it: no "previously", no pull request or issue numbers, no agent names. Git and the pull request keep the history.
+- A new top-level folder or a new package in `src/songs/` gets a line in the layout block of [`README.md`](README.md).
+- `tests/test_code_rules.py` checks the last three points. A person judges the first one in review.
+
 ## Never commit
 
 - Data files, or anything under `data/`, `outputs/`, `reports/`, `scratch/` or `overleaf/`.

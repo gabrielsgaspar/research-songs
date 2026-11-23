@@ -64,7 +64,12 @@ flowchart LR
 ## Layout
 
 ```
-src/songs/        importable, tested code
+src/songs/                    importable, tested code, in these packages:
+src/songs/common/             paths, schemas, manifests, storage, run and campaign records, rules
+src/songs/stage_00_ingest/    collect lyrics and match them to the catalog: dumps, the campaign ladder, imports
+src/songs/stage_10_clean/     clean the external data: GDP, democracy, fertility, population, crises
+src/songs/stage_30_topics/    topic ids, the scoring prompt, and the import of topic scores
+src/songs/stage_50_analysis/  eligible songs, the country-year panel and the analysis release
 tests/            tests and small fixtures
 docs/decisions/   why the project works the way it does
 docs/status/      generated status pages
@@ -75,6 +80,7 @@ exhibits/         figures and tables for the paper and the presentation
 prompts/roles/    instructions for the planner, builder and reviewer agents
 prompts/scoring/  the model configuration and prompt for topic scoring
 .github/          CI, agent workflows, code owners, issue and pull request templates
+.claude/          Claude Code settings and the regression skills (reg-did, reg-fe, reg-lp, reg-var)
 AGENTS.md         rules for agents and people
 CONTRIBUTING.md   how to make a change
 ```
