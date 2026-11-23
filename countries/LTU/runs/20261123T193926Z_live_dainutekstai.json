@@ -1,0 +1,31 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 0,
+  "backfilled": false,
+  "bulk_file": null,
+  "campaign_id": "20261123T193914Z",
+  "code_commit": "62dd747a3dffa9d7816dc5761cfc49b763143e0b",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-23T19:39:26Z",
+  "iso3": "LTU",
+  "known_gaps": [
+    "The run stopped: robots.txt was not read (status 0)."
+  ],
+  "limits_hit": {
+    "stopped": "robots.txt was not read (status 0)"
+  },
+  "notes": "",
+  "request_delay_seconds": 2.0,
+  "requests_sent": 1,
+  "route": "live",
+  "rows_added": 0,
+  "run_id": "20261123T193926Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 0,
+  "songs_attempted": 0,
+  "songs_rejected": {},
+  "source": "dainutekstai",
+  "started_utc": "2026-11-23T19:39:26Z",
+  "state": "partial"
+}

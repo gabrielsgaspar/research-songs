@@ -1,0 +1,39 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 4,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/fnanen/20261121/",
+  "campaign_id": "20261123T190557Z",
+  "code_commit": "6bf7c1ec3310d8aa9e3947f17ee9dff9fe11b799",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-23T19:06:35Z",
+  "iso3": "LBN",
+  "known_gaps": [
+    "close: 23 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 8 songs to add. 2 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 8,
+  "run_id": "20261123T190632Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 8,
+  "songs_attempted": 18142,
+  "songs_rejected": {
+    "already_linked": 64,
+    "close": 23,
+    "held": 611,
+    "held_loose_title": 7,
+    "no_track": 585,
+    "not_roster": 15815,
+    "out_of_scope": 62,
+    "same_title": 965,
+    "short_lyrics": 2
+  },
+  "source": "fnanen",
+  "started_utc": "2026-11-23T19:06:32Z",
+  "state": "complete"
+}

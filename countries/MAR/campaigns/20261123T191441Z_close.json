@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261123T191441Z",
+  "closed_utc": "2026-11-23T20:30:35Z",
+  "iso3": "MAR",
+  "next_time": "Check the roster first: some roster artists with a Discogs id have no release in the country. The local dumps are used. Find local or archive sources for the years before 1980, where lrclib and genius add few songs.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 6762
+}

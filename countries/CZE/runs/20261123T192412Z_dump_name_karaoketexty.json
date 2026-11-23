@@ -1,0 +1,41 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 306,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/karaoketexty/20261119/",
+  "campaign_id": "20261123T192412Z",
+  "code_commit": "6bf7c1ec3310d8aa9e3947f17ee9dff9fe11b799",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-23T19:24:19Z",
+  "iso3": "CZE",
+  "known_gaps": [
+    "close: 392 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 7418 songs to add. 4813 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 7418,
+  "run_id": "20261123T192412Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 7418,
+  "songs_attempted": 251986,
+  "songs_rejected": {
+    "already_linked": 230,
+    "close": 392,
+    "held": 19451,
+    "held_loose_title": 573,
+    "no_title_key": 9,
+    "no_track": 4908,
+    "not_roster": 209718,
+    "out_of_scope": 2296,
+    "same_title": 6366,
+    "short_lyrics": 418,
+    "track_taken": 207
+  },
+  "source": "karaoketexty",
+  "started_utc": "2026-11-23T19:24:12Z",
+  "state": "complete"
+}

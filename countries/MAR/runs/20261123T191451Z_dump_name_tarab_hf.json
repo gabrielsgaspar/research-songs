@@ -1,0 +1,40 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 2,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/tarab_hf/20261119/",
+  "campaign_id": "20261123T191441Z",
+  "code_commit": "6bf7c1ec3310d8aa9e3947f17ee9dff9fe11b799",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-23T19:14:53Z",
+  "iso3": "MAR",
+  "known_gaps": [
+    "close: 98 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 3 songs to add. 3 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 3,
+  "run_id": "20261123T191451Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 3,
+  "songs_attempted": 34240,
+  "songs_rejected": {
+    "already_linked": 41,
+    "close": 98,
+    "held": 109,
+    "held_loose_title": 18,
+    "no_track": 806,
+    "not_roster": 32253,
+    "out_of_scope": 66,
+    "same_title": 830,
+    "short_lyrics": 1,
+    "track_taken": 15
+  },
+  "source": "tarab_hf",
+  "started_utc": "2026-11-23T19:14:51Z",
+  "state": "complete"
+}
