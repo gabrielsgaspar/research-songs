@@ -225,13 +225,15 @@ def dump_keys(dump: Path) -> Path:
     which is never uploaded. The folder name is `_keys_version`, so a change of the
     key code gives a new folder. The build writes to a work folder and renames it
     last. DuckDB reads and writes Parquet in streams, so no table is held in Python.
+    The lyric text is read one time, for its length, on two threads: each thread
+    holds a row group of text, and more threads pass the memory limit on a large dump.
 
         credits.parquet     one row per credit: song id, source artist id, artist key, lead key
         alias_keys.parquet  one row per source artist id and key of one of its names
         songs.parquet       one row per song: artist, title and hash of its first credit,
-                            its title key, `has_key` (an artist name of it has a key), and
-                            `lyrics_chars` (the length of its lyric text without the spaces
-                            around it)
+                            its title key, and `has_key` (an artist name of it has a key)
+        lengths.parquet     one row per song: the length of the lyric text of its first
+                            credit, without the spaces around it
     """
     dump = dump.resolve()
     if dump.parent.parent.name != "dumps" or dump.parents[2].name != "clean":
@@ -270,6 +272,13 @@ def dump_keys(dump: Path) -> Path:
             "FROM a JOIN nk ON a.artist_name = nk.name WHERE nk.key <> ''"
         )
         connection.execute(f"COPY alias TO {_quoted(work / 'alias_keys.parquet')}")
+        connection.execute("SET threads = 2")
+        connection.execute(
+            "COPY (SELECT source_song_id, "
+            "arg_min(coalesce(length(trim(lyrics)), 0), credit_position) AS lyrics_chars "
+            f"FROM d GROUP BY source_song_id) TO {_quoted(work / 'lengths.parquet')}"
+        )
+        connection.execute("RESET threads")
         connection.execute(
             "COPY (SELECT d.source_song_id, d.source_artist_id, nk.key AS artist_key, "
             "nk.lead AS lead_key FROM d JOIN nk ON d.artist_name = nk.name) "
@@ -281,7 +290,6 @@ def dump_keys(dump: Path) -> Path:
             "arg_min(d.song_name, d.credit_position) AS song_name, "
             "arg_min(d.lyrics_sha256, d.credit_position) AS lyrics_sha256, "
             "arg_min(tk.key, d.credit_position) AS title_key, "
-            "arg_min(coalesce(length(trim(d.lyrics)), 0), d.credit_position) AS lyrics_chars, "
             "bool_or(nk.key <> '' OR k.source_artist_id IS NOT NULL) AS has_key "
             "FROM d JOIN nk ON d.artist_name = nk.name JOIN tk ON d.song_name = tk.title "
             "LEFT JOIN (SELECT DISTINCT source_artist_id FROM alias) AS k "
@@ -334,8 +342,8 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
     not_roster, no_title_key or no_artist_key, and has no row in `songs`.
     """
     keys = dump_keys(dump)
-    credits_file, alias_file, songs_file = (
-        _quoted(keys / name) for name in ("credits.parquet", "alias_keys.parquet", "songs.parquet")
+    credits_file, alias_file, songs_file, lengths_file = (
+        _quoted(keys / f"{name}.parquet") for name in ("credits", "alias_keys", "songs", "lengths")
     )
     with duckdb.connect() as connection:
         held_songs = schemas.read_table(
@@ -406,6 +414,7 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
                     lyrics_sha256 IN (SELECT lyrics_sha256 FROM held_hashes), title_key,
                     lyrics_chars
                 FROM {songs_file} SEMI JOIN candidates USING (source_song_id)
+                JOIN {lengths_file} USING (source_song_id)
                 ORDER BY source_song_id
                 """
             ).fetchall()
