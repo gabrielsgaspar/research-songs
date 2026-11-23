@@ -772,10 +772,45 @@ def test_a_song_of_an_artist_found_by_name_is_added_with_its_own_method_and_coun
     assert manifests.read_manifest(out).counts["dump_songs_added_artist_by_name"] == 1
     (record,) = run_records.read_run_records("ISL", countries)
     assert "1 songs added for artists whose Discogs id was found by name" in record.notes
-    # The roster of the new folder keeps no id: each run finds it again, so each song is marked.
+    # The roster of the new folder holds the id that the import found.
     assert duckdb.sql(
         f"SELECT discogs_artist_id FROM '{(out / 'artists.parquet').as_posix()}'"
-    ).fetchall() == [(None,)]
+    ).fetchall() == [("21",)]
+    # The artist stays an artist found by name: its link says so, also with no `artists` table.
+    (discogs / "artists.parquet").unlink()
+    later = dump_match.discogs_ids(out.resolve(), discogs.resolve(), "ISL")
+    assert (later["ids"], later["by_name"]) == ({"a2": 21}, {"a2": (21, "Bára")})
+
+
+def test_an_import_fills_the_id_of_an_artist_that_an_earlier_import_found_by_name(tmp_path):
+    data = tmp_path / "data"
+    dump = paths.clean_dump_dir(data, "kasilyrics", "20260102")
+    write(schemas.DUMP_ARTIST_NAMES, dump, [])
+    write(schemas.DUMP_SONGS, dump, [credit("b2", "Bara", "No Such Track", "kc")])
+    manifests.write_manifest(
+        data, dump, "clean_dump", source="kasilyrics", inputs=["raw/x/20260101/"]
+    )
+    # A folder of an earlier import: a link by name, and a roster with no Discogs id.
+    country = paths.country_songs_dir(data, "ISL", RUN)
+    write(schemas.COUNTRY_SONGS, country, [held("s9", "a2", "Bára", "Night Song", "kz")])
+    write(schemas.COUNTRY_ARTISTS, country, [artist("a2", "Bára"), artist("a3", "Dísa")])
+    link = {"country_iso3": "ISL", "song_id": "s9", "artist_id": "a2", "source": "invented"}
+    by_name = {"match_method": "dump_discogs_exact_title_artist_by_name", "run_id": RUN}
+    track = {"discogs_release_id": "500", "discogs_track_index": "1"}
+    write(schemas.COUNTRY_LINKS, country, [link | track | by_name])
+    manifests.write_manifest(
+        data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
+    )
+    discogs = tmp_path / "discogs"
+    write_named_discogs(discogs, "(21, 'Bára')")
+
+    result = import_dump(data, "kasilyrics", "ISL", discogs, countries=tmp_path / "countries")
+
+    assert result["songs_added"] == 0
+    roster = (result["path"] / "artists.parquet").as_posix()
+    assert duckdb.sql(
+        f"SELECT artist_id, discogs_artist_id FROM '{roster}' ORDER BY 1"
+    ).fetchall() == [("a2", "21"), ("a3", None)]
 
 
 def test_the_home_countries_of_discogs_include_the_states_that_no_longer_exist():

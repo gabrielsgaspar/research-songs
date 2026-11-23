@@ -177,6 +177,7 @@ def write_country_songs(
     run_id: str,
     collected_utc: str,
     links: pd.DataFrame | None = None,
+    discogs_ids: dict[str, str] | None = None,
 ) -> dict[str, int]:
     """Write the three tables of a country after the import to `out`. Return the counts.
 
@@ -184,11 +185,13 @@ def write_country_songs(
     except a song that the import gives again. The artists of the added songs
     count as attempted at `collected_utc`. The earlier links are carried over as
     they are. `links` holds the links of the added songs: a hand-collected song has
-    no catalog track, so a review import gives none.
+    no catalog track, so a review import gives none. `discogs_ids` gives the Discogs
+    id of roster artists (artist id -> Discogs id); it fills only an artist that has
+    no Discogs id.
     """
     with duckdb.connect() as connection:
         return _write_country_songs(
-            connection, reviewed, earlier, out, run_id, collected_utc, links
+            connection, reviewed, earlier, out, run_id, collected_utc, links, discogs_ids or {}
         )
 
 
@@ -200,7 +203,13 @@ def _write_country_songs(
     run_id: str,
     collected_utc: str,
     links: pd.DataFrame | None,
+    discogs_ids: dict[str, str],
 ) -> dict[str, int]:
+    filled = pd.DataFrame(
+        {"artist_id": list(discogs_ids), "discogs_artist_id": list(discogs_ids.values())},
+        dtype="str",
+    )
+    connection.register("filled_ids", filled)
     for name, table in (
         ("old_artists", schemas.COUNTRY_ARTISTS),
         ("old_songs", schemas.COUNTRY_SONGS),
@@ -239,13 +248,16 @@ def _write_country_songs(
             coalesce(old.country_iso3, new.country_iso3) AS country_iso3,
             artist_id,
             coalesce(old.artist_name, new.artist_name) AS artist_name,
-            coalesce(old.discogs_artist_id, new.discogs_artist_id) AS discogs_artist_id,
+            coalesce(
+                old.discogs_artist_id, new.discogs_artist_id, filled.discogs_artist_id
+            ) AS discogs_artist_id,
             coalesce(old.country_tag, new.country_tag) AS country_tag,
             coalesce(old.attempted, false) OR new.attempt_utc IS NOT NULL AS attempted,
             coalesce(new.attempt_utc, old.last_attempt_utc) AS last_attempt_utc,
             coalesce(counted.songs, 0) AS songs
         FROM old_artists AS old
         FULL JOIN review_artists AS new USING (artist_id)
+        LEFT JOIN filled_ids AS filled USING (artist_id)
         LEFT JOIN (
             SELECT artist_id, count(*) AS songs FROM new_songs GROUP BY artist_id
         ) AS counted USING (artist_id)

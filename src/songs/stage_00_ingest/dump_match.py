@@ -672,9 +672,13 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
     has that id, no other roster artist without an id has that key, and a release
     of a home country of `iso3` credits that artist (`load_home_countries`). The
     last rule keeps out an artist of another country with the same name. The roster
-    of the folder is not changed. Return `ids` (roster artist id -> Discogs id),
-    `by_name` (roster artist id -> Discogs id and Discogs name, for the ids found by
-    name), and the roster artists that stay without an id, counted by reason:
+    of the folder is not changed: `import_dump` writes the id of an artist that gets
+    a song, or that has a link of an earlier import, to the roster of its new folder.
+    Such an artist stays an artist found by name in each later folder, because a link
+    of it has a match method that ends
+    with `BY_NAME`. Return `ids` (roster artist id -> Discogs id), `by_name` (roster
+    artist id -> Discogs id and name, for the ids found by name now or by an earlier
+    import), and the roster artists that stay without an id, counted by reason:
     `none_found`, `more_than_one`, `id_taken`, `no_home_release` and `no_name_key`.
     A Discogs folder with no `artists.parquet` finds no id by name. A folder is
     write-once, so the result of a folder is kept.
@@ -685,6 +689,20 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
             "artist_id, artist_name, discogs_artist_id",
         )
         ids = {artist_id: int(number) for artist_id, _, number in roster if number}
+        named_before = set()
+        if (country / schemas.COUNTRY_LINKS.file).is_file():
+            named_before = {
+                row[0]
+                for row in schemas.read_table(schemas.COUNTRY_LINKS, country, connection)
+                .filter(f"match_method LIKE '%{BY_NAME}'")
+                .project("artist_id")
+                .fetchall()
+            }
+        stored = {
+            artist_id: (int(number), name)
+            for artist_id, name, number in roster
+            if number and artist_id in named_before
+        }
         missing = {artist_id: name_key(name) for artist_id, name, number in roster if not number}
         keys = sorted(set(missing.values()) - {""})
         found: dict[str, dict[int, str]] = {}
@@ -714,9 +732,10 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
             alone[artist_id] = next(iter(hits.items()))
     home = load_home_countries().get(iso3, frozenset())
     at_home = _with_home_release(discogs, sorted(pair[0] for pair in alone.values()), home)
-    result["by_name"] = {key: pair for key, pair in alone.items() if pair[0] in at_home}
-    result["no_home_release"] = len(alone) - len(result["by_name"])
-    result["ids"] = ids | {artist_id: pair[0] for artist_id, pair in result["by_name"].items()}
+    found_now = {key: pair for key, pair in alone.items() if pair[0] in at_home}
+    result["no_home_release"] = len(alone) - len(found_now)
+    result["by_name"] = stored | found_now
+    result["ids"] = ids | {artist_id: pair[0] for artist_id, pair in found_now.items()}
     return result
 
 
@@ -867,6 +886,7 @@ def _added_frames(
         match = chosen[song_id]
         artist_id = match["roster_artist_id"]
         roster_name, discogs_id, tag = roster[artist_id]
+        discogs_id = discogs_id or match["discogs_artist_id"]
         key = "dp_" + hashlib.sha256(f"{source}/{song_id}".encode()).hexdigest()[:20]
         shared = {
             "country_iso3": iso3,
@@ -908,6 +928,23 @@ def _added_frames(
     added = pd.DataFrame(song_rows, columns=song_columns).drop(columns=["run_id", "collected_utc"])
     links = pd.DataFrame(link_rows, columns=[c.name for c in schemas.COUNTRY_LINKS.columns])
     return added.astype({"year": "Int64"}), links.drop(columns=["run_id"])
+
+
+def _ids_of_earlier_links(country: Path, named: dict[str, tuple]) -> dict[str, str]:
+    """Return the Discogs id of each artist found by name that has a link in `country`.
+
+    An import before this rule left the roster without these ids; the next import
+    fills them.
+    """
+    with duckdb.connect() as connection:
+        linked = (
+            schemas.read_table(schemas.COUNTRY_LINKS, country, connection)
+            .filter(f"match_method LIKE '%{BY_NAME}'")
+            .project("artist_id")
+            .distinct()
+            .fetchall()
+        )
+    return {row[0]: str(named[row[0]][0]) for row in linked if row[0] in named}
 
 
 def load_reviewed_matches(root: Path | None = None) -> dict[tuple[str, ...], str]:
@@ -1188,8 +1225,15 @@ def import_dump(
         added, links = _added_frames(dump, earlier, iso3, source, plan["chosen"], plan["songs"])
         out = paths.country_songs_dir(data, iso3, record.run_id)
         out.mkdir(parents=True, exist_ok=False)
+        named = discogs_ids(earlier.resolve(), discogs, iso3)["by_name"]
         counts = review_workbooks.write_country_songs(
-            added, earlier, out, record.run_id, record.started_utc, links
+            added,
+            earlier,
+            out,
+            record.run_id,
+            record.started_utc,
+            links,
+            _ids_of_earlier_links(earlier, named),
         )
         manifests.write_manifest(
             data,
