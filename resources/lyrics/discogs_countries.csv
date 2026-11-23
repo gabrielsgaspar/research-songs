@@ -1,0 +1,352 @@
+discogs_country,country_iso3
+Abkhazia,GEO
+Afghanistan,AFG
+Albania,ALB
+Algeria,DZA
+American Samoa,ASM
+Andorra,AND
+Angola,AGO
+Anguilla,AIA
+Antigua & Barbuda,ATG
+Argentina,ARG
+Armenia,ARM
+Aruba,ABW
+Australasia,AUS
+Australasia,NZL
+Australia,AUS
+Australia & New Zealand,AUS
+Australia & New Zealand,NZL
+Austria,AUT
+Austria-Hungary,AUT
+Austria-Hungary,HUN
+Azerbaijan,AZE
+"Bahamas, The",BHS
+Bahrain,BHR
+Bangladesh,BGD
+Barbados,BRB
+Belarus,BLR
+Belgian Congo,COD
+Belgium,BEL
+Belize,BLZ
+Benelux,BEL
+Benelux,LUX
+Benelux,NLD
+Benin,BEN
+Bermuda,BMU
+Bhutan,BTN
+Bohemia,CZE
+Bolivia,BOL
+Bosnia & Herzegovina,BIH
+Botswana,BWA
+Brazil,BRA
+British Virgin Islands,VGB
+Brunei,BRN
+Bulgaria,BGR
+Burkina Faso,BFA
+Burma,MMR
+Cambodia,KHM
+Cameroon,CMR
+Canada,CAN
+Cape Verde,CPV
+Cayman Islands,CYM
+Central African Republic,CAF
+Chad,TCD
+Chile,CHL
+China,CHN
+Colombia,COL
+Comoros,COM
+"Congo, Democratic Republic of the",COD
+"Congo, Republic of the",COG
+Cook Islands,COK
+Costa Rica,CRI
+Croatia,HRV
+Cuba,CUB
+Curaçao,CUW
+Cyprus,CYP
+Czech And Slovak Federative Republic,CSK
+Czech And Slovak Federative Republic,CZE
+Czech And Slovak Federative Republic,SVK
+Czech Republic,CZE
+Czech Republic & Slovakia,CZE
+Czech Republic & Slovakia,SVK
+Czechoslovakia,CSK
+Czechoslovakia,CZE
+Czechoslovakia,SVK
+Dahomey,BEN
+Denmark,DNK
+Djibouti,DJI
+Dominica,DMA
+Dominican Republic,DOM
+Dutch East Indies,IDN
+East Timor,TLS
+Ecuador,ECU
+Egypt,EGY
+El Salvador,SLV
+Equatorial Guinea,GNQ
+Eritrea,ERI
+Estonia,EST
+Ethiopia,ETH
+Falkland Islands,FLK
+Faroe Islands,FRO
+Fiji,FJI
+Finland,FIN
+France,FRA
+France & Benelux,BEL
+France & Benelux,FRA
+France & Benelux,LUX
+France & Benelux,NLD
+French Guiana,GUF
+French Polynesia,PYF
+Gabon,GAB
+"Gambia, The",GMB
+Gaza Strip,PSE
+Georgia,GEO
+German Democratic Republic (GDR),DDR
+German Democratic Republic (GDR),DEU
+Germany,DEU
+Germany & Switzerland,CHE
+Germany & Switzerland,DEU
+"Germany, Austria, & Switzerland",AUT
+"Germany, Austria, & Switzerland",CHE
+"Germany, Austria, & Switzerland",DEU
+Ghana,GHA
+Gibraltar,GIB
+Greece,GRC
+Greenland,GRL
+Grenada,GRD
+Guadeloupe,GLP
+Guam,GUM
+Guatemala,GTM
+Guernsey,GGY
+Guinea,GIN
+Guinea-Bissau,GNB
+Guyana,GUY
+Haiti,HTI
+Honduras,HND
+Hong Kong,HKG
+Hong Kong & Thailand,HKG
+Hong Kong & Thailand,THA
+Hungary,HUN
+Iceland,ISL
+India,IND
+Indochina,KHM
+Indochina,LAO
+Indochina,VNM
+Indonesia,IDN
+Iran,IRN
+Iraq,IRQ
+Ireland,IRL
+Isle Of Man,IMN
+Israel,ISR
+Italy,ITA
+Ivory Coast,CIV
+Jamaica,JAM
+Japan,JPN
+Jersey,JEY
+Jordan,JOR
+Kazakhstan,KAZ
+Kenya,KEN
+Kiribati,KIR
+Korea (pre-1945),KOR
+Korea (pre-1945),PRK
+Kosovo,XKX
+Kuwait,KWT
+Kyrgyzstan,KGZ
+Laos,LAO
+Latvia,LVA
+Lebanon,LBN
+Lesotho,LSO
+Liberia,LBR
+Libya,LBY
+Liechtenstein,LIE
+Lithuania,LTU
+Luxembourg,LUX
+Macau,MAC
+Macedonia,MKD
+Madagascar,MDG
+Malawi,MWI
+Malaysia,MYS
+Maldives,MDV
+Mali,MLI
+Malta,MLT
+Marshall Islands,MHL
+Martinique,MTQ
+Mauritania,MRT
+Mauritius,MUS
+Mayotte,MYT
+Mexico,MEX
+"Moldova, Republic of",MDA
+Monaco,MCO
+Mongolia,MNG
+Montenegro,MNE
+Montserrat,MSR
+Morocco,MAR
+Mozambique,MOZ
+Namibia,NAM
+Nauru,NRU
+Nepal,NPL
+Netherlands,NLD
+Netherlands Antilles,ABW
+Netherlands Antilles,BES
+Netherlands Antilles,CUW
+Netherlands Antilles,SXM
+New Caledonia,NCL
+New Zealand,NZL
+Nicaragua,NIC
+Niger,NER
+Nigeria,NGA
+Niue,NIU
+Norfolk Island,NFK
+North America (inc Mexico),CAN
+North America (inc Mexico),MEX
+North America (inc Mexico),USA
+North Korea,PRK
+Northern Mariana Islands,MNP
+Norway,NOR
+Oman,OMN
+Ottoman Empire,TUR
+Pakistan,PAK
+Palau,PLW
+Palestine,PSE
+Panama,PAN
+Papua New Guinea,PNG
+Paraguay,PRY
+Peru,PER
+Philippines,PHL
+Pitcairn Islands,PCN
+Poland,POL
+Portugal,PRT
+Protectorate of Bohemia and Moravia,CZE
+Puerto Rico,PRI
+Qatar,QAT
+Reunion,REU
+Rhodesia,ZWE
+Romania,ROU
+Russia,RUS
+Russia & CIS,RUS
+Rwanda,RWA
+Saar,DEU
+Saint Kitts and Nevis,KNA
+Saint Lucia,LCA
+Saint Pierre and Miquelon,SPM
+Saint Vincent and the Grenadines,VCT
+Samoa,WSM
+San Marino,SMR
+Sao Tome and Principe,STP
+Saudi Arabia,SAU
+Scandinavia,DNK
+Scandinavia,NOR
+Scandinavia,SWE
+Senegal,SEN
+Serbia,SRB
+Serbia and Montenegro,MNE
+Serbia and Montenegro,SRB
+Seychelles,SYC
+Sierra Leone,SLE
+Singapore,SGP
+Singapore & Malaysia,MYS
+Singapore & Malaysia,SGP
+"Singapore, Malaysia & Hong Kong",HKG
+"Singapore, Malaysia & Hong Kong",MYS
+"Singapore, Malaysia & Hong Kong",SGP
+"Singapore, Malaysia, Hong Kong & Thailand",HKG
+"Singapore, Malaysia, Hong Kong & Thailand",MYS
+"Singapore, Malaysia, Hong Kong & Thailand",SGP
+"Singapore, Malaysia, Hong Kong & Thailand",THA
+Sint Maarten,SXM
+Slovakia,SVK
+Slovenia,SVN
+Solomon Islands,SLB
+Somalia,SOM
+South Africa,ZAF
+South Korea,KOR
+South Vietnam,VNM
+South West Africa,NAM
+Southern Rhodesia,ZWE
+Southern Sudan,SSD
+Spain,ESP
+Sri Lanka,LKA
+Sudan,SDN
+Suriname,SUR
+Swaziland,SWZ
+Sweden,SWE
+Switzerland,CHE
+Syria,SYR
+Taiwan,TWN
+Tajikistan,TJK
+Tanzania,TZA
+Thailand,THA
+Togo,TGO
+Tonga,TON
+Trinidad & Tobago,TTO
+Tunisia,TUN
+Turkey,TUR
+Turkmenistan,TKM
+Turks and Caicos Islands,TCA
+UK,GBR
+UK & Europe,GBR
+UK & France,FRA
+UK & France,GBR
+UK & Germany,DEU
+UK & Germany,GBR
+UK & Ireland,GBR
+UK & Ireland,IRL
+UK & US,GBR
+UK & US,USA
+"UK, Europe & Israel",GBR
+"UK, Europe & Israel",ISR
+"UK, Europe & Japan",GBR
+"UK, Europe & Japan",JPN
+"UK, Europe & US",GBR
+"UK, Europe & US",USA
+US,USA
+USA & Canada,CAN
+USA & Canada,USA
+USA & Europe,USA
+"USA, Canada & Europe",CAN
+"USA, Canada & Europe",USA
+"USA, Canada & UK",CAN
+"USA, Canada & UK",GBR
+"USA, Canada & UK",USA
+USSR,ARM
+USSR,AZE
+USSR,BLR
+USSR,EST
+USSR,GEO
+USSR,KAZ
+USSR,KGZ
+USSR,LTU
+USSR,LVA
+USSR,MDA
+USSR,RUS
+USSR,SUN
+USSR,TJK
+USSR,TKM
+USSR,UKR
+USSR,UZB
+Uganda,UGA
+Ukraine,UKR
+United Arab Emirates,ARE
+Upper Volta,BFA
+Uruguay,URY
+Uzbekistan,UZB
+Vanuatu,VUT
+Vatican City,VAT
+Venezuela,VEN
+Vietnam,VNM
+Virgin Islands,VIR
+Wallis and Futuna,WLF
+West Bank,PSE
+Yemen,YEM
+Yugoslavia,BIH
+Yugoslavia,HRV
+Yugoslavia,MKD
+Yugoslavia,MNE
+Yugoslavia,SRB
+Yugoslavia,SVN
+Yugoslavia,XKX
+Yugoslavia,YUG
+Zaire,COD
+Zambia,ZMB
+Zanzibar,TZA
+Zimbabwe,ZWE

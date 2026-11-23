@@ -552,7 +552,7 @@ def dumps_match(
     discogs = discogs or latest_clean_catalog_dir(data, "discogs")
     if discogs is None:
         return
-    found = match_discogs(result["songs"], country, discogs)
+    found = match_discogs(result["songs"], country, discogs, code)
     typer.echo(f"roster_new songs looked up in Discogs: {len(found)}")
     for name in DISCOGS_CLASSES:
         typer.echo(f"  {name}: {sum(row['discogs_class'] == name for row in found)}")

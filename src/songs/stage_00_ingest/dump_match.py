@@ -120,6 +120,9 @@ REVIEW_COLUMNS = (
     "reason",
 )
 DECISIONS = ("accept", "reject")
+# The release countries of Discogs that count as the home of each country.
+HOME_FILE = Path("resources") / "lyrics" / "discogs_countries.csv"
+HOME_COLUMNS = ("discogs_country", "country_iso3")
 DISCOGS_TABLES = (
     "release_artists",
     "release_track_artists",
@@ -555,20 +558,80 @@ def _earliest(hits: list[tuple]) -> tuple:
     return min(hits, key=lambda hit: (hit[3] is None, hit[3] or 0, hit[1], hit[2]))
 
 
+@functools.cache
+def load_home_countries(root: Path | None = None) -> dict[str, frozenset[str]]:
+    """Return, for each country code, the release countries of Discogs that are its home.
+
+    `HOME_FILE` has one row for each pair. A state that no longer exists, such as
+    the USSR, is a home of each country that followed it.
+    """
+    path = (root or paths.resolve_project_root()) / HOME_FILE
+    home: dict[str, set[str]] = {}
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if tuple(reader.fieldnames or ()) != HOME_COLUMNS:
+            raise ValueError(f"{path.name} must have the columns {', '.join(HOME_COLUMNS)}")
+        for line in reader:
+            paths.check_iso3(line["country_iso3"])
+            if line["discogs_country"] in home.setdefault(line["country_iso3"], set()):
+                raise ValueError(f"{path.name} lists {tuple(line.values())} twice")
+            home[line["country_iso3"]].add(line["discogs_country"])
+    return {iso3: frozenset(names) for iso3, names in home.items()}
+
+
+def _with_home_release(discogs: Path, artist_ids: list[int], home: frozenset[str]) -> set[int]:
+    """Return the Discogs artists that a release of a country in `home` credits.
+
+    The credit is on the release or on one of its tracks.
+    """
+    if not artist_ids or not home:
+        return set()
+    table = {
+        name: _quoted(discogs / f"{name}.parquet")
+        for name in ("release_artists", "release_track_artists", "releases")
+    }
+    with duckdb.connect() as connection:
+        connection.execute("SET memory_limit = '4GB'")
+        _table(connection, "ids", "int64", artist_ids)
+        _table(connection, "home", "str", sorted(home))
+        connection.execute(
+            f"""
+            CREATE TEMP TABLE credited AS
+            SELECT artist_id, release_id FROM {table["release_artists"]}
+            WHERE artist_id IN (SELECT value FROM ids)
+            UNION
+            SELECT artist_id, release_id FROM {table["release_track_artists"]}
+            WHERE artist_id IN (SELECT value FROM ids)
+            """
+        )
+        rows = connection.sql(
+            f"""
+            SELECT DISTINCT artist_id FROM credited WHERE release_id IN (
+                SELECT release_id FROM {table["releases"]}
+                WHERE release_id IN (SELECT release_id FROM credited)
+                    AND country IN (SELECT value FROM home)
+            )
+            """
+        ).fetchall()
+    return {row[0] for row in rows}
+
+
 @functools.lru_cache(maxsize=8)
-def discogs_ids(country: Path, discogs: Path) -> dict:
+def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
     """Return the Discogs id of each roster artist of a country folder, also found by name.
 
     A roster artist with no Discogs id gets the id of a Discogs artist by name when
-    three things hold: exactly one artist in `artists.parquet` of the Discogs folder
+    four things hold: exactly one artist in `artists.parquet` of the Discogs folder
     has the same `name_key` (without the homonym mark " (2)"), no other roster artist
-    has that id, and no other roster artist without an id has that key. The roster
+    has that id, no other roster artist without an id has that key, and a release
+    of a home country of `iso3` credits that artist (`load_home_countries`). The
+    last rule keeps out an artist of another country with the same name. The roster
     of the folder is not changed. Return `ids` (roster artist id -> Discogs id),
     `by_name` (roster artist id -> Discogs id and Discogs name, for the ids found by
     name), and the roster artists that stay without an id, counted by reason:
-    `none_found`, `more_than_one`, `id_taken` and `no_name_key`. A Discogs folder
-    with no `artists.parquet` finds no id by name. A folder is write-once, so the
-    result of a folder is kept.
+    `none_found`, `more_than_one`, `id_taken`, `no_home_release` and `no_name_key`.
+    A Discogs folder with no `artists.parquet` finds no id by name. A folder is
+    write-once, so the result of a folder is kept.
     """
     with duckdb.connect() as connection:
         roster = _rows(
@@ -586,10 +649,11 @@ def discogs_ids(country: Path, discogs: Path) -> dict:
                 "WHERE key IN (SELECT value FROM names)"
             ).fetchall():
                 found.setdefault(key, {})[number] = name
-    result = {"by_name": {}, "none_found": 0, "more_than_one": 0, "id_taken": 0}
+    result = {"none_found": 0, "more_than_one": 0, "id_taken": 0}
     result["no_name_key"] = sum(not key for key in missing.values())
     shared = Counter(missing.values())
     taken = set(ids.values())
+    alone = {}
     for artist_id, key in missing.items():
         hits = found.get(key, {})
         if not key:
@@ -601,26 +665,31 @@ def discogs_ids(country: Path, discogs: Path) -> dict:
         elif shared[key] > 1 or next(iter(hits)) in taken:
             result["id_taken"] += 1
         else:
-            result["by_name"][artist_id] = next(iter(hits.items()))
+            alone[artist_id] = next(iter(hits.items()))
+    home = load_home_countries().get(iso3, frozenset())
+    at_home = _with_home_release(discogs, sorted(pair[0] for pair in alone.values()), home)
+    result["by_name"] = {key: pair for key, pair in alone.items() if pair[0] in at_home}
+    result["no_home_release"] = len(alone) - len(result["by_name"])
     result["ids"] = ids | {artist_id: pair[0] for artist_id, pair in result["by_name"].items()}
     return result
 
 
-def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]:
+def match_discogs(songs: list[dict], country: Path, discogs: Path, iso3: str) -> list[dict]:
     """Look for each roster_new song of `match_dump` in the Discogs tracks of its artist.
 
     `songs` is the `songs` list of `match_dump`. Return one row for each roster_new
     song, in the order of `songs`, with its Discogs class and, for a found track,
     the release id, track index, Discogs title, year, match method and score.
     The Discogs id of an artist is the id of the roster, or the id that `discogs_ids`
-    finds by name. For such an id the row has `artist_by_name` true, and its match
-    method ends with `BY_NAME`. A song is `held_loose_title` when the country holds a
+    finds by name for the country `iso3`. For such an id the row has `artist_by_name`
+    true, and its match method ends with `BY_NAME`. A song is `held_loose_title` when
+    the country holds a
     song of the same roster artist with the same loose title key, with or without a
     link, so one track never gets a second song under a longer title. The same holds
     inside one dump: of the songs of an artist with one loose title key, only the song
     with the shortest title is added, and the first one when two are equally short.
     """
-    resolved = discogs_ids(country.resolve(), discogs.resolve())
+    resolved = discogs_ids(country.resolve(), discogs.resolve(), iso3)
     discogs_of, by_name = resolved["ids"], resolved["by_name"]
     with duckdb.connect() as connection:
         held_loose = {
@@ -823,7 +892,7 @@ def would_add(
     songs and the rejected songs add up to `songs_in`.
     """
     result = match_dump(dump, country)
-    found = match_discogs(result["songs"], country, discogs)
+    found = match_discogs(result["songs"], country, discogs, iso3)
     reviewed = load_reviewed_matches() if reviewed is None else reviewed
 
     def accepted(row: dict) -> bool:
@@ -945,7 +1014,7 @@ def gaps(data: Path, iso3: str, discogs: Path | None = None) -> dict:
             .project("discogs_release_id, discogs_track_index")
             .fetchall()
         )
-    resolved = discogs_ids(country.resolve(), discogs.resolve())
+    resolved = discogs_ids(country.resolve(), discogs.resolve(), iso3)
     discogs_of = resolved["ids"]
     held = {
         (discogs_of[artist_id], loose_key(title))
@@ -983,7 +1052,13 @@ def gaps(data: Path, iso3: str, discogs: Path | None = None) -> dict:
         "artists_no_discogs_id": artists - len(discogs_of),
         "artists_no_id_reasons": {
             name: resolved[name]
-            for name in ("none_found", "more_than_one", "id_taken", "no_name_key")
+            for name in (
+                "none_found",
+                "more_than_one",
+                "id_taken",
+                "no_home_release",
+                "no_name_key",
+            )
         },
         "tracks_in": tracks_in,
         "tracks_no_title_key": no_key,

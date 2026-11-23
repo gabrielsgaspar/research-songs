@@ -141,7 +141,7 @@ What the commands do:
 
 ### Artists with no Discogs id
 
-A roster artist with no Discogs id gets one when exactly one Discogs artist has the same name key. No other roster artist may hold that id or have that key. The songs of the artist still need a title match with a track of that artist. The links of these songs carry a match method that ends with `_artist_by_name`.
+A roster artist with no Discogs id gets one when exactly one Discogs artist has the same name key. No other roster artist may hold that id or have that key. A release of the country must credit that Discogs artist, so an artist of another country with the same name gets no id. The file `resources/lyrics/discogs_countries.csv` lists the release countries of Discogs that count for each country; a state that no longer exists, such as the USSR, counts for each country that followed it. The songs of the artist still need a title match with a track of that artist. The links of these songs carry a match method that ends with `_artist_by_name`.
 
 ## Run records
 
