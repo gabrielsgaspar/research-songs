@@ -269,6 +269,7 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
         song("none", "Other Artist Song"),
         song("no_discogs_id", "Sol sol", ("a2",)),
         song("two_artists", "Sol sol", ("a1", "a2")),
+        song("two_artists_new", "Duet", ("a2", "a1")),
         song("held", "Sol sol", kind="held"),
         song("held_loose", "A New Song (Live)"),
         song("longer_first", "Encore (Live)"),
@@ -287,7 +288,8 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
         "taken": "track_taken",
         "none": "no_track",
         "no_discogs_id": "out_of_scope",
-        "two_artists": "out_of_scope",
+        "two_artists": "track_taken",
+        "two_artists_new": "loose",
         "held_loose": "held_loose_title",
         "longer_first": "held_loose_title",
         "shorter_wins": "exact",
@@ -302,6 +304,8 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
     assert rows["close"]["discogs_title"] == "Riverside"
     assert rows["close"]["match_score"] == 94.1
     assert rows["track_credit"]["discogs_release_id"] == "300"
+    # Of the two roster artists of the song, only a1 has a Discogs id and the track.
+    assert rows["two_artists_new"]["roster_artist_id"] == "a1"
 
 
 def test_loose_key_drops_brackets_and_featuring():
