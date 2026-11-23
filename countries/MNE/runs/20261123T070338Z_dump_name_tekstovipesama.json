@@ -1,0 +1,38 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/tekstovipesama/20261120/",
+  "campaign_id": "20261123T070301Z",
+  "code_commit": "a51e039229762fbc6298769c5ea492090bf3f7d2",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-23T07:03:40Z",
+  "iso3": "MNE",
+  "known_gaps": [
+    "close: 3 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 1 songs to add. 1 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 1,
+  "run_id": "20261123T070338Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 1,
+  "songs_attempted": 81465,
+  "songs_rejected": {
+    "already_linked": 18,
+    "close": 3,
+    "held": 59,
+    "held_loose_title": 29,
+    "no_track": 184,
+    "not_roster": 80545,
+    "out_of_scope": 1,
+    "same_title": 625
+  },
+  "source": "tekstovipesama",
+  "started_utc": "2026-11-23T07:03:38Z",
+  "state": "complete"
+}
