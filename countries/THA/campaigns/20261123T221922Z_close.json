@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261123T221922Z",
+  "closed_utc": "2026-11-23T22:20:42Z",
+  "iso3": "THA",
+  "next_time": "lrclib added 1008 and genius 12; siamzone has no dump. Large no-year gap remains (5166 held). Build siamzone dump and resolve no-year Discogs years before the next campaign.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 19162
+}
