@@ -7,8 +7,11 @@ table has the shape that `songs dumps build` reads as the family `site_snapshot`
 The collector matches nothing: `songs lyrics import-dump` does that.
 
 The collector reads `robots.txt` first and sends no request that it disallows. It
-waits between requests, sends each request one time, and stops when the site
-refuses it.
+waits between requests and stops when the site refuses it. A request with no
+answer, a server error or an empty page is sent again after each wait of
+`RETRY_WAITS`. A run continues the newest earlier folder when that folder has a
+stop file: the new folder holds the songs of the earlier folder, and the run reads
+only the songs that the earlier folder lacks.
 """
 
 import http.client
@@ -37,6 +40,8 @@ MIN_DELAY_SECONDS = 2.0
 TIMEOUT_SECONDS = 30
 STOP_STATUSES = (401, 403, 429)
 MAX_ERRORS_IN_A_ROW = 3
+# Seconds to wait before each new try of a request that got no page.
+RETRY_WAITS = (60, 300, 900)
 LYRIC_FILE = f"{SOURCE}_lyrics.parquet"
 STOP_FILE = "STOP"
 COLUMNS = (
@@ -211,13 +216,27 @@ class _Session:
     def __init__(self, fetch: Fetch, sleep: Callable[[float], None], delay: float) -> None:
         self.fetch, self.sleep, self.delay = fetch, sleep, delay
         self.requests = self.errors = self.errors_in_a_row = self.robots_disallowed = 0
+        self.retries = 0
         self.robots = RobotFileParser()
 
     def _send(self, url: str) -> tuple[int, str]:
-        if self.requests:
-            self.sleep(self.delay)
-        self.requests += 1
-        return self.fetch(url)
+        """Send a request, and send it again after each wait while the site gives no page.
+
+        No answer, a server error and an empty page can pass with time. Any other
+        answer is final.
+        """
+        waits = iter(RETRY_WAITS)
+        while True:
+            if self.requests:
+                self.sleep(self.delay)
+            self.requests += 1
+            status, body = self.fetch(url)
+            passing = status == 0 or status >= 500 or (status == 200 and not body.strip())
+            wait = next(waits, None) if passing else None
+            if wait is None:
+                return status, body
+            self.retries += 1
+            self.sleep(wait)
 
     def read_robots(self) -> None:
         status, body = self._send(BASE + "/robots.txt")
@@ -272,7 +291,7 @@ def _crawl(
     if artist_limit is not None and len(urls) >= artist_limit:
         limits["artist_limit"] = artist_limit
         urls = urls[:artist_limit]
-    seen: set[str] = set()
+    seen = {row["song_url"] for row in rows}
     for artist_url in urls:
         counts["artists"] += 1
         for url in song_urls(session.get(artist_url)[0]):
@@ -294,7 +313,23 @@ def _crawl(
                 rows.append(row)
 
 
-def _write(data: Path, folder: Path, rows: list[dict], counts: dict, stopped: str) -> None:
+def _earlier_rows(data: Path) -> tuple[Path | None, list[dict]]:
+    """Return the newest raw folder and its songs when a run must continue it, if not None, [].
+
+    A run continues a folder that has a stop file: its run ended early.
+    """
+    folder = paths.latest_raw_dir(data, SOURCE)
+    if folder is None or not (folder / STOP_FILE).is_file():
+        return None, []
+    with duckdb.connect() as connection:
+        table = connection.read_parquet((folder / LYRIC_FILE).as_posix())
+        found = table.project(", ".join(COLUMNS)).fetchall()
+    return folder, [dict(zip(COLUMNS, row, strict=True)) for row in found]
+
+
+def _write(
+    data: Path, folder: Path, rows: list[dict], counts: dict, stopped: str, inputs: list[str]
+) -> None:
     """Write the lyric table, the stop file of a run that ended early, and the manifest last."""
     folder.mkdir(parents=True)
     marks = ", ".join("?" for _ in COLUMNS)
@@ -314,6 +349,7 @@ def _write(data: Path, folder: Path, rows: list[dict], counts: dict, stopped: st
         folder,
         "raw",
         source=SOURCE,
+        inputs=inputs,
         origin={"url": BASE, "retrieved_utc": run_records.utc_now(), "license": None},
         counts=counts,
         notes=f"Collected page by page. {stopped}".strip(),
@@ -331,6 +367,7 @@ def collect(
     fetch: Fetch | None = None,
     sleep: Callable[[float], None] = time.sleep,
     countries: Path | None = None,
+    day: str | None = None,
 ) -> dict:
     """Collect the site for a country, write the raw folder and one run record.
 
@@ -339,13 +376,16 @@ def collect(
     source file and the crawl delay of `robots.txt`. A run that ends early keeps the
     songs that it has. Its folder has a stop file, so `songs dumps build` marks the dump
     as incomplete. A run that the site stopped has the state `partial` in its record.
+    The next run continues such a folder (`_earlier_rows`): its new folder holds the
+    earlier songs, and its record counts only the songs that it read. `day` replaces
+    the date of today in the folder name (for tests).
     """
     source = next(item for item in lyric_sources.load_lyric_sources() if item.id == SOURCE)
     if source.access != "allowed":
         raise CollectError(f"requests to {SOURCE} are {source.access} in the source file")
     if iso3 not in source.countries:
         raise CollectError(f"{SOURCE} does not serve {iso3} in the source file")
-    folder = paths.raw_dir(data, SOURCE, datetime.now(UTC).strftime("%Y%m%d"))
+    folder = paths.raw_dir(data, SOURCE, day or datetime.now(UTC).strftime("%Y%m%d"))
     if folder.exists():
         raise FileExistsError(
             f"{paths.data_relative(data, folder)} exists; raw data is never written over"
@@ -354,7 +394,8 @@ def collect(
     session = _Session(fetch or http_fetch, sleep, delay)
     # shortcut: the rows stay in memory until the run ends, so a killed process loses them;
     # keep a queue in staging/ when a site has more than about 100,000 songs.
-    rows: list[dict] = []
+    earlier, rows = _earlier_rows(data)
+    carried = len(rows)
     counts: Counter = Counter()
     limits: dict = {}
     with run_records.record_run(
@@ -395,15 +436,20 @@ def collect(
                 )
             if stopped:
                 record.known_gaps.append(stopped)
+            if earlier:
+                record.notes = (
+                    f"Continues {paths.data_relative(data, earlier)}: "
+                    f"{carried} songs of it are in the new folder."
+                )
             record.request_delay_seconds = session.delay
             record.requests_sent = session.requests
             record.artists_attempted = counts["artists"]
-            record.songs_attempted = len(rows) + sum(left_out.values())
-            record.songs_accepted = len(rows)
+            record.songs_attempted = len(rows) - carried + sum(left_out.values())
+            record.songs_accepted = len(rows) - carried
             record.songs_rejected = left_out
             record.limits_hit = limits
             record.rows_added = 0
-            if rows:
+            if len(rows) > carried:
                 _write(
                     data,
                     folder,
@@ -411,16 +457,20 @@ def collect(
                     {
                         "pages_requested": session.requests,
                         "songs_written": len(rows),
+                        **({"songs_of_earlier_folder": carried} if earlier else {}),
                         **{f"songs_left_out_{name}": number for name, number in left_out.items()},
                     },
                     stopped,
+                    [paths.data_relative(data, earlier)] if earlier else [],
                 )
                 record.notes = f"{record.notes} Wrote {paths.data_relative(data, folder)}".strip()
     return {
-        "path": paths.data_relative(data, folder) if rows else None,
+        "path": paths.data_relative(data, folder) if len(rows) > carried else None,
         "state": record.state,
         "requests_sent": session.requests,
+        "retries": session.retries,
         "songs_written": len(rows),
+        "songs_of_earlier_folder": carried,
         "songs_left_out": left_out,
         "known_gaps": record.known_gaps,
     }

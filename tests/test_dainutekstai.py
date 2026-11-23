@@ -217,9 +217,52 @@ def test_three_failed_requests_in_a_row_stop_the_run(run, tmp_path):
 
 
 def test_no_robots_answer_stops_the_run_before_any_page(run, tmp_path):
-    result, asked, _ = run(fake_site(**{f"{BASE}/robots.txt": (0, "")}))
-    assert asked == [f"{BASE}/robots.txt"]
+    result, asked, waits = run(fake_site(**{f"{BASE}/robots.txt": (0, "")}))
+    # The request is sent again after each wait, and no other page is asked.
+    assert asked == [f"{BASE}/robots.txt"] * (1 + len(site.RETRY_WAITS))
+    assert [wait for wait in waits if wait in site.RETRY_WAITS] == list(site.RETRY_WAITS)
     assert result["state"] == "partial"
+
+
+def test_an_empty_page_is_asked_again_and_a_missing_page_is_not(run, tmp_path):
+    answers = {song_url("r1"): [(200, " "), (0, ""), (200, song_page("r1"))]}
+    pages = fake_site(**{song_url("r3"): (404, "")})
+    asked = []
+
+    def fetch(url):
+        asked.append(url)
+        return answers[url].pop(0) if answers.get(url) else pages.get(url, (404, ""))
+
+    result = site.collect(
+        tmp_path / "data", "LTU", fetch=fetch, sleep=lambda _: None, countries=tmp_path / "c"
+    )
+
+    assert (asked.count(song_url("r1")), asked.count(song_url("r3"))) == (3, 1)
+    assert (result["retries"], result["state"]) == (2, "complete")
+    assert result["songs_left_out"]["http_error"] == 1
+
+
+def test_a_run_continues_the_folder_of_a_run_that_stopped(run, tmp_path, monkeypatch):
+    ids = iter(f"2026010{day}T000000Z" for day in (1, 2, 3))
+    monkeypatch.setattr(run_records, "new_run_id", lambda now=None: next(ids))
+    first, _, _ = run(fake_site(**{song_url("r3"): (403, "")}), day="20260101")
+    result, asked, _ = run(day="20260102")
+
+    # The songs of the earlier folder are not asked again, and the new folder holds them.
+    read = [url for url in asked if "/r" in url and "robots" not in url]
+    assert set(read).isdisjoint({song_url("r1")}) and song_url("r3") in read
+    assert result["songs_of_earlier_folder"] == first["songs_written"] == 1
+    assert result["songs_written"] == 2
+    data = tmp_path / "data"
+    folder = paths.latest_raw_dir(data, "dainutekstai")
+    assert folder.name == "20260102" and not (folder / site.STOP_FILE).exists()
+    assert manifests.read_manifest(folder).inputs == ["raw/dainutekstai/20260101/"]
+    records = run_records.read_run_records("LTU", tmp_path / "countries")
+    assert records[-1].songs_accepted == 1
+
+    # A complete folder is not continued: the next run reads every song again.
+    again, asked, _ = run(day="20260103", reason="again")
+    assert again["songs_of_earlier_folder"] == 0 and song_url("r1") in asked
 
 
 def test_a_song_limit_ends_the_run_and_marks_the_folder(run, tmp_path):

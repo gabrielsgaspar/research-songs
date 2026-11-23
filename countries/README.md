@@ -155,11 +155,12 @@ What the command does:
 
 - It reads `robots.txt` first. It sends no request that `robots.txt` disallows, and it counts each page that it skips.
 - It waits 2 seconds or more between requests. `--delay` gives a longer wait. The delay of the source file and the crawl delay of `robots.txt` apply when they are longer.
-- It sends each request one time. It stops at HTTP 401, 403 or 429, and after 3 failed requests in a row.
+- It sends a request again when the site gives no answer, a server error or an empty page. It waits 1 minute, then 5 minutes, then 15 minutes before each new try. It stops at HTTP 401, 403 or 429, and after 3 pages in a row that still fail.
 - `--artist-limit` and `--song-limit` make a short first run.
 - It writes `raw/dainutekstai/<YYYYMMDD>/` in the data folder: one lyric table and a manifest. It never writes over a folder, so a second run on the same day is refused.
 - It writes one run record with the route `live`: the delay, the limits, the pages requested, the songs written, and the songs left out by reason. `rows_added` is 0, because the command adds no song to the country.
 - A run that ends early keeps its songs. Its folder has a file `STOP`, so the dump is marked as incomplete.
+- The next run continues a folder that has a file `STOP`. It reads only the songs that the folder lacks, and its new folder holds the songs of both runs. Its run record counts only the songs that it read.
 
 The command prints the two commands that follow it. `songs dumps build` turns the raw folder into a dump, and `songs lyrics import-dump` adds the songs that match a Discogs track.
 
