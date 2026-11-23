@@ -31,6 +31,11 @@ CASES = {
         {"inputs": ["resources/lyrics/song_quarantine.csv"]},
         None,
     ),
+    "clean_artist_country": (
+        (DAY,),
+        {"inputs": ["clean/catalog/discogs/20261101/", "lyrics/BRA/songs/20261105T140000Z/"]},
+        None,
+    ),
     "country_songs": (
         ("BRA", RUN),
         {"country_iso3": "BRA", "run_id": RUN, "inputs": ["clean/dumps/letras/20261105/"]},

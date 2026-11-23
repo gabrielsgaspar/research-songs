@@ -38,6 +38,7 @@ clean/dumps/<source>/<YYYYMMDD>/             one lyric dump in the uniform forma
 clean/catalog/<source>/<YYYYMMDD>/           parsed MusicBrainz and Discogs tables
 clean/countries/<YYYYMMDD>/                  country-year table of economic and social variables: countries.parquet
 clean/quality/song_quarantine/<YYYYMMDD>/    songs that the old quality checks put in quarantine: song_quarantine.csv
+clean/quality/artist_country/<YYYYMMDD>/     roster artists that belong to another country: artist_country.parquet
 lyrics/<ISO3>/songs/<run id>/                full state of the country after that run: artists.parquet, songs.parquet, links.parquet
 lyrics/<ISO3>/scores/<run id>/               topic scores of one scoring run: topics.parquet, provenance.parquet
 analysis/<YYYYMMDD>/                         the release: country_year.parquet, songs.parquet
@@ -53,6 +54,7 @@ Each version folder has one function in `src/songs/common/paths.py`. No other mo
 | `clean/catalog/<source>/<YYYYMMDD>/` | `clean_catalog_dir(data, source, day)` | `latest_clean_catalog_dir(data, source)` |
 | `clean/countries/<YYYYMMDD>/` | `clean_countries_dir(data, day)` | `latest_clean_countries_dir(data)` |
 | `clean/quality/song_quarantine/<YYYYMMDD>/` | `clean_song_quarantine_dir(data, day)` | `latest_clean_song_quarantine_dir(data)` |
+| `clean/quality/artist_country/<YYYYMMDD>/` | `clean_artist_country_dir(data, day)` | `latest_clean_artist_country_dir(data)` |
 | `lyrics/<ISO3>/songs/<run id>/` | `country_songs_dir(data, iso3, run_id)` | `latest_country_songs_dir(data, iso3)` |
 | `lyrics/<ISO3>/scores/<run id>/` | `country_scores_dir(data, iso3, run_id)` | `latest_country_scores_dir(data, iso3)` |
 | `analysis/<YYYYMMDD>/` | `analysis_dir(data, day)` | `latest_analysis_dir(data)` |
@@ -108,7 +110,7 @@ A complete version folder goes to the bucket under the same path, with the prefi
 - `songs data pull <ISO3> ...` downloads the newest complete folders that a campaign for the countries needs. For each country it takes the songs folder, the scores folder and the dump of each lyric source of the country. Then it takes the Discogs catalog. The option `--no-catalog` leaves the catalog out (17 GB, about 2 hours). A folder that is complete on this disk is not downloaded again. The rules of `songs data download` hold.
 - `songs lyrics publish <ISO3> ...` uploads the songs folders of the countries that the bucket lacks, oldest first. Before a folder, it uploads the inputs of its manifest that this disk holds and the bucket lacks. It checks each uploaded folder against its manifest. It does not upload a folder when one of its inputs is a version folder that is neither on this disk nor in the bucket, and it does not upload the folders that need that folder. It then exits with 1 after the other uploads. An input that is not a version folder of the data layout is only noted.
 - `songs lyrics audit` compares the run records with the songs folders of the bucket. It prints each run record that wrote a songs folder with no complete folder in the bucket, and each complete songs folder with no run record. It exits with 1 when it finds one. It takes about 3 minutes.
-- `songs data sync` prints a Markdown report of the complete local folders that the bucket lacks. It looks at these kinds: clean dumps, catalogs, the country-year table, the quarantine list, country songs, country scores and the analysis release. With `--write`, it uploads them with the rules of `songs lyrics publish`, inputs first. Without `--write`, it uploads nothing. It uploads a songs folder only when `countries/<ISO3>/runs/` holds a run record with the same run id and the country has no open campaign. The report lists each folder that is left out, with the reason. The report also names the newest country-year table and the newest analysis release when they are stale, with the command that builds each one again. The country-year table is stale when a build would now read a file that its manifest does not name. The release is stale when an input has a newer complete folder, or when a country has songs or scores that are not an input. The command builds nothing, scores nothing and deletes nothing. It exits with 1 when a folder names an input that is neither on this disk nor in the bucket. The code is in `src/songs/common/sync.py`.
+- `songs data sync` prints a Markdown report of the complete local folders that the bucket lacks. It looks at these kinds: clean dumps, catalogs, the country-year table, the quarantine list, country songs, the table of artist countries, country scores and the analysis release. With `--write`, it uploads them with the rules of `songs lyrics publish`, inputs first. Without `--write`, it uploads nothing. It uploads a songs folder only when `countries/<ISO3>/runs/` holds a run record with the same run id and the country has no open campaign. The report lists each folder that is left out, with the reason. The report also names the newest country-year table and the newest analysis release when they are stale, with the command that builds each one again. The country-year table is stale when a build would now read a file that its manifest does not name. The release is stale when an input has a newer complete folder, or when a country has songs or scores that are not an input. The command builds nothing, scores nothing and deletes nothing. It exits with 1 when a folder names an input that is neither on this disk nor in the bucket. The code is in `src/songs/common/sync.py`.
 
 A weekly task in Windows Task Scheduler runs the sync. To register the task, run this command one time in PowerShell, in the folder of the repository:
 
@@ -148,6 +150,7 @@ Every version folder holds one `_MANIFEST.json`. All kinds of folder use one for
 | `clean_catalog` | `clean/catalog/<source>/<YYYYMMDD>/` | `source`, `inputs` | Tables of the catalog |
 | `clean_countries` | `clean/countries/<YYYYMMDD>/` | `inputs` | `countries.parquet` |
 | `clean_song_quarantine` | `clean/quality/song_quarantine/<YYYYMMDD>/` | `inputs` | `song_quarantine.csv` |
+| `clean_artist_country` | `clean/quality/artist_country/<YYYYMMDD>/` | `inputs` | `artist_country.parquet` |
 | `country_songs` | `lyrics/<ISO3>/songs/<run id>/` | `country_iso3`, `run_id`, `inputs` | `artists.parquet`, `songs.parquet`, `links.parquet` |
 | `country_scores` | `lyrics/<ISO3>/scores/<run id>/` | `country_iso3`, `run_id`, `inputs` | `topics.parquet`, `provenance.parquet` |
 | `analysis` | `analysis/<YYYYMMDD>/` | `inputs` | `country_year.parquet`, `songs.parquet` |
@@ -338,6 +341,41 @@ These are renamed: the old `provider` becomes `source`, `tag_re_release` becomes
 ## Country-year table
 
 `clean/countries/<YYYYMMDD>/countries.parquet` has one row per country and year. `songs panel countries` builds it (`src/songs/stage_50_analysis/countries_panel.py`). The columns are `COUNTRY_COLUMNS` in that module. [Data sources](data_sources.md) says where each variable comes from. The manifest names every input file that the build read.
+
+## Artist countries
+
+Some rosters hold artists of other countries. `songs lyrics roster-check --write` writes `clean/quality/artist_country/<YYYYMMDD>/` (`src/songs/stage_10_clean/artist_country.py`). Without `--write`, the command only prints the counts. The table has one row for each roster artist with a Discogs id, from the newest songs folder of every country. No person checks a row.
+
+The decision is `other_country` only when three conditions hold. Every other artist gets `keep`.
+
+1. The first 160 characters of the Discogs profile state another country. A statement is a country word that describes a role noun within a few words ("Syrian traditional singer"), or a country word that follows "from" within 40 characters with no sentence break ("from Dublin, Ireland"). A word followed by "-born" or " born" is no statement.
+2. No word of a home country is anywhere in that text. A home country is the country itself, and each country whose Discogs release names are all release names of this country in `resources/lyrics/discogs_countries.csv`. For example, the USSR is a home of Ukraine. The Federal Republic of Germany is a home of the German Democratic Republic.
+3. The artist has a release with a country, fewer than 20% of those releases are in a home release country, and the release country with the most releases is not a home release country.
+
+The country words are in `resources/lyrics/country_words.csv`. A word in capitals or of three letters or fewer, such as `UK`, is matched with its case. Every other word is matched without case. A longer word wins over a shorter one. Some phrases hold a country word and name no country of an artist, such as "New Jersey". The rule makes them blank first (`IGNORED_PHRASES`).
+
+The manifest names the Discogs catalog folder and the songs folder of each country that the rule read. It counts the roster artists read, the artists with a Discogs id, the artists with `other_country`, and the songs of those artists.
+
+<!-- generated:quality_tables:start -->
+<!-- Do not edit by hand. To rebuild, run: python -m songs.common.schemas --write -->
+
+### `artist_country.parquet`: one row per roster artist with a Discogs id
+
+Folder: `clean/quality/artist_country/<YYYYMMDD>/`. Key: `country_iso3`, `artist_id`.
+
+| Column | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `country_iso3` | string | yes | Country of the roster |
+| `artist_id` | string | yes | Joins to `artists.parquet` of the country |
+| `discogs_artist_id` | string | yes | Discogs id of the roster, or the id that `dump_match.discogs_ids` found by name |
+| `stated_country` | string | yes | Country that the start of the Discogs profile states for the artist, as a code. Empty text when it states none |
+| `home_word` | boolean | yes | True when the start of the profile holds a word of a home country |
+| `releases` | int64 | yes | Releases that credit the artist and have a country |
+| `releases_home` | int64 | yes | Those releases in a home release country |
+| `top_release_country` | string | yes | Release country of Discogs with the most of those releases. Empty text when `releases` is 0 |
+| `decision` | string | yes | `other_country` when the artist belongs to another country, or `keep` |
+
+<!-- generated:quality_tables:end -->
 
 ## Score tables
 
