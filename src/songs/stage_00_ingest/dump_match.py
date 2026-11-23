@@ -149,17 +149,36 @@ _CREDIT_SPLIT = re.compile(
 )
 
 
+# Letters that Unicode does not split into a plain letter and an accent.
+_PLAIN = str.maketrans({"ı": "i", "đ": "d", "ł": "l", "ø": "o"})
+
+
+def _in_key(char: str) -> bool:
+    """Return whether a character stays in a key: a letter, a digit, or a vowel sign.
+
+    A vowel sign of a script such as Devanagari, Tamil or Thai is a mark, not a
+    letter, but the word is another word without it.
+    """
+    if char.isalnum():
+        return True
+    mark = unicodedata.category(char) in ("Mn", "Mc")
+    return mark and not unicodedata.name(char, "").startswith("VARIATION SELECTOR")
+
+
 def name_key(text: str | None) -> str:
     """Return the matching key of an artist name or a title: folded case, no accents, no marks.
 
-    Letters and digits of every script stay. Every other character is a space, and
-    runs of spaces become one.
+    Letters, digits and vowel signs of every script stay (`_in_key`). An accent is
+    dropped, and a letter of `_PLAIN` becomes its plain letter. Every other character
+    is a space, and runs of spaces become one.
     """
     if not text:
         return ""
-    folded = unicodedata.normalize("NFKD", unicodedata.normalize("NFKC", text).casefold())
+    folded = unicodedata.normalize("NFKC", text).casefold().translate(_PLAIN)
     kept = "".join(
-        char if char.isalnum() else " " for char in folded if not unicodedata.combining(char)
+        char if _in_key(char) else " "
+        for char in unicodedata.normalize("NFKD", folded)
+        if not unicodedata.combining(char)
     )
     return " ".join(kept.split())
 
@@ -187,9 +206,10 @@ def _table(connection: duckdb.DuckDBPyConnection, name: str, kind: str, values: 
 
 def _keys_text() -> str:
     """Return everything that decides the content of a key cache, as one text."""
-    builders = (name_key, lead_artist, dump_keys, _discogs_keys)
+    builders = (_in_key, name_key, lead_artist, dump_keys, _discogs_keys)
+    constants = (_CREDIT_SPLIT.pattern, _CREDIT_SPLIT.flags, _HOMONYM, sorted(_PLAIN.items()))
     return "".join(inspect.getsource(part) for part in builders) + repr(
-        (_CREDIT_SPLIT.pattern, _CREDIT_SPLIT.flags, _HOMONYM, unicodedata.unidata_version)
+        (*constants, unicodedata.unidata_version)
     )
 
 
