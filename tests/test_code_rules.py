@@ -166,6 +166,48 @@ def comment_stands_in_for_a_test(path: str, text: str) -> list[str]:
     ]
 
 
+LONGEST_COMMENT = 3
+HISTORY_COMMENT = re.compile(
+    r"\b(previously|used to be|was changed|changed from|we (now|changed|added|fixed)|"
+    r"as requested|per (the )?review|claude|llm|codex|chatgpt|pull request #?\d+|"
+    r"pr ?#?\d+|issue #?\d+)\b",
+    re.IGNORECASE,
+)
+
+
+def comments(text: str) -> list[tokenize.TokenInfo]:
+    return [
+        token
+        for token in tokenize.generate_tokens(io.StringIO(text).readline)
+        if token.type == tokenize.COMMENT
+    ]
+
+
+def comment_too_long(path: str, text: str) -> list[str]:
+    lines = [token.start[0] for token in comments(text) if token.line.lstrip().startswith("#")]
+    problems, start, previous = [], None, None
+    for line in [*lines, None]:
+        if line is not None and previous is not None and line == previous + 1:
+            previous = line
+            continue
+        if start is not None and previous - start + 1 > LONGEST_COMMENT:
+            problems.append(
+                f"{path}:{start} has a comment of {previous - start + 1} lines; keep only the "
+                f"reason the code cannot show, in at most {LONGEST_COMMENT} lines"
+            )
+        start = previous = line
+    return problems
+
+
+def comment_tells_history(path: str, text: str) -> list[str]:
+    return [
+        f"{path}:{token.start[0]} has a comment about the history of the code or who wrote it; "
+        "Git and the pull request keep that, so delete the comment"
+        for token in comments(text)
+        if HISTORY_COMMENT.search(token.string)
+    ]
+
+
 ELIGIBILITY_VALUES = {"suppress_duplicate", "quarantine"}
 ELIGIBILITY_SQL = re.compile(r"(duplicate_decision|quality_status|canonical_song_id)\s*(=|<>|!=)")
 
@@ -193,6 +235,9 @@ CHECKS: list[tuple[Callable[[str, str], list[str]], str, str, str]] = [
     (bucket_named, "", "", 'ADDRESS = "gs://some-bucket/raw"'),
     (comment_stands_in_for_a_test, SRC, ".py", "x = 1  # do not change: the panel needs it\n"),
     (comment_stands_in_for_a_test, SRC, ".py", "# Workaround for the bad header row\nx = 1\n"),
+    (comment_too_long, SRC, ".py", "# One\n# two\n# three\n# four\nx = 1\n"),
+    (comment_tells_history, SRC, ".py", "x = 1  # previously 2, changed in PR 12\n"),
+    (comment_tells_history, SRC, ".py", "# Claude added this step\nx = 1\n"),
     (eligibility_rule_written_again, SRC, ".py", 'keep = frame["quality_status"] != "quarantine"'),
     (eligibility_rule_written_again, SRC, ".py", "SQL = \"WHERE duplicate_decision <> 'x'\""),
     (paragraph_hard_wrapped, "", ".md", "A paragraph that goes on\nto a second line.\n"),
@@ -303,3 +348,16 @@ def test_generated_page_is_current():
     assert on_disk == rules.render_rules_markdown(rules.load_rules()), (
         "docs/standards/rules.md is out of date. Run: python -m songs.common.rules --write"
     )
+
+
+def test_the_readme_layout_names_every_folder():
+    """The layout block of README.md names each top-level folder and each package of src/songs/."""
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    block = readme.split("## Layout", 1)[1].split("```")[1]
+    named = {line.split()[0] for line in block.splitlines() if line.strip()}
+    folders = {path.split("/")[0] + "/" for path in tracked() if "/" in path}
+    packages = {
+        "/".join(path.split("/")[:3]) + "/" for path in tracked(SRC) if path.count("/") >= 3
+    }
+    missing = sorted(f for f in folders | packages if not any(n.startswith(f) for n in named))
+    assert not missing, f"the layout block of README.md lacks {missing}"
