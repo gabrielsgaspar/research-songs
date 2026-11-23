@@ -223,7 +223,8 @@ def write_discogs(folder: Path) -> None:
         "release_tracklist": "SELECT * FROM (VALUES (100, 1, 'Sól Sól'), "
         "(100, 2, 'Morning Light (Remix)'), (200, 1, 'Sól, sól!'), (200, 2, 'Riverside'), "
         "(300, 1, 'Other Artist Song'), (300, 2, 'Night Train'), (900, 1, 'Old Song'), "
-        "(200, 3, 'A New Song'), (100, 3, 'Duet (Radio Edit)'), (200, 4, 'Another New Sng')) "
+        "(200, 3, 'A New Song'), (100, 3, 'Duet (Radio Edit)'), (200, 4, 'Another New Sng'), "
+        "(100, 4, 'Encore'), (100, 5, 'Encore (Live)')) "
         "AS t(release_id, track_index, title)",
         "releases": "SELECT * FROM (VALUES (100, 50, '1999-05-00'), (200, NULL, '1995'), "
         "(300, NULL, '2001'), (900, NULL, '1990')) AS t(release_id, master_id, released)",
@@ -270,6 +271,8 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
         song("two_artists", "Sol sol", ("a1", "a2")),
         song("held", "Sol sol", kind="held"),
         song("held_loose", "A New Song (Live)"),
+        song("longer_first", "Encore (Live)"),
+        song("shorter_wins", "Encore"),
     ]
     rows = {
         row["source_song_id"]: row for row in match_discogs(songs, country, tmp_path / "discogs")
@@ -285,6 +288,8 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
         "no_discogs_id": "out_of_scope",
         "two_artists": "out_of_scope",
         "held_loose": "held_loose_title",
+        "longer_first": "held_loose_title",
+        "shorter_wins": "exact",
     }
     assert (rows["exact"]["discogs_release_id"], rows["exact"]["year"]) == ("200", 1995)
     assert rows["exact"]["match_method"] == "dump_discogs_exact_title"
@@ -478,9 +483,9 @@ def test_gaps_counts_the_songs_held_and_the_tracks_wanted_by_year(tmp_path):
     assert found["songs_folder"] == f"lyrics/ISL/songs/{RUN}/"
     assert (found["songs"], found["held_by_year"], found["held_no_year"]) == (3, {1990: 2}, 1)
     assert (found["artists"], found["artists_no_discogs_id"]) == (2, 1)
-    assert (found["tracks_in"], found["tracks_no_title_key"], found["pairs"]) == (9, 0, 8)
-    assert (found["pairs_linked"], found["pairs_held"], found["wanted"]) == (0, 2, 6)
-    assert found["wanted_by_year"] == {1995: 3, 1997: 2, 2001: 1}
+    assert (found["tracks_in"], found["tracks_no_title_key"], found["pairs"]) == (11, 0, 9)
+    assert (found["pairs_linked"], found["pairs_held"], found["wanted"]) == (0, 2, 7)
+    assert found["wanted_by_year"] == {1995: 3, 1997: 3, 2001: 1}
     assert found["pairs_linked"] + found["pairs_held"] + found["wanted"] == found["pairs"]
 
     later = paths.country_songs_dir(data, "ISL", "20260201T000000Z")
@@ -502,8 +507,8 @@ def test_gaps_counts_the_songs_held_and_the_tracks_wanted_by_year(tmp_path):
         inputs=["lyrics/isl/"],
     )
     found = gaps(data, "ISL")
-    assert (found["pairs_linked"], found["pairs_held"], found["wanted"]) == (1, 2, 5)
-    assert found["wanted_by_year"] == {1995: 2, 1997: 2, 2001: 1}
+    assert (found["pairs_linked"], found["pairs_held"], found["wanted"]) == (1, 2, 6)
+    assert found["wanted_by_year"] == {1995: 2, 1997: 3, 2001: 1}
 
 
 def test_import_dump_uses_the_newest_catalog_folder_and_names_it_as_an_input(tmp_path):

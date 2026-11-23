@@ -616,7 +616,9 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]
     finds by name. For such an id the row has `artist_by_name` true, and its match
     method ends with `BY_NAME`. A song is `held_loose_title` when the country holds a
     song of the same roster artist with the same loose title key, with or without a
-    link, so one track never gets a second song under a longer title.
+    link, so one track never gets a second song under a longer title. The same holds
+    inside one dump: of the songs of an artist with one loose title key, only the song
+    with the shortest title is added, and the first one when two are equally short.
     """
     resolved = discogs_ids(country.resolve(), discogs.resolve())
     discogs_of, by_name = resolved["ids"], resolved["by_name"]
@@ -656,10 +658,12 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]
             indexes[artist] = (by_exact, by_loose, sorted(by_loose))
         return indexes[artist]
 
-    rows = []
-    for song in candidates:
-        row = {"source_song_id": song["source_song_id"], "discogs_class": "out_of_scope"}
-        rows.append(row)
+    rows = [
+        {"source_song_id": song["source_song_id"], "discogs_class": "out_of_scope"}
+        for song in candidates
+    ]
+    added_loose: set[tuple] = set()
+    for song, row in sorted(zip(candidates, rows), key=lambda pair: len(pair[0]["song_name"])):
         artist = artist_of.get(song["source_song_id"])
         if artist is None:
             continue
@@ -686,8 +690,15 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]
             continue
         title, release_id, index, year = _earliest(hits)
         method, fixed = DISCOGS_METHODS.get(kind, ("dump_discogs_close_title", None))
+        held_key = (song["roster_artist_ids"][0], loose)
+        if (release_id, index) in taken:
+            kind = "track_taken"
+        elif kind in ADDED and held_key in added_loose:
+            kind = "held_loose_title"
+        elif kind in ADDED:
+            added_loose.add(held_key)
         row |= {
-            "discogs_class": "track_taken" if (release_id, index) in taken else kind,
+            "discogs_class": kind,
             "discogs_release_id": str(release_id),
             "discogs_track_index": str(index),
             "discogs_title": title,
