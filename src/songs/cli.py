@@ -300,6 +300,67 @@ def lyrics_import_dump(
             typer.echo(f"not added, {name}: {value}")
 
 
+@lyrics_app.command("collect")
+def lyrics_collect(
+    source: Annotated[str, typer.Argument(help="Source key of the site, lower case.")],
+    iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
+    delay: Annotated[
+        float, typer.Option(help="Seconds between requests. The command uses 2 or more.")
+    ] = 2.0,
+    artist_limit: Annotated[
+        int | None, typer.Option("--artist-limit", help="Read at most this number of artists.")
+    ] = None,
+    song_limit: Annotated[
+        int | None, typer.Option("--song-limit", help="Read at most this number of songs.")
+    ] = None,
+    reason: Annotated[
+        str | None,
+        typer.Option(help="Why the site is collected again. Needed to repeat a complete run."),
+    ] = None,
+) -> None:
+    """Collect the pages of a lyric site into a new folder raw/<source>/<YYYYMMDD>/.
+
+    The command sends requests to the site. It obeys robots.txt, waits between requests
+    and writes one run record with the route live. It adds no song to the country: build
+    the dump and import it with the two commands that it prints.
+    """
+    from songs.common.paths import data_root
+    from songs.stage_00_ingest import dainutekstai
+
+    code = _country(iso3)
+    if source != dainutekstai.SOURCE:
+        typer.echo(
+            f"error: no collector for {source}; one exists for {dainutekstai.SOURCE}", err=True
+        )
+        raise typer.Exit(1)
+    typer.echo(run_records.format_history(run_records.read_run_records(code)))
+    data = data_root()
+    try:
+        result = dainutekstai.collect(
+            data,
+            code,
+            delay=delay,
+            artist_limit=artist_limit,
+            song_limit=song_limit,
+            reason=reason,
+        )
+    except (FileExistsError, ValueError) as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    typer.echo(
+        f"{result['state']}: {result['requests_sent']} pages requested, "
+        f"{result['songs_written']} songs written"
+    )
+    for name, number in result["songs_left_out"].items():
+        typer.echo(f"left out, {name}: {number}")
+    for gap in result["known_gaps"]:
+        typer.echo(f"note: {gap}")
+    if result["path"]:
+        typer.echo(f"wrote {result['path']}. Next:")
+        typer.echo(f'uv run songs dumps build {source} "{data / result["path"]}" {result["path"]}')
+        typer.echo(f"uv run songs lyrics import-dump {source} {code}")
+
+
 @lyrics_app.command("import-scores")
 def lyrics_import_scores(
     iso3: Annotated[str, typer.Argument(help="Country code, three capital letters.")],
