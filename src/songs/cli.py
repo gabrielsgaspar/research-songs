@@ -623,6 +623,32 @@ def data_pull(
         typer.echo(f"{folder or parent}: {outcome}")
 
 
+@data_app.command("sync")
+def data_sync(
+    write: Annotated[
+        bool, typer.Option("--write", help="Upload. Without it, the command only prints.")
+    ] = False,
+) -> None:
+    """Print a Markdown report of the complete local folders that the bucket lacks.
+
+    With --write, the command uploads them, inputs first. A songs folder goes only when
+    its run record is in countries/<ISO3>/runs/ and the country has no open campaign.
+    The report also names each derived folder that is stale. The command builds nothing.
+    """
+    from songs.common import sync
+    from songs.common.paths import data_root
+
+    storage, transport, bucket = _bucket()
+    try:
+        result = sync.sync(transport, bucket, data_root(), write=write)
+    except storage.StorageError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    typer.echo(sync.report(data_root(), result, write=write))
+    if result["missing_inputs"]:
+        raise typer.Exit(1)
+
+
 @lyrics_app.command("publish")
 def lyrics_publish(countries: CountriesArgument) -> None:
     """Upload the songs folders of the countries that the bucket lacks, with their inputs.
