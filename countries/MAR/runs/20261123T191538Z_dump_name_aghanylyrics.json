@@ -1,0 +1,30 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/aghanylyrics/20261121/",
+  "campaign_id": "20261123T191441Z",
+  "code_commit": "6bf7c1ec3310d8aa9e3947f17ee9dff9fe11b799",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-23T19:15:39Z",
+  "iso3": "MAR",
+  "known_gaps": [],
+  "limits_hit": {},
+  "notes": "The survey estimates 1 songs to add. 1 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 1,
+  "run_id": "20261123T191538Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 1,
+  "songs_attempted": 94,
+  "songs_rejected": {
+    "no_track": 1,
+    "not_roster": 92
+  },
+  "source": "aghanylyrics",
+  "started_utc": "2026-11-23T19:15:38Z",
+  "state": "complete"
+}
