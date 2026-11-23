@@ -55,6 +55,10 @@ its master.
 
 The new folder holds the earlier rows and the added songs, each with one link to
 its Discogs track. Its run record counts every other song of the dump by class.
+A song that the import would add is left out as `artist_other_country` when the
+newest complete table of artist countries (`clean/quality/artist_country/<YYYYMMDD>/`,
+written by `songs.stage_10_clean.artist_country`) gives its roster artist the
+decision `other_country` for the country. With no such table, no song is left out.
 The import reads the lyric text of the added songs from the dump; lyric text never
 goes to Git, to a manifest or to a run record.
 
@@ -115,6 +119,8 @@ _HOMONYM = r"\s\(\d+\)$"
 _ARTIST_ORDER = ("held_loose_title", "already_linked", "exact", "loose", "close", "no_track")
 # The Discogs classes that the import adds, and the route of its run.
 ADDED = ("exact", "loose")
+# The class of a song that the import would add, of a roster artist of another country.
+ARTIST_OTHER_COUNTRY = "artist_other_country"
 ROUTE = "dump_name"
 # A person's decision on each close match: accept adds the song, reject leaves it out.
 REVIEWED_FILE = Path("resources") / "lyrics" / "reviewed_close_matches.csv"
@@ -932,6 +938,29 @@ def load_reviewed_matches(root: Path | None = None) -> dict[tuple[str, ...], str
     return decisions
 
 
+def other_country_artists(data: Path, iso3: str) -> tuple[Path | None, frozenset[str]]:
+    """Return the roster artists of a country that belong to another country.
+
+    The first value is the newest complete table of artist countries of the data
+    folder, and the second holds each `artist_id` with the decision `other_country`
+    for `iso3`. With no such table, return None and no artist.
+    """
+    folder = paths.latest_clean_artist_country_dir(data)
+    if folder is None:
+        return None, frozenset()
+    with duckdb.connect() as connection:
+        rows = (
+            schemas.read_table(schemas.ARTIST_COUNTRY, folder, connection)
+            .filter(
+                f"country_iso3 = '{paths.check_iso3(iso3)}' "
+                f"AND decision = '{schemas.OTHER_COUNTRY}'"
+            )
+            .project("artist_id")
+            .fetchall()
+        )
+    return folder, frozenset(row[0] for row in rows)
+
+
 def would_add(
     dump: Path,
     country: Path,
@@ -939,14 +968,17 @@ def would_add(
     source: str,
     iso3: str,
     reviewed: dict[tuple[str, ...], str] | None = None,
+    other_country: frozenset[str] = frozenset(),
 ) -> dict:
     """Decide which songs of the dump folder `dump` an import adds to the folder `country`.
 
     A song is added when `match_discogs` gives it the class `exact` or `loose`, or
     the class `close` and `REVIEWED_FILE` accepts it for the same Discogs track.
-    `reviewed` replaces the decisions of that file (for tests). Return the songs
-    read (`songs_in`), the chosen songs with their Discogs rows (`chosen`), every
-    other song counted by class (`rejected`), and the chosen songs counted by
+    `reviewed` replaces the decisions of that file (for tests). Such a song of a roster
+    artist in `other_country` (`other_country_artists`) is not added; it gets the class
+    `ARTIST_OTHER_COUNTRY`. Return the songs read (`songs_in`), the chosen songs with
+    their Discogs rows (`chosen`), every other song counted by class (`rejected`), and
+    the chosen songs counted by
     year (`by_year`, and `no_year` for a song with no year). `by_name` counts the
     chosen songs whose artist got its Discogs id by name (`discogs_ids`). The chosen
     songs and the rejected songs add up to `songs_in`.
@@ -959,11 +991,13 @@ def would_add(
         key = (source, iso3, row["source_song_id"], row.get("discogs_release_id", ""))
         return reviewed.get((*key, row.get("discogs_track_index", ""))) == "accept"
 
-    chosen = {
-        row["source_song_id"]: row
-        for row in found
-        if row["discogs_class"] in ADDED or (row["discogs_class"] == "close" and accepted(row))
-    }
+    def adds(row: dict) -> bool:
+        return row["discogs_class"] in ADDED or (row["discogs_class"] == "close" and accepted(row))
+
+    for row in found:
+        if row.get("roster_artist_id") in other_country and adds(row):
+            row["discogs_class"] = ARTIST_OTHER_COUNTRY
+    chosen = {row["source_song_id"]: row for row in found if adds(row)}
     close_accepted = sum(row["discogs_class"] == "close" for row in chosen.values())
     discogs_counts = Counter(row["discogs_class"] for row in found)
     discogs_counts["close"] -= close_accepted
@@ -979,6 +1013,7 @@ def would_add(
             **{name: result["counts"][name] for name in CLASSES if name != "roster_new"},
             **result["left_out"],
             **{name: discogs_counts[name] for name in DISCOGS_CLASSES if name not in ADDED},
+            ARTIST_OTHER_COUNTRY: discogs_counts[ARTIST_OTHER_COUNTRY],
         },
         "by_year": dict(sorted(years.items())),
         "no_year": no_year,
@@ -1020,6 +1055,7 @@ def survey(data: Path, iso3: str, sources: list[str], discogs: Path | None = Non
     if country is None:
         raise FileNotFoundError(f"no songs folder of {iso3}")
     discogs = _discogs_folder(data, discogs)
+    _, other_country = other_country_artists(data, iso3)
     rows = []
     for source in sources:
         dump = paths.latest_clean_dump_dir(data, source)
@@ -1027,7 +1063,7 @@ def survey(data: Path, iso3: str, sources: list[str], discogs: Path | None = Non
             rows.append({"source": source, "dump": None})
             continue
         start = time.monotonic()
-        plan = would_add(dump, country, discogs, source, iso3)
+        plan = would_add(dump, country, discogs, source, iso3, other_country=other_country)
         rows.append(
             {
                 "source": source,
@@ -1151,8 +1187,10 @@ def import_dump(
     folder is an input of the manifest. For a folder outside the data folder,
     `discogs_label` names it in the manifest notes. `reviewed` replaces the
     decisions of `REVIEWED_FILE` (for tests). Every other song of the dump is
-    counted in the run record with its class. A second run of the same dump for the
-    same country needs `repeat_reason`; the reason goes to the notes of the record.
+    counted in the run record with its class. The manifest notes name the table of
+    artist countries that the import read (`other_country_artists`). A second run of
+    the same dump for the same country needs `repeat_reason`; the reason goes to the
+    notes of the record.
     """
     paths.check_iso3(iso3)
     dump = paths.latest_clean_dump_dir(data, source)
@@ -1179,7 +1217,8 @@ def import_dump(
             raise ValueError(f"{earlier} is not older than this run ({record.run_id})")
         manifests.read_manifest(dump)
         manifests.read_manifest(earlier)
-        plan = would_add(dump, earlier, discogs, source, iso3, reviewed)
+        table, other_country = other_country_artists(data, iso3)
+        plan = would_add(dump, earlier, discogs, source, iso3, reviewed, other_country)
         rejected, close_accepted, by_name = (
             plan["rejected"],
             plan["close_accepted"],
@@ -1205,6 +1244,7 @@ def import_dump(
             notes=(
                 f"Songs of {bulk_file} that match a Discogs track of their roster artist. "
                 f"Discogs tables: {discogs_label}."
+                + (f" Artist countries: {paths.data_relative(data, table)}." if table else "")
             ),
         )
         record.rows_added = counts["songs_added"]

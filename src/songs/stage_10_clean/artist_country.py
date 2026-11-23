@@ -44,13 +44,13 @@ import duckdb
 import pandas as pd
 
 from songs.common import manifests, paths, schemas
+from songs.common.schemas import KEEP, OTHER_COUNTRY
 from songs.stage_00_ingest import dump_match
 
 WORDS_FILE = Path("resources") / "lyrics" / "country_words.csv"
 WORD_COLUMNS = ("country_iso3", "word")
 PROFILE_CHARS = 160
 MAX_HOME_SHARE = 0.2
-KEEP, OTHER_COUNTRY = "keep", "other_country"
 # Country -> more countries that count as its home in the profile text.
 ALSO_HOME = {"DDR": ("DEU",)}
 # Phrases with a country word that say nothing about the country of an artist.

@@ -462,6 +462,9 @@ ANALYSIS_SONGS = Table(
     ),
 )
 
+# The decisions of `artist_country.parquet`.
+KEEP, OTHER_COUNTRY = "keep", "other_country"
+
 ARTIST_COUNTRY = Table(
     file="artist_country.parquet",
     folder=ARTIST_COUNTRY_FOLDER,
@@ -502,7 +505,7 @@ ARTIST_COUNTRY = Table(
             "decision",
             "string",
             True,
-            "`other_country` when the artist belongs to another country, or `keep`",
+            f"`{OTHER_COUNTRY}` when the artist belongs to another country, or `{KEEP}`",
         ),
     ),
 )
