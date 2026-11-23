@@ -143,6 +143,26 @@ What the commands do:
 
 A roster artist with no Discogs id gets one when exactly one Discogs artist has the same name key. No other roster artist may hold that id or have that key. The songs of the artist still need a title match with a track of that artist. The links of these songs carry a match method that ends with `_artist_by_name`.
 
+## Collect a lyric site
+
+A site with no dump on this disk is collected first. One collector exists, for `dainutekstai` (LTU). Only a person starts it, because it sends requests to the site:
+
+```bash
+uv run songs lyrics collect dainutekstai LTU
+```
+
+What the command does:
+
+- It reads `robots.txt` first. It sends no request that `robots.txt` disallows, and it counts each page that it skips.
+- It waits 2 seconds or more between requests. `--delay` gives a longer wait. The delay of the source file and the crawl delay of `robots.txt` apply when they are longer.
+- It sends each request one time. It stops at HTTP 401, 403 or 429, and after 3 failed requests in a row.
+- `--artist-limit` and `--song-limit` make a short first run.
+- It writes `raw/dainutekstai/<YYYYMMDD>/` in the data folder: one lyric table and a manifest. It never writes over a folder, so a second run on the same day is refused.
+- It writes one run record with the route `live`: the delay, the limits, the pages requested, the songs written, and the songs left out by reason. `rows_added` is 0, because the command adds no song to the country.
+- A run that ends early keeps its songs. Its folder has a file `STOP`, so the dump is marked as incomplete.
+
+The command prints the two commands that follow it. `songs dumps build` turns the raw folder into a dump, and `songs lyrics import-dump` adds the songs that match a Discogs track.
+
 ## Run records
 
 A collection command writes one record when it ends, also when it fails. Nobody writes or edits a record by hand, and a record is never overwritten. The file name is `<run id>_<route>_<source>.json`.
