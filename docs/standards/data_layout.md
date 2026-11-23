@@ -341,7 +341,7 @@ These are renamed: the old `provider` becomes `source`, `tag_re_release` becomes
 
 ## Score tables
 
-`songs lyrics import-scores <ISO3>` writes these tables from the old topic scores. Only a person starts a scoring run. The command calls no model.
+Two commands write these tables: `songs lyrics import-scores <ISO3>` from the old topic scores, and `songs score collect <run id>` from a scoring run. Only a person starts a scoring run.
 
 <!-- generated:score_tables:start -->
 <!-- Do not edit by hand. To rebuild, run: python -m songs.common.schemas --write -->
@@ -393,6 +393,17 @@ Folder: `lyrics/<ISO3>/scores/<run id>/`. Key: `song_id`.
 - The command reads neither `values.parquet` nor `value_flags.parquet`. This project keeps topic scores only.
 - The command writes no collection run record. A score import is not a collection run.
 - The first manifest input is `lyrics/<iso3>/scores/`, relative to the old data folder. The second input is the songs folder.
+
+### How a scoring run fills the tables
+
+A scoring run sends songs to the model and the prompt of `prompts/scoring/` through the Batch API (`src/songs/stage_30_topics/scoring_run.py`). It has three commands.
+
+- `songs score prepare <ISO3> ... --max-requests N` reads the newest songs folder and the newest scores folder of each country. It takes the songs that `eligible_songs.classify` lets in and that have no score from this prompt and model for their current `lyrics_sha256`. Songs of one country with the same `lyrics_sha256` and decade share one request. A song in a run that is not collected yet is not taken again. The command writes the batch file and prints the counts and a cost estimate in US dollars. It sends nothing.
+- `songs score submit <run id> --max-usd X` uploads the batch file and starts the batch. It stops when the estimate is above `--max-usd`, when the prompt changed after `prepare`, and when the run was submitted before. It asks the person to type the run id. The key is the environment variable `OPENAI_API_KEY`.
+- `songs score collect <run id>` reads the answers when the batch has ended. It checks each answer against the answer format: the model, the field order, and a score from 0 to 100 for each topic, or `unknown` for each topic when the text is not song lyrics. It writes a new folder `lyrics/<ISO3>/scores/<run id>/` for each country with a valid answer. The folder holds every score of the newest scores folder, with the new scores in place of older scores of the same `song_id`. `status` is `complete` and `scored_utc` is the time of the collection.
+- The manifest counts `scores` (rows written), `scores_carried` (rows from the earlier folder), `requests`, `answers`, the songs by `text_kind` (`songs_song_lyrics`, `songs_non_song`, `songs_uncertain`), and the requests with no valid answer by reason: `no_answer`, `request_error`, `http_error`, `not_completed`, `bad_answer`. A song with no valid answer gets no score, and the next `prepare` takes it again. The inputs are the songs folder that `prepare` read and the earlier scores folder.
+- The working files of a run are in `staging/scoring/<run id>/`: the batch file (with lyric text), the request of each song, the plan, the batch ids, and the answers. They are never uploaded. `collected.json` marks a run as collected.
+- The cost estimate counts about 4 bytes of request for each input token and 1,000 output tokens for each request, at the batch price, with no cache reads. It is an upper estimate.
 
 The old data also has value scores. This project scores topics only (decision 0005).
 

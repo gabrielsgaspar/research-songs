@@ -56,7 +56,7 @@ flowchart LR
 | Country folders, run records and campaigns | Working: `songs lyrics history`, `songs lyrics plan`, `songs lyrics campaign`, and [coverage by country](docs/status/coverage.md) |
 | Lyric collection and matching | Working for lyric dumps: `songs lyrics survey`, `songs lyrics import-dump`, and the campaign ladder (`songs lyrics campaign run`) in [countries/README.md](countries/README.md). Collection from web sources is not in this repository |
 | Country-year panel | Working in part: `songs panel countries`. Democracy, populism, banking crises and the corpus counts wait for their inputs |
-| Topic scoring | Working in part: `songs lyrics import-scores` imports the scores of the old pipeline. No command scores new songs yet |
+| Topic scoring | Working: `songs score prepare`, `songs score submit` (a person only) and `songs score collect` score new songs through the Batch API. `songs lyrics import-scores` imports the scores of the old pipeline |
 | Figure and topic standards | Working: [figures](docs/standards/figures.md), [topics](docs/standards/topics.md) |
 | Analysis release | Working: `songs analysis release` writes `analysis/<YYYYMMDD>/` from the eligible songs. No estimation code and no figure for the paper yet |
 | Agent workflows on GitHub (planner, builder, reviewer) | Workflow files are in `.github/workflows/`. A person starts each stage with a label |
@@ -68,7 +68,7 @@ src/songs/                    importable, tested code, in these packages:
 src/songs/common/             paths, schemas, manifests, storage, run and campaign records, rules
 src/songs/stage_00_ingest/    collect lyrics and match them to the catalog: dumps, the campaign ladder, imports
 src/songs/stage_10_clean/     clean the external data: GDP, democracy, fertility, population, crises
-src/songs/stage_30_topics/    topic ids, the scoring prompt, and the import of topic scores
+src/songs/stage_30_topics/    topic ids, the scoring prompt, the scoring run, and the import of old scores
 src/songs/stage_50_analysis/  eligible songs, the country-year panel and the analysis release
 tests/            tests and small fixtures
 docs/decisions/   why the project works the way it does

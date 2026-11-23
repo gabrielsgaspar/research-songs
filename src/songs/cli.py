@@ -30,6 +30,12 @@ data_app = typer.Typer(
     no_args_is_help=True, help="Copy version folders between the data folder and the bucket."
 )
 app.add_typer(data_app, name="data")
+
+score_app = typer.Typer(
+    no_args_is_help=True,
+    help="Topic scoring through the Batch API: prepare, submit (a person only) and collect.",
+)
+app.add_typer(score_app, name="score")
 FolderArgument = Annotated[
     str,
     typer.Argument(
@@ -930,3 +936,63 @@ def campaign_report(
         typer.echo(f"error: {error}", err=True)
         raise typer.Exit(1) from error
     typer.echo(text)
+
+
+@score_app.command("prepare")
+def score_prepare(
+    countries: Annotated[list[str], typer.Argument(help="Country codes, three letters each.")],
+    max_requests: Annotated[
+        int, typer.Option(help="Most requests in the batch. The other songs wait.")
+    ] = 1_000,
+) -> None:
+    """Write the batch file of the eligible songs that have no current score. Sends nothing."""
+    from songs.common.paths import data_root
+    from songs.stage_30_topics import scoring_run
+
+    plan = scoring_run.prepare(data_root(), countries, max_requests)
+    for code, counts in plan["countries"].items():
+        typer.echo(
+            f"{code}: "
+            + ", ".join(f"{key} {value}" for key, value in counts.items() if isinstance(value, int))
+        )
+    estimate = plan["estimate"]
+    if not plan["requests"]:
+        typer.echo("nothing to score; no run was written")
+        return
+    typer.echo(
+        f"run {plan['run_id']}: {plan['requests']} requests, about {estimate['usd']} USD "
+        f"({estimate['input_tokens']} input and {estimate['output_tokens']} output tokens)"
+    )
+
+
+@score_app.command("submit")
+def score_submit(
+    run_id: Annotated[str, typer.Argument(help="Run id that `songs score prepare` printed.")],
+    max_usd: Annotated[float, typer.Option(help="Stop when the estimate is above this.")],
+) -> None:
+    """Upload the batch file of a prepared run and start the batch. This costs money."""
+    from songs.common.paths import data_root
+    from songs.stage_30_topics import scoring_run
+
+    plan = scoring_run.read_plan(data_root(), run_id)
+    typer.echo(f"run {run_id}: {plan['requests']} requests, about {plan['estimate']['usd']} USD")
+    if typer.prompt("Type the run id to send the batch", default="") != run_id:
+        raise typer.Exit(1)
+    batch = scoring_run.submit(data_root(), run_id, max_usd)
+    typer.echo(f"started batch {batch['batch_id']}")
+
+
+@score_app.command("collect")
+def score_collect(
+    run_id: Annotated[str, typer.Argument(help="Run id of a submitted run.")],
+) -> None:
+    """Read the answers of a submitted run and write one scores folder for each country."""
+    from songs.common.paths import data_root
+    from songs.stage_30_topics import scoring_run
+
+    result = scoring_run.collect(data_root(), run_id)
+    typer.echo(f"batch {result['status']}")
+    for folder in result["written"]:
+        typer.echo(f"wrote {folder}")
+    for code, counts in result.get("counts", {}).items():
+        typer.echo(f"{code}: " + ", ".join(f"{key} {value}" for key, value in counts.items()))
