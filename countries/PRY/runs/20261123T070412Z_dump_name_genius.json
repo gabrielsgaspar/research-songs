@@ -1,0 +1,33 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/genius/20261120/",
+  "campaign_id": "20261123T070349Z",
+  "code_commit": "a51e039229762fbc6298769c5ea492090bf3f7d2",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-23T07:04:16Z",
+  "iso3": "PRY",
+  "known_gaps": [],
+  "limits_hit": {},
+  "notes": "The survey estimates 2 songs to add.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 2,
+  "run_id": "20261123T070412Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 2,
+  "songs_attempted": 5053001,
+  "songs_rejected": {
+    "held": 22,
+    "no_title_key": 707,
+    "no_track": 36,
+    "not_roster": 5052223,
+    "same_title": 11
+  },
+  "source": "genius",
+  "started_utc": "2026-11-23T07:04:12Z",
+  "state": "complete"
+}

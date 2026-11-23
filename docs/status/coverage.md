@@ -137,9 +137,9 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [MEX](../../countries/MEX/) | 2 | 2026-11-21 | old_layout | old_pipeline | 62722 |
 | [MKD](../../countries/MKD/) | 2 | 2026-11-21 | old_layout | old_pipeline | 1085 |
 | [MLI](../../countries/MLI/) | 2 | 2026-11-21 | old_layout | old_pipeline | 883 |
-| [MLT](../../countries/MLT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 343 |
+| [MLT](../../countries/MLT/) | 4 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline | 433 |
 | [MMR](../../countries/MMR/) | 2 | 2026-11-21 | old_layout | old_pipeline | 16 |
-| [MNE](../../countries/MNE/) | 2 | 2026-11-21 | old_layout | old_pipeline | 941 |
+| [MNE](../../countries/MNE/) | 7 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline, tekstomanija, tekstovi, tekstovipesama | 1103 |
 | [MNG](../../countries/MNG/) | 2 | 2026-11-21 | old_layout | old_pipeline | 181 |
 | [MOZ](../../countries/MOZ/) | 2 | 2026-11-21 | old_layout | old_pipeline | 220 |
 | [MRT](../../countries/MRT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 21 |
@@ -170,7 +170,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [PRI](../../countries/PRI/) | 2 | 2026-11-21 | old_layout | old_pipeline | 26404 |
 | [PRK](../../countries/PRK/) | 2 | 2026-11-21 | old_layout | old_pipeline | 53 |
 | [PRT](../../countries/PRT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 22556 |
-| [PRY](../../countries/PRY/) | 2 | 2026-11-21 | old_layout | old_pipeline | 563 |
+| [PRY](../../countries/PRY/) | 5 | 2026-11-23 | dump_name, old_layout | genius, lrclib, musica, old_pipeline | 678 |
 | [PSE](../../countries/PSE/) | 2 | 2026-11-21 | old_layout | old_pipeline | 1283 |
 | [QAT](../../countries/QAT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 502 |
 | [REU](../../countries/REU/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
@@ -213,7 +213,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [TZA](../../countries/TZA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 3540 |
 | [UGA](../../countries/UGA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 958 |
 | [UKR](../../countries/UKR/) | 2 | 2026-11-21 | old_layout | old_pipeline | 16569 |
-| [URY](../../countries/URY/) | 2 | 2026-11-21 | old_layout | old_pipeline | 5442 |
+| [URY](../../countries/URY/) | 6 | 2026-11-23 | dump_name, old_layout | genius, lrclib, musica, old_pipeline, todotango | 8058 |
 | [USA](../../countries/USA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 1149227 |
 | [UZB](../../countries/UZB/) | 2 | 2026-11-21 | old_layout | old_pipeline | 283 |
 | [VAT](../../countries/VAT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
