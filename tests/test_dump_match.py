@@ -138,6 +138,12 @@ def test_name_key_folds_case_accents_and_marks():
     assert name_key("Sól, sól!") == "sol sol"
     assert name_key("Þór & Æsa") == "þor æsa"
     assert name_key(None) == "" and name_key("...") == ""
+    # Letters with no accent to drop get their plain letter.
+    assert name_key("Işık Đàm Łódź Sørensen") == "isik dam lodz sorensen"
+    # A vowel sign stays in its word, so two words with other vowels have two keys.
+    assert name_key("कीर") == "कीर"
+    assert name_key("की") != name_key("का")
+    assert name_key("Night ❤️") == "night"
 
 
 def test_each_dump_song_counts_once_in_one_class(tmp_path):
