@@ -22,7 +22,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -450,7 +450,14 @@ def pull_newest(
 
 
 def publish(
-    transport: Transport, bucket: str, data: Path, parents: list[str], echo: Echo | None = None
+    transport: Transport,
+    bucket: str,
+    data: Path,
+    parents: list[str],
+    echo: Echo | None = None,
+    *,
+    held: Collection[str] = (),
+    write: bool = True,
 ) -> dict[str, list]:
     """Upload each local complete version folder under `parents` that the bucket lacks.
 
@@ -463,6 +470,10 @@ def publish(
     for that reason: the bucket never gets a folder that names an input it does not
     hold. An input that is no version folder (a path of the old data folder) does not
     stop the upload.
+
+    A folder in `held` that the bucket lacks is not uploaded, and a folder that needs it
+    is in `skipped`. With `write` false, nothing is uploaded: `uploaded` then lists the
+    folders that a run with `write` would upload.
 
     Return five lists: `uploaded` (in upload order), `present` (the bucket had the
     manifest), `missing_inputs` (one (folder, input) for each absent version folder),
@@ -489,6 +500,9 @@ def publish(
         if in_bucket(folder + paths.MANIFEST_NAME):
             result["present"].append(folder)
             return True
+        if folder in held:
+            sent[folder] = False
+            return False
         ready = True
         for item in _local_manifest(data, folder).inputs:
             name = item.rstrip("/")
@@ -503,10 +517,13 @@ def publish(
             result["skipped"].append(folder)
             sent[folder] = False
             return False
-        upload_folder(transport, bucket, data, folder, echo)
-        problems = check_folder(transport, bucket, folder)
-        if problems:
-            raise StorageError(f"{folder} does not match its manifest after the upload: {problems}")
+        if write:
+            upload_folder(transport, bucket, data, folder, echo)
+            problems = check_folder(transport, bucket, folder)
+            if problems:
+                raise StorageError(
+                    f"{folder} does not match its manifest after the upload: {problems}"
+                )
         result["uploaded"].append(folder)
         return True
 
