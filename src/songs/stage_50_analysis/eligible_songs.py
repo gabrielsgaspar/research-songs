@@ -233,6 +233,27 @@ def _load(
     return loaded
 
 
+def load_rule(
+    connection: duckdb.DuckDBPyConnection,
+    data: Path,
+    *,
+    exceptions: Path | None = None,
+    suspect: Path | None = None,
+    quarantine: Path | None = None,
+    excluded_artists: Path | None = None,
+    artist_countries: Path | None = None,
+) -> tuple[list[NamedGroup], dict[str, duckdb.DuckDBPyRelation]]:
+    """Return the exceptions and the lists that `classify` takes, read into `connection`.
+
+    Each file defaults to the tracked file in `resources/lyrics/`, and the list of songs
+    in quarantine to the newest complete quarantine folder of `data`.
+    """
+    lists = load_hash_lists(
+        connection, suspect, quarantine or quarantine_file(data)
+    ) | load_artist_lists(connection, excluded_artists, artist_countries)
+    return load_exceptions(exceptions), lists
+
+
 def classify(
     songs: duckdb.DuckDBPyRelation,
     exceptions: list[NamedGroup],

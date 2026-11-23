@@ -15,7 +15,7 @@ Topic labels and definitions are not in this folder. They are in [`resources/top
 
 The answer format is built in code from the topic ids: a song is lyrics with 38 scores, or it is not lyrics and every topic is `unknown`.
 
-The code that sends requests and stores scores is not in this repository yet.
+`songs.stage_30_topics.scoring_run` sends the requests and stores the scores (`songs score prepare`, `submit` and `collect`). The data layout standard describes the run.
 
 ## The fixed values
 
