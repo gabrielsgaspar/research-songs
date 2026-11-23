@@ -26,9 +26,9 @@ artist:
     in   <Discogs folder>   release_artists, release_track_artists, release_tracklist,
                             releases, masters (Parquet, the column names of the Discogs dump)
 
-Only a song with exactly one roster artist, and a Discogs id for that artist, is
-in scope. The tracks of an artist are the tracks of the releases that credit it,
-and the tracks that credit it. The first title step that finds a track wins:
+Only a song with a roster artist that has a Discogs id is in scope. The tracks of
+an artist are the tracks of the releases that credit it, and the tracks that
+credit it. The first title step that finds a track wins:
 
     exact           the title keys are the same
     loose           the keys are the same without parts in brackets and featuring parts
@@ -38,6 +38,9 @@ A song is `held_loose_title` when the country holds a song of the same roster
 artist with the same loose key. A song is `already_linked` when a track with its
 title already has a link in the
 country, and `track_taken` when an earlier song of the dump took the same track.
+A song with more than one roster artist is looked up for each of them. A held or
+linked title of one of them stops the song. If not, the artist with the best title
+step gets the song, and the first artist by id when two are equal.
 Of the releases that hold the track, the one with the earliest year wins, then the
 lowest release id. The year is the earlier of the release date and the year of
 its master.
@@ -104,6 +107,8 @@ CLOSE_CUTOFF = 0.9
 BY_NAME = "_artist_by_name"
 # Discogs marks the second artist of one name as "Name (2)".
 _HOMONYM = r"\s\(\d+\)$"
+# The order in which the result of one roster artist wins over that of another.
+_ARTIST_ORDER = ("held_loose_title", "already_linked", "exact", "loose", "close", "no_track")
 # The Discogs classes that the import adds, and the route of its run.
 ADDED = ("exact", "loose")
 ROUTE = "dump_name"
@@ -688,6 +693,8 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path, iso3: str) ->
     link, so one track never gets a second song under a longer title. The same holds
     inside one dump: of the songs of an artist with one loose title key, only the song
     with the shortest title is added, and the first one when two are equally short.
+    A song with more than one roster artist is looked up for each artist that has a
+    Discogs id; `_ARTIST_ORDER` chooses the artist, and `roster_artist_id` names it.
     """
     resolved = discogs_ids(country.resolve(), discogs.resolve(), iso3)
     discogs_of, by_name = resolved["ids"], resolved["by_name"]
@@ -707,12 +714,13 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path, iso3: str) ->
             .fetchall()
         )
     candidates = [song for song in songs if song["class"] == "roster_new"]
-    artist_of = {
-        song["source_song_id"]: int(discogs_of[song["roster_artist_ids"][0]])
+    wanted = {
+        int(discogs_of[artist_id])
         for song in candidates
-        if len(song["roster_artist_ids"]) == 1 and discogs_of.get(song["roster_artist_ids"][0])
+        for artist_id in song["roster_artist_ids"]
+        if discogs_of.get(artist_id)
     }
-    tracks = _discogs_tracks(discogs, sorted(set(artist_of.values())))
+    tracks = _discogs_tracks(discogs, sorted(wanted))
     taken: set[tuple] = set()
     indexes: dict[int, tuple[dict, dict, list[str]]] = {}
 
@@ -733,17 +741,13 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path, iso3: str) ->
     ]
     added_loose: set[tuple] = set()
     pairs = zip(candidates, rows, strict=True)
-    for song, row in sorted(pairs, key=lambda pair: len(pair[0]["song_name"])):
-        artist = artist_of.get(song["source_song_id"])
-        if artist is None:
-            continue
-        row["discogs_artist_id"] = str(artist)
-        named = song["roster_artist_ids"][0] in by_name
-        by_exact, by_loose, keys = tracks_of(artist)
+
+    def look(song: dict, artist_id: str) -> tuple:
+        """Return the class, the hits and the close score of a song for one roster artist."""
+        by_exact, by_loose, keys = tracks_of(int(discogs_of[artist_id]))
         exact, loose = name_key(song["song_name"]), loose_key(song["song_name"])
-        if (song["roster_artist_ids"][0], loose) in held_loose:
-            row["discogs_class"] = "held_loose_title"
-            continue
+        if (artist_id, loose) in held_loose:
+            return "held_loose_title", [], None
         kind, hits, score = "exact", by_exact.get(exact, []), None
         if not hits:
             kind, hits = "loose", by_loose.get(loose, [])
@@ -753,14 +757,28 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path, iso3: str) ->
             if close:
                 score = round(100 * difflib.SequenceMatcher(None, loose, close[0]).ratio(), 1)
         if not hits:
-            row["discogs_class"] = "no_track"
-            continue
+            return "no_track", [], None
         if any((str(hit[1]), str(hit[2])) in linked for hit in hits):
-            row["discogs_class"] = "already_linked"
+            return "already_linked", [], None
+        return kind, hits, score
+
+    for song, row in sorted(pairs, key=lambda pair: len(pair[0]["song_name"])):
+        looked = [
+            (artist_id, *look(song, artist_id))
+            for artist_id in song["roster_artist_ids"]
+            if discogs_of.get(artist_id)
+        ]
+        if not looked:
             continue
+        artist_id, kind, hits, score = min(looked, key=lambda one: _ARTIST_ORDER.index(one[1]))
+        row |= {"discogs_artist_id": str(discogs_of[artist_id]), "roster_artist_id": artist_id}
+        if not hits:
+            row["discogs_class"] = kind
+            continue
+        named = artist_id in by_name
         title, release_id, index, year = _earliest(hits)
         method, fixed = DISCOGS_METHODS.get(kind, ("dump_discogs_close_title", None))
-        held_key = (song["roster_artist_ids"][0], loose)
+        held_key = (artist_id, loose_key(song["song_name"]))
         if (release_id, index) in taken:
             kind = "track_taken"
         elif kind in ADDED and held_key in added_loose:
@@ -805,7 +823,8 @@ def _added_frames(
         )
     song_rows, link_rows = [], []
     for song_id, url, title, lyrics, sha, language in dumped:
-        match, artist_id = chosen[song_id], songs[song_id]["roster_artist_ids"][0]
+        match = chosen[song_id]
+        artist_id = match["roster_artist_id"]
         roster_name, discogs_id, tag = roster[artist_id]
         key = "dp_" + hashlib.sha256(f"{source}/{song_id}".encode()).hexdigest()[:20]
         shared = {
