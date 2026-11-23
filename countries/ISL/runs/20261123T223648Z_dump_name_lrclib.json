@@ -1,0 +1,42 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 146,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/lrclib/20261120/",
+  "campaign_id": "20261123T223648Z",
+  "code_commit": "e51556cada0dae78e5a886874374068ee712e1c4",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-23T22:37:18Z",
+  "iso3": "ISL",
+  "known_gaps": [
+    "close: 40 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 898 songs to add. 717 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 898,
+  "run_id": "20261123T223648Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 898,
+  "songs_attempted": 29206785,
+  "songs_rejected": {
+    "already_linked": 111,
+    "close": 40,
+    "held": 9732,
+    "held_loose_title": 562,
+    "no_artist_key": 1121,
+    "no_title_key": 843,
+    "no_track": 3748,
+    "not_roster": 29173919,
+    "out_of_scope": 7340,
+    "same_title": 5075,
+    "short_lyrics": 58,
+    "track_taken": 3338
+  },
+  "source": "lrclib",
+  "started_utc": "2026-11-23T22:36:48Z",
+  "state": "complete"
+}

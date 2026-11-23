@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261123T224238Z",
+  "closed_utc": "2026-11-23T22:43:52Z",
+  "iso3": "HUN",
+  "next_time": "lrclib added 1624 and genius 858; dalszoveg and zeneszoveg have no dump. Most adds after 2000. Build Hungarian lyric dumps and clear close matches (115) before the next campaign.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 24154
+}
