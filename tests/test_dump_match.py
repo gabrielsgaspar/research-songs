@@ -275,7 +275,8 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
         song("shorter_wins", "Encore"),
     ]
     rows = {
-        row["source_song_id"]: row for row in match_discogs(songs, country, tmp_path / "discogs")
+        row["source_song_id"]: row
+        for row in match_discogs(songs, country, tmp_path / "discogs", "ISL")
     }
     assert {key: row["discogs_class"] for key, row in rows.items()} == {
         "exact": "exact",
@@ -631,13 +632,14 @@ def write_named_discogs(folder: Path, artists: str) -> None:
     folder.mkdir(parents=True)
     tables = {
         "artists": f"SELECT * FROM (VALUES {artists}) AS t(artist_id, name)",
-        "release_artists": "SELECT * FROM (VALUES (500, 21)) AS t(release_id, artist_id)",
+        "release_artists": "SELECT * FROM (VALUES (500, 21), (600, 81)) "
+        "AS t(release_id, artist_id)",
         "release_track_artists": "SELECT * FROM (VALUES (500, 1, 21)) "
         "AS t(release_id, track_index, artist_id) WHERE false",
         "release_tracklist": "SELECT * FROM (VALUES (500, 1, 'Night Song')) "
         "AS t(release_id, track_index, title)",
-        "releases": "SELECT * FROM (VALUES (500, NULL::BIGINT, '1988')) "
-        "AS t(release_id, master_id, released)",
+        "releases": "SELECT * FROM (VALUES (500, NULL::BIGINT, '1988', 'Iceland'), "
+        "(600, NULL::BIGINT, '1990', 'US')) AS t(release_id, master_id, released, country)",
         "masters": "SELECT * FROM (VALUES (50, 1997)) AS t(master_id, year) WHERE false",
     }
     for name, sql in tables.items():
@@ -660,6 +662,7 @@ def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_pat
             artist("a8", "..."),
             artist("a9", "Νίκος"),
             artist("a10", "Strasse"),
+            artist("a11", "Hanna"),
         ],
     )
     # The two Greek names differ only in case and in the final sigma, and the two German
@@ -667,10 +670,11 @@ def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_pat
     write_named_discogs(
         tmp_path / "discogs",
         "(21, 'BÁRA (2)'), (31, 'Disa'), (32, 'Dísa (2)'), (11, 'Elin'), (41, 'Gunnar'), "
-        "(51, 'Bára Band'), (61, 'Νίκος'), (62, 'ΝΙΚΟΣ'), (71, 'Straße'), (72, 'STRASSE')",
+        "(51, 'Bára Band'), (61, 'Νίκος'), (62, 'ΝΙΚΟΣ'), (71, 'Straße'), (72, 'STRASSE'), "
+        "(81, 'Hanna')",
     )
 
-    found = dump_match.discogs_ids(country, tmp_path / "discogs")
+    found = dump_match.discogs_ids(country, tmp_path / "discogs", "ISL")
 
     # One artist with the name, with or without the homonym mark: the id is used.
     assert found["by_name"] == {"a2": (21, "BÁRA (2)")}
@@ -678,17 +682,25 @@ def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_pat
     # Two homonyms block. An id of another roster artist blocks, and so does a shared name.
     assert (found["more_than_one"], found["id_taken"]) == (3, 3)
     assert (found["none_found"], found["no_name_key"]) == (1, 1)
+    # The only Discogs artist with the name has no release in Iceland: the id is not used.
+    assert found["no_home_release"] == 1
+    assert dump_match.discogs_ids(country, tmp_path / "discogs", "USA")["by_name"] == {
+        "a11": (81, "Hanna")
+    }
 
     # For a catalog folder of the data folder, the keys of Discogs are built one time in cache/.
     catalog = paths.clean_catalog_dir(tmp_path / "data", "discogs", "20260101")
     write_named_discogs(catalog, "(21, 'BÁRA (2)'), (61, 'Νίκος'), (62, 'ΝΙΚΟΣ')")
-    assert dump_match.discogs_ids(country, catalog)["by_name"] == {"a2": (21, "BÁRA (2)")}
+    assert dump_match.discogs_ids(country, catalog, "ISL")["by_name"] == {"a2": (21, "BÁRA (2)")}
     cache = tmp_path / "data" / "cache" / "discogs_keys" / "discogs" / "20260101"
     assert [path.name for path in cache.iterdir()] == [dump_match._keys_version()]
 
     write(schemas.COUNTRY_ARTISTS, tmp_path / "other", [artist("a2", "Bára")])
     write_discogs(tmp_path / "no_artists_table")
-    assert dump_match.discogs_ids(tmp_path / "other", tmp_path / "no_artists_table")["ids"] == {}
+    assert (
+        dump_match.discogs_ids(tmp_path / "other", tmp_path / "no_artists_table", "ISL")["ids"]
+        == {}
+    )
 
 
 def test_a_song_of_an_artist_found_by_name_is_added_with_its_own_method_and_count(tmp_path):
@@ -732,3 +744,12 @@ def test_a_song_of_an_artist_found_by_name_is_added_with_its_own_method_and_coun
     assert duckdb.sql(
         f"SELECT discogs_artist_id FROM '{(out / 'artists.parquet').as_posix()}'"
     ).fetchall() == [(None,)]
+
+
+def test_the_home_countries_of_discogs_include_the_states_that_no_longer_exist():
+    home = dump_match.load_home_countries()
+
+    assert home["ISL"] == {"Iceland"}
+    assert {"Ukraine", "USSR"} <= home["UKR"] and "USSR" in home["SUN"]
+    assert {"Serbia", "Yugoslavia", "Serbia and Montenegro"} <= home["SRB"]
+    assert "Europe" not in set().union(*home.values())
