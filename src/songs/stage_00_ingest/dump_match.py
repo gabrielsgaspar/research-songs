@@ -663,7 +663,8 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]
         for song in candidates
     ]
     added_loose: set[tuple] = set()
-    for song, row in sorted(zip(candidates, rows), key=lambda pair: len(pair[0]["song_name"])):
+    pairs = zip(candidates, rows, strict=True)
+    for song, row in sorted(pairs, key=lambda pair: len(pair[0]["song_name"])):
         artist = artist_of.get(song["source_song_id"])
         if artist is None:
             continue
