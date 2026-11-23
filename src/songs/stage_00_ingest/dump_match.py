@@ -12,13 +12,15 @@ Each song of the dump counts once, in the first class that it fits:
 
 A song of the dump is one `source_song_id`; it can have more than one credited
 artist. The artists of a song are its credited names and the other names of
-those artists in `artist_names.parquet`. When no artist of a song gives
+those artists in `artist_names.parquet`. A song that is not held, and whose lyric
+text has fewer than `MIN_LYRICS_CHARS` characters, is left out as `short_lyrics`:
+such a text is a placeholder, not a lyric. When no artist of a song gives
 same_title or roster_new, the lead part of each credited name is tried next
 (`lead_artist`: "A feat. B", "A x B" and "A & B" give A). A featured part alone
 never makes a match. `matched_by_split` counts the songs that the lead parts
 matched. A song that is not held, and whose title
 or whose every artist name has no key, is left out with its reason. The
-comparison reads no lyric text, only its hash.
+comparison reads no lyric text, only its hash and its length.
 
 `match_discogs` then looks for each roster_new song in the Discogs tracks of its
 artist:
@@ -83,7 +85,9 @@ from songs.stage_00_ingest import review_workbooks
 
 CLASSES = ("held", "same_title", "roster_new", "not_roster")
 NEW_CLASSES = CLASSES[1:]
-LEFT_OUT = ("no_title_key", "no_artist_key")
+LEFT_OUT = ("no_title_key", "no_artist_key", "short_lyrics")
+# A lyric text with fewer characters, without the spaces around it, is a placeholder.
+MIN_LYRICS_CHARS = 30
 DISCOGS_CLASSES = (
     "exact",
     "loose",
@@ -225,7 +229,9 @@ def dump_keys(dump: Path) -> Path:
         credits.parquet     one row per credit: song id, source artist id, artist key, lead key
         alias_keys.parquet  one row per source artist id and key of one of its names
         songs.parquet       one row per song: artist, title and hash of its first credit,
-                            its title key, and `has_key` (an artist name of it has a key)
+                            its title key, `has_key` (an artist name of it has a key), and
+                            `lyrics_chars` (the length of its lyric text without the spaces
+                            around it)
     """
     dump = dump.resolve()
     if dump.parent.parent.name != "dumps" or dump.parents[2].name != "clean":
@@ -275,6 +281,7 @@ def dump_keys(dump: Path) -> Path:
             "arg_min(d.song_name, d.credit_position) AS song_name, "
             "arg_min(d.lyrics_sha256, d.credit_position) AS lyrics_sha256, "
             "arg_min(tk.key, d.credit_position) AS title_key, "
+            "arg_min(coalesce(length(trim(d.lyrics)), 0), d.credit_position) AS lyrics_chars, "
             "bool_or(nk.key <> '' OR k.source_artist_id IS NOT NULL) AS has_key "
             "FROM d JOIN nk ON d.artist_name = nk.name JOIN tk ON d.song_name = tk.title "
             "LEFT JOIN (SELECT DISTINCT source_artist_id FROM alias) AS k "
@@ -389,13 +396,15 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
                 "song_name": row[2],
                 "held": row[3],
                 "title": row[4],
+                "chars": row[5],
                 "keys": set(),
                 "leads": set(),
             }
             for row in connection.sql(
                 f"""
                 SELECT source_song_id, artist_name, song_name,
-                    lyrics_sha256 IN (SELECT lyrics_sha256 FROM held_hashes), title_key
+                    lyrics_sha256 IN (SELECT lyrics_sha256 FROM held_hashes), title_key,
+                    lyrics_chars
                 FROM {songs_file} SEMI JOIN candidates USING (source_song_id)
                 ORDER BY source_song_id
                 """
@@ -422,7 +431,7 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
 
     counts = Counter({name: 0 for name in CLASSES})
     counts["not_roster"] = not_roster
-    left_out = Counter({"no_title_key": no_title, "no_artist_key": no_artist})
+    left_out = Counter({"no_title_key": no_title, "no_artist_key": no_artist, "short_lyrics": 0})
     ambiguous = split = 0
     rows = []
     for song_id, song in songs.items():
@@ -437,6 +446,9 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
             continue
         elif not keys:
             left_out["no_artist_key"] += 1
+            continue
+        elif song["chars"] < MIN_LYRICS_CHARS:
+            left_out["short_lyrics"] += 1
             continue
         elif any((key, title) in held_pairs for key in keys):
             kind = "same_title"

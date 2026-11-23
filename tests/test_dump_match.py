@@ -47,7 +47,7 @@ def credit(song_id: str, artist: str, title: str, sha: str, position: int = 1, *
         "source_artist_id": over.get("artist_id", artist),
         "credit_position": position,
         "song_name": title,
-        "lyrics": "invented line",
+        "lyrics": over.get("lyrics", "an invented line of text for the tests"),
         "lyrics_sha256": sha,
     }
 
@@ -154,7 +154,7 @@ def test_each_dump_song_counts_once_in_one_class(tmp_path):
     assert result["credit_rows_in"] == 9
     assert result["songs_in"] == 8
     assert result["counts"] == {"held": 1, "same_title": 1, "roster_new": 3, "not_roster": 1}
-    assert result["left_out"] == {"no_title_key": 1, "no_artist_key": 1}
+    assert result["left_out"] == {"no_title_key": 1, "no_artist_key": 1, "short_lyrics": 0}
     assert result["songs_out"] + sum(result["left_out"].values()) == result["songs_in"]
     assert result["examples"]["not_roster"] == [("Unknown Band", "Far Away")]
 
@@ -301,6 +301,28 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
     assert rows["close"]["discogs_title"] == "Riverside"
     assert rows["close"]["match_score"] == 94.1
     assert rows["track_credit"]["discogs_release_id"] == "300"
+
+
+def test_a_song_with_a_short_lyric_text_is_left_out(tmp_path):
+    _, country = make_folders(tmp_path)
+    dump = paths.clean_dump_dir(tmp_path, "short", "20260102")
+    write(schemas.DUMP_ARTIST_NAMES, dump, [])
+    write(
+        schemas.DUMP_SONGS,
+        dump,
+        [
+            credit("d3", "Anna Jons", "A New Song", "h3", lyrics="  no text yet  "),
+            credit("d9", "Anna Jons", "Second Song", "h9"),
+            credit("d1", "Someone Else", "Any Title", "h1", lyrics="held"),
+        ],
+    )
+
+    result = match_dump(dump, country)
+
+    # A held song stays held: its hash decides, not its length.
+    assert (result["counts"]["roster_new"], result["counts"]["held"]) == (1, 1)
+    assert result["left_out"]["short_lyrics"] == 1
+    assert result["songs_out"] + sum(result["left_out"].values()) == result["songs_in"]
 
 
 def test_loose_key_drops_brackets_and_featuring():
@@ -564,7 +586,7 @@ def test_songs_with_no_roster_artist_are_counted_and_have_no_row(tmp_path):
     assert [row["source_song_id"] for row in result["songs"]] == ["n5"]
     assert (result["credit_rows_in"], result["songs_in"]) == (6, 5)
     assert result["counts"] == {"held": 0, "same_title": 0, "roster_new": 1, "not_roster": 2}
-    assert result["left_out"] == {"no_title_key": 1, "no_artist_key": 1}
+    assert result["left_out"] == {"no_title_key": 1, "no_artist_key": 1, "short_lyrics": 0}
     assert result["songs_out"] + sum(result["left_out"].values()) == result["songs_in"]
     assert result["examples"]["not_roster"] == [
         ("Other Band", "Far Away"),
