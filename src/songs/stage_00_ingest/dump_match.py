@@ -34,7 +34,9 @@ and the tracks that credit it. The first title step that finds a track wins:
     loose           the keys are the same without parts in brackets and featuring parts
     close           the loose keys are similar (`CLOSE_CUTOFF` or more); a person reviews these
 
-A song is `already_linked` when a track with its title already has a link in the
+A song is `held_loose_title` when the country holds a song of the same roster
+artist with the same loose key. A song is `already_linked` when a track with its
+title already has a link in the
 country, and `track_taken` when an earlier song of the dump took the same track.
 Of the releases that hold the track, the one with the earliest year wins, then the
 lowest release id. The year is the earlier of the release date and the year of
@@ -50,12 +52,24 @@ The new folder holds the earlier rows and the added songs, each with one link to
 its Discogs track. Its run record counts every other song of the dump by class.
 The import reads the lyric text of the added songs from the dump; lyric text never
 goes to Git, to a manifest or to a run record.
+
+`would_add` decides which songs an import adds; `import_dump` and `survey` both use
+it. `survey` and `gaps` only read:
+
+    survey   for each source, what an import of its newest dump would add, by year
+    gaps     for each year, the songs that the country holds and the Discogs tracks of
+             its roster artists that have no song yet
 """
 
 import csv
 import difflib
+import functools
 import hashlib
+import inspect
 import re
+import shutil
+import tempfile
+import time
 import unicodedata
 from collections import Counter
 from pathlib import Path
@@ -74,6 +88,7 @@ DISCOGS_CLASSES = (
     "exact",
     "loose",
     "close",
+    "held_loose_title",
     "already_linked",
     "track_taken",
     "no_track",
@@ -85,6 +100,10 @@ DISCOGS_METHODS = {
     "loose": ("dump_discogs_loose_title", 95.0),
 }
 CLOSE_CUTOFF = 0.9
+# Added to the match method of a song whose artist got its Discogs id by name.
+BY_NAME = "_artist_by_name"
+# Discogs marks the second artist of one name as "Name (2)".
+_HOMONYM = r"\s\(\d+\)$"
 # The Discogs classes that the import adds, and the route of its run.
 ADDED = ("exact", "loose")
 ROUTE = "dump_name"
@@ -146,73 +165,272 @@ def _rows(relation: duckdb.DuckDBPyRelation, columns: str) -> list[tuple]:
     return relation.project(columns).fetchall()
 
 
+def _table(connection: duckdb.DuckDBPyConnection, name: str, kind: str, values: list) -> None:
+    """Create the one-column table `name` (column `value`) from a list, which can be empty."""
+    frame = pd.DataFrame({"value": pd.Series(values, dtype=kind)})
+    connection.register("frame", frame)
+    connection.execute(f"CREATE TEMP TABLE {name} AS SELECT value FROM frame")
+    connection.unregister("frame")
+
+
+def _keys_text() -> str:
+    """Return everything that decides the content of a key cache, as one text."""
+    builders = (name_key, lead_artist, dump_keys, _discogs_keys)
+    return "".join(inspect.getsource(part) for part in builders) + repr(
+        (_CREDIT_SPLIT.pattern, _CREDIT_SPLIT.flags, _HOMONYM, unicodedata.unidata_version)
+    )
+
+
+def _keys_version() -> str:
+    """Return a short hash of `_keys_text`; a change of the key code gives a new key cache."""
+    return hashlib.sha256(_keys_text().encode()).hexdigest()[:12]
+
+
+def _work_folder(parent: Path) -> Path:
+    """Return a new work folder in a cache folder, and remove the work folders of stopped builds.
+
+    A work folder that is older than one day belongs to no build that still runs.
+    """
+    parent.mkdir(parents=True, exist_ok=True)
+    for old in parent.glob("work-*"):
+        if time.time() - old.stat().st_mtime > 86400:
+            shutil.rmtree(old, ignore_errors=True)
+    return Path(tempfile.mkdtemp(dir=parent, prefix="work-"))
+
+
+def _keep(work: Path, folder: Path) -> None:
+    """Give a finished work folder its final name. A stopped build leaves no such name."""
+    try:
+        work.rename(folder)
+    except OSError:
+        # Another process built the same folder first; its result is the same.
+        shutil.rmtree(work, ignore_errors=True)
+        if not folder.is_dir():
+            raise
+
+
+def _quoted(path: Path) -> str:
+    return "'" + path.as_posix().replace("'", "''") + "'"
+
+
+def dump_keys(dump: Path) -> Path:
+    """Return the folder of the key tables of a dump, and build it when it is absent.
+
+    The dump stores no key, so the keys of `name_key` and `lead_artist` are computed
+    one time for each dump folder and kept under `cache/dump_keys/` of the data folder,
+    which is never uploaded. The folder name is `_keys_version`, so a change of the
+    key code gives a new folder. The build writes to a work folder and renames it
+    last. DuckDB reads and writes Parquet in streams, so no table is held in Python.
+
+        credits.parquet     one row per credit: song id, source artist id, artist key, lead key
+        alias_keys.parquet  one row per source artist id and key of one of its names
+        songs.parquet       one row per song: artist, title and hash of its first credit,
+                            its title key, and `has_key` (an artist name of it has a key)
+    """
+    dump = dump.resolve()
+    if dump.parent.parent.name != "dumps" or dump.parents[2].name != "clean":
+        raise ValueError(f"{dump} is not a clean/dumps/<source>/<YYYYMMDD>/ folder")
+    folder = dump.parents[3] / "cache" / "dump_keys" / dump.parent.name / dump.name
+    folder = folder / _keys_version()
+    if folder.is_dir():
+        return folder
+    work = _work_folder(folder.parent)
+    with duckdb.connect() as connection:
+        connection.execute(f"SET temp_directory = {_quoted(work / 'spill')}")
+        connection.execute("SET memory_limit = '4GB'")
+        connection.execute("SET preserve_insertion_order = false")
+        connection.create_function(
+            "name_key", name_key, ["VARCHAR"], "VARCHAR", null_handling="special"
+        )
+        connection.create_function(
+            "lead_key",
+            lambda name: name_key(lead_artist(name)),
+            ["VARCHAR"],
+            "VARCHAR",
+            null_handling="special",
+        )
+        schemas.read_table(schemas.DUMP_SONGS, dump, connection).create_view("d")
+        schemas.read_table(schemas.DUMP_ARTIST_NAMES, dump, connection).create_view("a")
+        connection.execute(
+            "CREATE TEMP TABLE nk AS SELECT name, name_key(name) AS key, lead_key(name) AS lead "
+            "FROM (SELECT artist_name AS name FROM d UNION SELECT artist_name FROM a)"
+        )
+        connection.execute(
+            "CREATE TEMP TABLE tk AS SELECT title, name_key(title) AS key "
+            "FROM (SELECT DISTINCT song_name AS title FROM d)"
+        )
+        connection.execute(
+            "CREATE TEMP TABLE alias AS SELECT DISTINCT a.source_artist_id, nk.key "
+            "FROM a JOIN nk ON a.artist_name = nk.name WHERE nk.key <> ''"
+        )
+        connection.execute(f"COPY alias TO {_quoted(work / 'alias_keys.parquet')}")
+        connection.execute(
+            "COPY (SELECT d.source_song_id, d.source_artist_id, nk.key AS artist_key, "
+            "nk.lead AS lead_key FROM d JOIN nk ON d.artist_name = nk.name) "
+            f"TO {_quoted(work / 'credits.parquet')}"
+        )
+        connection.execute(
+            "COPY (SELECT d.source_song_id, "
+            "arg_min(d.artist_name, d.credit_position) AS artist_name, "
+            "arg_min(d.song_name, d.credit_position) AS song_name, "
+            "arg_min(d.lyrics_sha256, d.credit_position) AS lyrics_sha256, "
+            "arg_min(tk.key, d.credit_position) AS title_key, "
+            "bool_or(nk.key <> '' OR k.source_artist_id IS NOT NULL) AS has_key "
+            "FROM d JOIN nk ON d.artist_name = nk.name JOIN tk ON d.song_name = tk.title "
+            "LEFT JOIN (SELECT DISTINCT source_artist_id FROM alias) AS k "
+            "ON d.source_artist_id = k.source_artist_id GROUP BY d.source_song_id) "
+            f"TO {_quoted(work / 'songs.parquet')}"
+        )
+    shutil.rmtree(work / "spill", ignore_errors=True)
+    _keep(work, folder)
+    return folder
+
+
+def _discogs_keys(connection: duckdb.DuckDBPyConnection, discogs: Path) -> str:
+    """Return the SQL source of the Discogs artists with their name key: artist_id, name, key.
+
+    The key is `name_key` of the name without the homonym mark, computed by `name_key`
+    itself, so two Discogs names with one key are always seen as two. For a
+    `clean/catalog/<source>/<YYYYMMDD>/` folder the table is built one time under
+    `cache/discogs_keys/` of the data folder, like `dump_keys`. For any other folder
+    it is computed in the query.
+    """
+    connection.create_function(
+        "bare_key",
+        lambda name: name_key(re.sub(_HOMONYM, "", name or "")),
+        ["VARCHAR"],
+        "VARCHAR",
+        null_handling="special",
+    )
+    select = (
+        f"SELECT artist_id, name, bare_key(name) AS key FROM {_quoted(discogs / 'artists.parquet')}"
+    )
+    if discogs.parent.parent.name != "catalog" or discogs.parents[2].name != "clean":
+        return f"({select})"
+    folder = discogs.parents[3] / "cache" / "discogs_keys" / discogs.parent.name / discogs.name
+    folder = folder / _keys_version()
+    if not folder.is_dir():
+        work = _work_folder(folder.parent)
+        connection.execute(f"COPY ({select}) TO {_quoted(work / 'artist_keys.parquet')}")
+        _keep(work, folder)
+    return _quoted(folder / "artist_keys.parquet")
+
+
 def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
     """Classify each song of the dump folder `dump` against the country folder `country`.
 
     Return the counts, the songs left out with their reasons, up to `examples`
-    artist and title pairs of each new class, and one row for each classified song.
+    artist and title pairs of each new class, and one row for each candidate song.
+    A candidate is a song whose hash the country holds, or with an artist key or a
+    lead key that is the key of a roster artist or of the artist of a held song.
+    Only the candidates are read into Python. Every other song is counted in SQL as
+    not_roster, no_title_key or no_artist_key, and has no row in `songs`.
     """
+    keys = dump_keys(dump)
+    credits_file, alias_file, songs_file = (
+        _quoted(keys / name) for name in ("credits.parquet", "alias_keys.parquet", "songs.parquet")
+    )
     with duckdb.connect() as connection:
-        credits = _rows(
-            schemas.read_table(schemas.DUMP_SONGS, dump, connection),
-            "source_song_id, credit_position, artist_name, source_artist_id, song_name, "
-            "lyrics_sha256",
+        held_songs = schemas.read_table(
+            schemas.COUNTRY_SONGS, country, connection, fill_absent=True
         )
-        aliases = _rows(
-            schemas.read_table(schemas.DUMP_ARTIST_NAMES, dump, connection),
-            "source_artist_id, artist_name",
-        )
-        held = _rows(
-            schemas.read_table(schemas.COUNTRY_SONGS, country, connection, fill_absent=True),
-            "artist_id, artist_name, song_name, lyrics_sha256",
-        )
+        held = _rows(held_songs, "artist_id, artist_name, song_name")
+        held_songs.project("lyrics_sha256").create_view("held_hashes")
         roster = _rows(
             schemas.read_table(schemas.COUNTRY_ARTISTS, country, connection),
             "artist_id, artist_name",
         )
-
-    names_of: dict[str, set[str]] = {}
-    for artist_id, name in aliases:
-        names_of.setdefault(artist_id, set()).add(name_key(name))
-    roster_ids: dict[str, set[str]] = {}
-    roster_name: dict[str, str] = {}
-    for artist_id, name in roster:
-        roster_ids.setdefault(name_key(name), set()).add(artist_id)
-        roster_name[artist_id] = name
-    held_hashes = {row[3] for row in held}
-    held_pairs = set()
-    for artist_id, artist, title, _ in held:
-        for key in (name_key(artist), name_key(roster_name.get(artist_id))):
-            held_pairs.add((key, name_key(title)))
-
-    songs: dict[str, dict] = {}
-    for song_id, _position, artist, artist_id, title, sha in sorted(credits):
-        song = songs.setdefault(
-            song_id,
-            {
-                "artist_name": artist,
-                "song_name": title,
-                "lyrics_sha256": sha,
+        roster_ids: dict[str, set[str]] = {}
+        roster_name: dict[str, str] = {}
+        for artist_id, name in roster:
+            roster_ids.setdefault(name_key(name), set()).add(artist_id)
+            roster_name[artist_id] = name
+        held_pairs = set()
+        for artist_id, artist, title in held:
+            for key in (name_key(artist), name_key(roster_name.get(artist_id))):
+                held_pairs.add((key, name_key(title)))
+        wanted = sorted(({*roster_ids} | {key for key, _ in held_pairs}) - {""})
+        _table(connection, "wanted", "str", wanted)
+        connection.execute(
+            f"""
+            CREATE TEMP TABLE candidates AS
+            SELECT source_song_id FROM {credits_file}
+            WHERE artist_key IN (SELECT value FROM wanted)
+                OR lead_key IN (SELECT value FROM wanted)
+                OR source_artist_id IN (
+                    SELECT source_artist_id FROM {alias_file}
+                    WHERE key IN (SELECT value FROM wanted)
+                )
+            UNION
+            SELECT source_song_id FROM {songs_file}
+            WHERE lyrics_sha256 IN (SELECT lyrics_sha256 FROM held_hashes)
+            """
+        )
+        credit_rows_in = connection.sql(f"SELECT count(*) FROM {credits_file}").fetchall()[0][0]
+        songs_in, no_title, no_artist, not_roster = connection.sql(
+            f"""
+            SELECT (SELECT count(*) FROM {songs_file}),
+                coalesce(count_if(title_key = ''), 0),
+                coalesce(count_if(title_key <> '' AND NOT has_key), 0),
+                coalesce(count_if(title_key <> '' AND has_key), 0)
+            FROM {songs_file} ANTI JOIN candidates USING (source_song_id)
+            """
+        ).fetchall()[0]
+        other_examples = connection.sql(
+            f"""
+            SELECT artist_name, song_name
+            FROM {songs_file} ANTI JOIN candidates USING (source_song_id)
+            WHERE title_key <> '' AND has_key ORDER BY ALL LIMIT {int(examples)}
+            """
+        ).fetchall()
+        songs = {
+            row[0]: {
+                "artist_name": row[1],
+                "song_name": row[2],
+                "held": row[3],
+                "title": row[4],
                 "keys": set(),
                 "leads": set(),
-            },
+            }
+            for row in connection.sql(
+                f"""
+                SELECT source_song_id, artist_name, song_name,
+                    lyrics_sha256 IN (SELECT lyrics_sha256 FROM held_hashes), title_key
+                FROM {songs_file} SEMI JOIN candidates USING (source_song_id)
+                ORDER BY source_song_id
+                """
+            ).fetchall()
+        }
+        connection.execute(
+            f"CREATE TEMP TABLE chosen AS SELECT * FROM {credits_file} "
+            "SEMI JOIN candidates USING (source_song_id)"
         )
-        song["keys"] |= {name_key(artist), *names_of.get(artist_id, ())}
-        song["leads"].add(name_key(lead_artist(artist)))
+        names_of: dict[str, set[str]] = {}
+        for artist_id, key in connection.sql(
+            f"SELECT source_artist_id, key FROM {alias_file} "
+            "WHERE source_artist_id IN (SELECT source_artist_id FROM chosen)"
+        ).fetchall():
+            names_of.setdefault(artist_id, set()).add(key)
+        for song_id, artist_id, artist_key, lead_key in connection.sql(
+            "SELECT source_song_id, source_artist_id, artist_key, lead_key FROM chosen"
+        ).fetchall():
+            songs[song_id]["keys"] |= {artist_key, *names_of.get(artist_id, ())}
+            songs[song_id]["leads"].add(lead_key)
 
     def on_roster(keys: set[str]) -> set[str]:
         return set().union(*(roster_ids.get(key, set()) for key in keys))
 
     counts = Counter({name: 0 for name in CLASSES})
-    left_out = Counter({name: 0 for name in LEFT_OUT})
+    counts["not_roster"] = not_roster
+    left_out = Counter({"no_title_key": no_title, "no_artist_key": no_artist})
     ambiguous = split = 0
     rows = []
     for song_id, song in songs.items():
         keys = song["keys"] - {""}
         leads = song["leads"] - keys - {""}
-        title = name_key(song["song_name"])
+        title = song["title"]
         artist_ids: set[str] = set()
-        if song["lyrics_sha256"] in held_hashes:
+        if song["held"]:
             kind = "held"
         elif not title:
             left_out["no_title_key"] += 1
@@ -241,22 +459,20 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
                 "roster_artist_ids": sorted(artist_ids),
             }
         )
+    pairs = {
+        kind: sorted((row["artist_name"], row["song_name"]) for row in rows if row["class"] == kind)
+        for kind in NEW_CLASSES
+    }
+    pairs["not_roster"] = sorted(pairs["not_roster"] + other_examples)
     return {
-        "credit_rows_in": len(credits),
-        "songs_in": len(songs),
+        "credit_rows_in": credit_rows_in,
+        "songs_in": songs_in,
         "songs_out": sum(counts.values()),
         "counts": dict(counts),
         "left_out": dict(left_out),
         "roster_new_more_than_one_artist": ambiguous,
         "matched_by_split": split,
-        "examples": {
-            kind: [
-                (row["artist_name"], row["song_name"])
-                for row in sorted(rows, key=lambda row: (row["artist_name"], row["song_name"]))
-                if row["class"] == kind
-            ][:examples]
-            for kind in NEW_CLASSES
-        },
+        "examples": {kind: pairs[kind][:examples] for kind in NEW_CLASSES},
         "songs": rows,
     }
 
@@ -278,30 +494,54 @@ def _discogs_tracks(discogs: Path, artist_ids: list[int]) -> dict[int, list[tupl
     table = {
         name: (discogs / f"{name}.parquet").as_posix().replace("'", "''") for name in DISCOGS_TABLES
     }
+    if not artist_ids:
+        return {}
     with duckdb.connect() as connection:
-        connection.execute("CREATE TABLE ids (artist_id BIGINT)")
-        connection.executemany("INSERT INTO ids VALUES (?)", [[number] for number in artist_ids])
+        # Each step is a small table, so DuckDB never builds a hash table of a whole Discogs table.
+        connection.execute("SET memory_limit = '4GB'")
+        _table(connection, "ids", "int64", artist_ids)
+        connection.execute(
+            f"""
+            CREATE TEMP TABLE credited AS
+            SELECT artist_id, release_id, CAST(NULL AS BIGINT) AS track_index
+            FROM '{table["release_artists"]}' WHERE artist_id IN (SELECT value FROM ids)
+            UNION
+            SELECT artist_id, release_id, track_index
+            FROM '{table["release_track_artists"]}' WHERE artist_id IN (SELECT value FROM ids)
+            """
+        )
+        connection.execute(
+            f"""
+            CREATE TEMP TABLE found AS
+            SELECT DISTINCT c.artist_id, t.title, t.release_id, t.track_index
+            FROM '{table["release_tracklist"]}' AS t
+            JOIN credited AS c
+                ON t.release_id = c.release_id
+                AND (c.track_index IS NULL OR c.track_index = t.track_index)
+            WHERE t.title IS NOT NULL
+                AND t.release_id IN (SELECT release_id FROM credited)
+            """
+        )
+        connection.execute(
+            f"""
+            CREATE TEMP TABLE dated AS
+            SELECT release_id, released, master_id FROM '{table["releases"]}'
+            WHERE release_id IN (SELECT release_id FROM found)
+            """
+        )
         rows = connection.sql(
             f"""
-            WITH credited AS (
-                SELECT artist_id, release_id, CAST(NULL AS BIGINT) AS track_index
-                FROM '{table["release_artists"]}' JOIN ids USING (artist_id)
-                UNION
-                SELECT artist_id, release_id, track_index
-                FROM '{table["release_track_artists"]}' JOIN ids USING (artist_id)
-            )
-            SELECT DISTINCT c.artist_id, t.title, t.release_id, t.track_index,
+            SELECT f.artist_id, f.title, f.release_id, f.track_index,
                 least(
                     nullif(TRY_CAST(left(r.released, 4) AS INTEGER), 0),
                     nullif(CAST(m.year AS INTEGER), 0)
                 ) AS year
-            FROM credited AS c
-            JOIN '{table["release_tracklist"]}' AS t
-                ON t.release_id = c.release_id
-                AND (c.track_index IS NULL OR c.track_index = t.track_index)
-            LEFT JOIN '{table["releases"]}' AS r ON r.release_id = t.release_id
-            LEFT JOIN '{table["masters"]}' AS m ON m.master_id = r.master_id
-            WHERE t.title IS NOT NULL
+            FROM found AS f
+            LEFT JOIN dated AS r ON r.release_id = f.release_id
+            LEFT JOIN (
+                SELECT master_id, year FROM '{table["masters"]}'
+                WHERE master_id IN (SELECT master_id FROM dated)
+            ) AS m ON m.master_id = r.master_id
             """
         ).fetchall()
     tracks: dict[int, list[tuple]] = {}
@@ -315,19 +555,80 @@ def _earliest(hits: list[tuple]) -> tuple:
     return min(hits, key=lambda hit: (hit[3] is None, hit[3] or 0, hit[1], hit[2]))
 
 
+@functools.lru_cache(maxsize=8)
+def discogs_ids(country: Path, discogs: Path) -> dict:
+    """Return the Discogs id of each roster artist of a country folder, also found by name.
+
+    A roster artist with no Discogs id gets the id of a Discogs artist by name when
+    three things hold: exactly one artist in `artists.parquet` of the Discogs folder
+    has the same `name_key` (without the homonym mark " (2)"), no other roster artist
+    has that id, and no other roster artist without an id has that key. The roster
+    of the folder is not changed. Return `ids` (roster artist id -> Discogs id),
+    `by_name` (roster artist id -> Discogs id and Discogs name, for the ids found by
+    name), and the roster artists that stay without an id, counted by reason:
+    `none_found`, `more_than_one`, `id_taken` and `no_name_key`. A Discogs folder
+    with no `artists.parquet` finds no id by name. A folder is write-once, so the
+    result of a folder is kept.
+    """
+    with duckdb.connect() as connection:
+        roster = _rows(
+            schemas.read_table(schemas.COUNTRY_ARTISTS, country, connection),
+            "artist_id, artist_name, discogs_artist_id",
+        )
+        ids = {artist_id: int(number) for artist_id, _, number in roster if number}
+        missing = {artist_id: name_key(name) for artist_id, name, number in roster if not number}
+        keys = sorted(set(missing.values()) - {""})
+        found: dict[str, dict[int, str]] = {}
+        if keys and (discogs / "artists.parquet").is_file():
+            _table(connection, "names", "str", keys)
+            for number, name, key in connection.sql(
+                f"SELECT artist_id, name, key FROM {_discogs_keys(connection, discogs)} "
+                "WHERE key IN (SELECT value FROM names)"
+            ).fetchall():
+                found.setdefault(key, {})[number] = name
+    result = {"by_name": {}, "none_found": 0, "more_than_one": 0, "id_taken": 0}
+    result["no_name_key"] = sum(not key for key in missing.values())
+    shared = Counter(missing.values())
+    taken = set(ids.values())
+    for artist_id, key in missing.items():
+        hits = found.get(key, {})
+        if not key:
+            continue
+        if not hits:
+            result["none_found"] += 1
+        elif len(hits) > 1:
+            result["more_than_one"] += 1
+        elif shared[key] > 1 or next(iter(hits)) in taken:
+            result["id_taken"] += 1
+        else:
+            result["by_name"][artist_id] = next(iter(hits.items()))
+    result["ids"] = ids | {artist_id: pair[0] for artist_id, pair in result["by_name"].items()}
+    return result
+
+
 def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]:
     """Look for each roster_new song of `match_dump` in the Discogs tracks of its artist.
 
     `songs` is the `songs` list of `match_dump`. Return one row for each roster_new
     song, in the order of `songs`, with its Discogs class and, for a found track,
     the release id, track index, Discogs title, year, match method and score.
+    The Discogs id of an artist is the id of the roster, or the id that `discogs_ids`
+    finds by name. For such an id the row has `artist_by_name` true, and its match
+    method ends with `BY_NAME`. A song is `held_loose_title` when the country holds a
+    song of the same roster artist with the same loose title key, with or without a
+    link, so one track never gets a second song under a longer title.
     """
+    resolved = discogs_ids(country.resolve(), discogs.resolve())
+    discogs_of, by_name = resolved["ids"], resolved["by_name"]
     with duckdb.connect() as connection:
-        discogs_of = dict(
-            schemas.read_table(schemas.COUNTRY_ARTISTS, country, connection)
-            .project("artist_id, discogs_artist_id")
+        held_loose = {
+            (artist_id, loose_key(title))
+            for artist_id, title in schemas.read_table(
+                schemas.COUNTRY_SONGS, country, connection, fill_absent=True
+            )
+            .project("artist_id, song_name")
             .fetchall()
-        )
+        }
         linked = set(
             schemas.read_table(schemas.COUNTRY_LINKS, country, connection)
             .filter("discogs_release_id IS NOT NULL")
@@ -342,6 +643,19 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]
     }
     tracks = _discogs_tracks(discogs, sorted(set(artist_of.values())))
     taken: set[tuple] = set()
+    indexes: dict[int, tuple[dict, dict, list[str]]] = {}
+
+    def tracks_of(artist: int) -> tuple[dict, dict, list[str]]:
+        """Return the tracks of an artist by exact key and by loose key, and the loose keys."""
+        if artist not in indexes:
+            by_exact: dict[str, list[tuple]] = {}
+            by_loose: dict[str, list[tuple]] = {}
+            for hit in tracks.get(artist, []):
+                by_exact.setdefault(name_key(hit[0]), []).append(hit)
+                by_loose.setdefault(loose_key(hit[0]), []).append(hit)
+            indexes[artist] = (by_exact, by_loose, sorted(by_loose))
+        return indexes[artist]
+
     rows = []
     for song in candidates:
         row = {"source_song_id": song["source_song_id"], "discogs_class": "out_of_scope"}
@@ -350,15 +664,18 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]
         if artist is None:
             continue
         row["discogs_artist_id"] = str(artist)
-        found = tracks.get(artist, [])
+        named = song["roster_artist_ids"][0] in by_name
+        by_exact, by_loose, keys = tracks_of(artist)
         exact, loose = name_key(song["song_name"]), loose_key(song["song_name"])
-        kind, hits, score = "exact", [hit for hit in found if name_key(hit[0]) == exact], None
+        if (song["roster_artist_ids"][0], loose) in held_loose:
+            row["discogs_class"] = "held_loose_title"
+            continue
+        kind, hits, score = "exact", by_exact.get(exact, []), None
         if not hits:
-            kind, hits = "loose", [hit for hit in found if loose_key(hit[0]) == loose]
+            kind, hits = "loose", by_loose.get(loose, [])
         if not hits:
-            keys = sorted({loose_key(hit[0]) for hit in found})
             close = difflib.get_close_matches(loose, keys, n=1, cutoff=CLOSE_CUTOFF)
-            kind, hits = "close", [hit for hit in found if close and loose_key(hit[0]) == close[0]]
+            kind, hits = "close", by_loose[close[0]] if close else []
             if close:
                 score = round(100 * difflib.SequenceMatcher(None, loose, close[0]).ratio(), 1)
         if not hits:
@@ -375,8 +692,9 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path) -> list[dict]
             "discogs_track_index": str(index),
             "discogs_title": title,
             "year": year,
-            "match_method": method,
+            "match_method": method + BY_NAME * named,
             "match_score": fixed if fixed is not None else score,
+            "artist_by_name": named,
         }
         taken.add((release_id, index))
     return rows
@@ -393,8 +711,10 @@ def _added_frames(
             .project("artist_id, artist_name, discogs_artist_id, country_tag")
             .fetchall()
         }
-        connection.execute("CREATE TABLE chosen (source_song_id VARCHAR)")
-        connection.executemany("INSERT INTO chosen VALUES (?)", [[key] for key in sorted(chosen)])
+        _table(connection, "chosen_ids", "str", sorted(chosen))
+        connection.execute(
+            "CREATE TEMP TABLE chosen AS SELECT value AS source_song_id FROM chosen_ids"
+        )
         dumped = (
             schemas.read_table(schemas.DUMP_SONGS, dump, connection)
             .filter("credit_position = 1")
@@ -471,78 +791,270 @@ def load_reviewed_matches(root: Path | None = None) -> dict[tuple[str, ...], str
     return decisions
 
 
+def would_add(
+    dump: Path,
+    country: Path,
+    discogs: Path,
+    source: str,
+    iso3: str,
+    reviewed: dict[tuple[str, ...], str] | None = None,
+) -> dict:
+    """Decide which songs of the dump folder `dump` an import adds to the folder `country`.
+
+    A song is added when `match_discogs` gives it the class `exact` or `loose`, or
+    the class `close` and `REVIEWED_FILE` accepts it for the same Discogs track.
+    `reviewed` replaces the decisions of that file (for tests). Return the songs
+    read (`songs_in`), the chosen songs with their Discogs rows (`chosen`), every
+    other song counted by class (`rejected`), and the chosen songs counted by
+    year (`by_year`, and `no_year` for a song with no year). `by_name` counts the
+    chosen songs whose artist got its Discogs id by name (`discogs_ids`). The chosen
+    songs and the rejected songs add up to `songs_in`.
+    """
+    result = match_dump(dump, country)
+    found = match_discogs(result["songs"], country, discogs)
+    reviewed = load_reviewed_matches() if reviewed is None else reviewed
+
+    def accepted(row: dict) -> bool:
+        key = (source, iso3, row["source_song_id"], row.get("discogs_release_id", ""))
+        return reviewed.get((*key, row.get("discogs_track_index", ""))) == "accept"
+
+    chosen = {
+        row["source_song_id"]: row
+        for row in found
+        if row["discogs_class"] in ADDED or (row["discogs_class"] == "close" and accepted(row))
+    }
+    close_accepted = sum(row["discogs_class"] == "close" for row in chosen.values())
+    discogs_counts = Counter(row["discogs_class"] for row in found)
+    discogs_counts["close"] -= close_accepted
+    years = Counter(row["year"] for row in chosen.values())
+    no_year = years.pop(None, 0)
+    return {
+        "songs_in": result["songs_in"],
+        "songs": {song["source_song_id"]: song for song in result["songs"]},
+        "chosen": chosen,
+        "close_accepted": close_accepted,
+        "by_name": sum(row["artist_by_name"] for row in chosen.values()),
+        "rejected": {
+            **{name: result["counts"][name] for name in CLASSES if name != "roster_new"},
+            **result["left_out"],
+            **{name: discogs_counts[name] for name in DISCOGS_CLASSES if name not in ADDED},
+        },
+        "by_year": dict(sorted(years.items())),
+        "no_year": no_year,
+    }
+
+
+def by_decade(by_year: dict[int, int]) -> dict[int, int]:
+    """Return counts by decade from counts by year. The key is the first year of the decade."""
+    decades: Counter = Counter()
+    for year, number in by_year.items():
+        decades[year // 10 * 10] += number
+    return dict(sorted(decades.items()))
+
+
+def _discogs_folder(data: Path, discogs: Path | None) -> Path:
+    """Return the Discogs folder: the one given, or the newest complete catalog folder."""
+    found = discogs or paths.latest_clean_catalog_dir(data, "discogs")
+    if found is None:
+        raise FileNotFoundError(
+            "no Discogs tables: name a folder, or put a complete "
+            "clean/catalog/discogs/<YYYYMMDD>/ in the data folder"
+        )
+    return found
+
+
+def survey(data: Path, iso3: str, sources: list[str], discogs: Path | None = None) -> list[dict]:
+    """Estimate, for each source, what an import of its newest dump adds to a country.
+
+    The function only reads: it writes no folder and no run record. Return one row
+    for each source, in the order given. A source with no complete dump in the data
+    folder has `dump` None and no counts. Every other row has the dump folder, the
+    songs read (`songs_in`), the songs that `import_dump` would add (`would_add`),
+    how many of them have an artist whose Discogs id was found by name
+    (`would_add_by_name`), those songs by year (`by_year`, `no_year`), every other song by class
+    (`rejected`), and the seconds that the estimate took. `discogs` defaults to the
+    newest complete `clean/catalog/discogs/<YYYYMMDD>/`.
+    """
+    country = paths.latest_country_songs_dir(data, iso3)
+    if country is None:
+        raise FileNotFoundError(f"no songs folder of {iso3}")
+    discogs = _discogs_folder(data, discogs)
+    rows = []
+    for source in sources:
+        dump = paths.latest_clean_dump_dir(data, source)
+        if dump is None:
+            rows.append({"source": source, "dump": None})
+            continue
+        start = time.monotonic()
+        plan = would_add(dump, country, discogs, source, iso3)
+        rows.append(
+            {
+                "source": source,
+                "dump": paths.data_relative(data, dump),
+                "songs_in": plan["songs_in"],
+                "would_add": len(plan["chosen"]),
+                "would_add_by_name": plan["by_name"],
+                "by_year": plan["by_year"],
+                "no_year": plan["no_year"],
+                "rejected": plan["rejected"],
+                "seconds": round(time.monotonic() - start, 1),
+            }
+        )
+    return rows
+
+
+def gaps(data: Path, iso3: str, discogs: Path | None = None) -> dict:
+    """Count, for each year, the songs that a country holds and the tracks that it lacks.
+
+    The function only reads the newest songs folder of the country and the Discogs
+    tables. A wanted pair is one roster artist with a Discogs id and one loose title
+    key of a Discogs track of that artist. A pair is left out as `pairs_linked` when
+    a track of the pair has a link in the country, and as `pairs_held` when the
+    country holds a song of the artist with that title key. The year of a pair is
+    the earliest year of its tracks. Two roster rows with one Discogs id are one
+    artist. The Discogs ids are those of `discogs_ids`: `artists_by_name` counts the
+    roster artists whose id was found by name. `artists_no_discogs_id` counts the
+    artists that stay without an id, which the dump route cannot serve, and
+    `artists_no_id_reasons` counts them by reason. A track whose title has no key
+    is counted in `tracks_no_title_key`.
+    """
+    country = paths.latest_country_songs_dir(data, iso3)
+    if country is None:
+        raise FileNotFoundError(f"no songs folder of {iso3}")
+    discogs = _discogs_folder(data, discogs)
+    with duckdb.connect() as connection:
+        songs = schemas.read_table(schemas.COUNTRY_SONGS, country, connection, fill_absent=True)
+        held_years = dict(songs.aggregate("year, count(*)").fetchall())
+        held_titles = songs.project("artist_id, song_name").fetchall()
+        artists = len(schemas.read_table(schemas.COUNTRY_ARTISTS, country, connection))
+        linked = set(
+            schemas.read_table(schemas.COUNTRY_LINKS, country, connection)
+            .filter("discogs_release_id IS NOT NULL")
+            .project("discogs_release_id, discogs_track_index")
+            .fetchall()
+        )
+    resolved = discogs_ids(country.resolve(), discogs.resolve())
+    discogs_of = resolved["ids"]
+    held = {
+        (discogs_of[artist_id], loose_key(title))
+        for artist_id, title in held_titles
+        if artist_id in discogs_of
+    }
+    tracks = _discogs_tracks(discogs, sorted(set(discogs_of.values())))
+    earliest: dict[tuple[int, str], int | None] = {}
+    with_link: set[tuple[int, str]] = set()
+    tracks_in = no_key = 0
+    for artist, found in tracks.items():
+        for title, release_id, index, year in found:
+            tracks_in += 1
+            pair = (artist, loose_key(title))
+            if not pair[1]:
+                no_key += 1
+                continue
+            years = [value for value in (earliest.get(pair), year) if value is not None]
+            earliest[pair] = min(years, default=None)
+            if (str(release_id), str(index)) in linked:
+                with_link.add(pair)
+    held_pairs = (held & set(earliest)) - with_link
+    wanted = Counter(
+        year for pair, year in earliest.items() if pair not in with_link and pair not in held_pairs
+    )
+    held_no_year = held_years.pop(None, 0)
+    wanted_no_year = wanted.pop(None, 0)
+    return {
+        "songs_folder": paths.data_relative(data, country),
+        "songs": sum(held_years.values()) + held_no_year,
+        "held_by_year": dict(sorted(held_years.items())),
+        "held_no_year": held_no_year,
+        "artists": artists,
+        "artists_by_name": len(resolved["by_name"]),
+        "artists_no_discogs_id": artists - len(discogs_of),
+        "artists_no_id_reasons": {
+            name: resolved[name]
+            for name in ("none_found", "more_than_one", "id_taken", "no_name_key")
+        },
+        "tracks_in": tracks_in,
+        "tracks_no_title_key": no_key,
+        "pairs": len(earliest),
+        "pairs_linked": len(with_link),
+        "pairs_held": len(held_pairs),
+        "wanted": sum(wanted.values()) + wanted_no_year,
+        "wanted_by_year": dict(sorted(wanted.items())),
+        "wanted_no_year": wanted_no_year,
+    }
+
+
 def import_dump(
     data: Path,
     source: str,
     iso3: str,
-    discogs: Path,
+    discogs: Path | None = None,
     *,
-    discogs_label: str,
+    discogs_label: str | None = None,
     countries: Path | None = None,
     reviewed: dict[tuple[str, ...], str] | None = None,
+    repeat_reason: str | None = None,
 ) -> dict:
     """Add the songs of the newest dump that match a Discogs track of their roster artist.
 
-    The `exact` and `loose` songs of `match_discogs` are added, and the `close`
-    songs that `REVIEWED_FILE` accepts for the same Discogs track. The command
-    writes a new folder `lyrics/<ISO3>/songs/<run id>/` with the earlier rows and
-    the added songs and links, its manifest, and the run record. `discogs_label`
-    names the Discogs folder in the manifest notes, and `reviewed` replaces the
-    decisions of `REVIEWED_FILE` (for tests), since that folder is outside
-    the data folder. Every other song of the dump is counted in the run record with
-    its class.
+    `would_add` chooses the songs. The command writes a new folder
+    `lyrics/<ISO3>/songs/<run id>/` with the earlier rows and the added songs and
+    links, its manifest, and the run record. `discogs` defaults to the newest
+    complete `clean/catalog/discogs/<YYYYMMDD>/`. A Discogs folder inside the data
+    folder is an input of the manifest. For a folder outside the data folder,
+    `discogs_label` names it in the manifest notes. `reviewed` replaces the
+    decisions of `REVIEWED_FILE` (for tests). Every other song of the dump is
+    counted in the run record with its class. A second run of the same dump for the
+    same country needs `repeat_reason`; the reason goes to the notes of the record.
     """
     paths.check_iso3(iso3)
     dump = paths.latest_clean_dump_dir(data, source)
     earlier = paths.latest_country_songs_dir(data, iso3)
     if dump is None or earlier is None:
         raise FileNotFoundError(f"no dump of {source} or no songs folder of {iso3}")
+    discogs = _discogs_folder(data, discogs).resolve()
+    catalog = (
+        [paths.data_relative(data.resolve(), discogs)]
+        if discogs.is_relative_to(data.resolve())
+        else []
+    )
+    discogs_label = catalog[0] if catalog else discogs_label or discogs.name
     bulk_file = paths.data_relative(data, dump)
     with run_records.record_run(
-        iso3, ROUTE, source, countries=countries, bulk_file=bulk_file
+        iso3,
+        ROUTE,
+        source,
+        countries=countries,
+        bulk_file=bulk_file,
+        repeat_reason=repeat_reason,
     ) as record:
         if earlier.name >= record.run_id:
             raise ValueError(f"{earlier} is not older than this run ({record.run_id})")
         manifests.read_manifest(dump)
         manifests.read_manifest(earlier)
-        result = match_dump(dump, earlier)
-        found = match_discogs(result["songs"], earlier, discogs)
-        reviewed = load_reviewed_matches() if reviewed is None else reviewed
-
-        def accepted(row: dict) -> bool:
-            key = (source, iso3, row["source_song_id"], row.get("discogs_release_id", ""))
-            return reviewed.get((*key, row.get("discogs_track_index", ""))) == "accept"
-
-        close_accepted = sum(row["discogs_class"] == "close" and accepted(row) for row in found)
-        chosen = {
-            row["source_song_id"]: row
-            for row in found
-            if row["discogs_class"] in ADDED or (row["discogs_class"] == "close" and accepted(row))
-        }
-        songs = {song["source_song_id"]: song for song in result["songs"]}
-        added, links = _added_frames(dump, earlier, iso3, source, chosen, songs)
+        plan = would_add(dump, earlier, discogs, source, iso3, reviewed)
+        rejected, close_accepted, by_name = (
+            plan["rejected"],
+            plan["close_accepted"],
+            plan["by_name"],
+        )
+        added, links = _added_frames(dump, earlier, iso3, source, plan["chosen"], plan["songs"])
         out = paths.country_songs_dir(data, iso3, record.run_id)
         out.mkdir(parents=True, exist_ok=False)
         counts = review_workbooks.write_country_songs(
             added, earlier, out, record.run_id, record.started_utc, links
         )
-        discogs_counts = Counter(row["discogs_class"] for row in found)
-        discogs_counts["close"] -= close_accepted
-        rejected = {
-            **{name: result["counts"][name] for name in CLASSES if name != "roster_new"},
-            **result["left_out"],
-            **{name: discogs_counts[name] for name in DISCOGS_CLASSES if name not in ADDED},
-        }
         manifests.write_manifest(
             data,
             out,
             "country_songs",
             country_iso3=iso3,
             run_id=record.run_id,
-            inputs=[bulk_file, paths.data_relative(data, earlier)],
+            inputs=[bulk_file, paths.data_relative(data, earlier), *catalog],
             counts=counts
             | {f"dump_songs_{name}": value for name, value in rejected.items()}
-            | {"dump_songs_close_accepted": close_accepted},
+            | {"dump_songs_close_accepted": close_accepted}
+            | {"dump_songs_added_artist_by_name": by_name},
             notes=(
                 f"Songs of {bulk_file} that match a Discogs track of their roster artist. "
                 f"Discogs tables: {discogs_label}."
@@ -550,18 +1062,23 @@ def import_dump(
         )
         record.rows_added = counts["songs_added"]
         record.requests_sent, record.limits_hit = 0, {}
-        record.songs_attempted = result["songs_in"]
+        record.songs_attempted = plan["songs_in"]
         record.songs_accepted = len(added)
         record.songs_rejected = {name: value for name, value in rejected.items() if value}
         record.artists_attempted = int(added["artist_id"].nunique())
-        if discogs_counts["close"]:
+        if rejected["close"]:
             record.known_gaps.append(
-                f"close: {discogs_counts['close']} songs match a Discogs title by close "
+                f"close: {rejected['close']} songs match a Discogs title by close "
                 "spelling and wait for review"
             )
+        if by_name:
+            record.notes = (
+                f"{record.notes} {by_name} songs added for artists whose Discogs id was "
+                f"found by name (their match method ends with {BY_NAME})."
+            ).strip()
         if close_accepted:
             record.notes = (
                 f"{record.notes} {close_accepted} close matches added after review "
                 f"({REVIEWED_FILE.as_posix()})."
             ).strip()
-    return {"path": out, "songs_attempted": result["songs_in"], "rejected": rejected, **counts}
+    return {"path": out, "songs_attempted": plan["songs_in"], "rejected": rejected, **counts}

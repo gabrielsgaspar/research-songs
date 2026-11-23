@@ -80,7 +80,8 @@ def test_a_campaign_opens_takes_its_runs_and_closes(tmp_path, clock):
         "    songs before: not recorded, songs after: 5930",
         "    next time: Raise the song limit to 20.",
         "    runs: 1",
-        f"        BRA {record.started_utc[:10]} live genius: complete, rows not recorded, 0 s; "
+        f"        BRA {record.started_utc[:10]} live genius: complete, rows not recorded, "
+        f"{run_records.duration_text(record)}; "
         f"song limit 5; campaign {opened.campaign_id}",
     ]
 

@@ -1,5 +1,7 @@
 """The comparison of a dump with the songs of a country, on small invented tables."""
 
+import os
+import unicodedata
 from pathlib import Path
 
 import duckdb
@@ -10,7 +12,11 @@ from typer.testing import CliRunner
 from songs.cli import app
 from songs.common import manifests, paths, run_records, schemas
 from songs.common.paths import DATA_ROOT_ENV
+from songs.stage_00_ingest import dump_match
 from songs.stage_00_ingest.dump_match import (
+    by_decade,
+    dump_keys,
+    gaps,
     import_dump,
     lead_artist,
     load_reviewed_matches,
@@ -18,6 +24,8 @@ from songs.stage_00_ingest.dump_match import (
     match_discogs,
     match_dump,
     name_key,
+    survey,
+    would_add,
 )
 
 RUN = "20260101T000000Z"
@@ -140,7 +148,6 @@ def test_each_dump_song_counts_once_in_one_class(tmp_path):
         "d2": "same_title",
         "d3": "roster_new",
         "d4": "roster_new",
-        "d5": "not_roster",
         "d7": "roster_new",
     }
     assert by_id["d4"]["roster_artist_ids"] == ["a1"]
@@ -184,12 +191,11 @@ def test_the_lead_of_a_featuring_credit_matches_and_is_counted(tmp_path):
     by_id = {row["source_song_id"]: row for row in result["songs"]}
     assert {song: (row["class"], row["roster_artist_ids"]) for song, row in by_id.items()} == {
         "f1": ("roster_new", ["a1"]),
-        "f2": ("not_roster", []),
         "f3": ("same_title", []),
         "f4": ("roster_new", ["a2"]),
         "f5": ("roster_new", ["a1"]),
-        "f6": ("not_roster", []),
     }
+    assert result["counts"]["not_roster"] == 2
     assert result["matched_by_split"] == 3
     assert result["roster_new_more_than_one_artist"] == 0
 
@@ -240,6 +246,8 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
         country,
         [link | {"discogs_release_id": "900", "discogs_track_index": "1", "run_id": RUN}],
     )
+    # The country holds this song with no link; a longer title of it must not enter again.
+    write(schemas.COUNTRY_SONGS, country, [held("h1", "a1", "Anna Jóns", "A New Song", "kh")])
     write_discogs(tmp_path / "discogs")
 
     def song(song_id, title, artists=("a1",), kind="roster_new"):
@@ -261,6 +269,7 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
         song("no_discogs_id", "Sol sol", ("a2",)),
         song("two_artists", "Sol sol", ("a1", "a2")),
         song("held", "Sol sol", kind="held"),
+        song("held_loose", "A New Song (Live)"),
     ]
     rows = {
         row["source_song_id"]: row for row in match_discogs(songs, country, tmp_path / "discogs")
@@ -275,6 +284,7 @@ def test_match_discogs_finds_the_earliest_track_of_each_step(tmp_path):
         "none": "no_track",
         "no_discogs_id": "out_of_scope",
         "two_artists": "out_of_scope",
+        "held_loose": "held_loose_title",
     }
     assert (rows["exact"]["discogs_release_id"], rows["exact"]["year"]) == ("200", 1995)
     assert rows["exact"]["match_method"] == "dump_discogs_exact_title"
@@ -390,6 +400,132 @@ def test_import_dump_adds_a_close_match_only_for_the_reviewed_track(tmp_path):
     assert manifests.read_manifest(result["path"]).counts["dump_songs_close_accepted"] == 1
 
 
+def complete_folders(data: Path) -> Path:
+    """Write the dump and the country of `make_folders` with their manifests."""
+    dump, country = make_folders(data, "kasilyrics")
+    manifests.write_manifest(
+        data, dump, "clean_dump", source="kasilyrics", inputs=["raw/x/20260101/"]
+    )
+    manifests.write_manifest(
+        data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
+    )
+    return country
+
+
+def write_catalog(data: Path) -> str:
+    """Write the invented Discogs tables as a complete catalog folder. Return its path."""
+    folder = paths.clean_catalog_dir(data, "discogs", "20260101")
+    write_discogs(folder)
+    manifests.write_manifest(
+        data, folder, "clean_catalog", source="discogs", inputs=["raw/discogs/20260101/"]
+    )
+    return paths.data_relative(data, folder)
+
+
+def test_the_survey_gives_what_the_import_then_adds_and_writes_nothing(tmp_path):
+    data = tmp_path / "data"
+    complete_folders(data)
+    write_discogs(tmp_path / "discogs")
+
+    def outside() -> list[Path]:
+        return sorted(path for path in tmp_path.rglob("*") if "cache" not in path.parts)
+
+    before = outside()
+
+    found, absent = survey(data, "ISL", ["kasilyrics", "no_dump"], tmp_path / "discogs")
+
+    assert outside() == before
+    assert absent == {"source": "no_dump", "dump": None}
+    assert (found["dump"], found["songs_in"]) == ("clean/dumps/kasilyrics/20260102/", 8)
+    assert (found["by_year"], found["no_year"]) == ({1995: 1, 1997: 1}, 0)
+    assert sum(found["by_year"].values()) + found["no_year"] == found["would_add"]
+    assert found["would_add"] + sum(found["rejected"].values()) == found["songs_in"]
+    assert found["seconds"] >= 0
+    result = import_dump(
+        data, "kasilyrics", "ISL", tmp_path / "discogs", countries=tmp_path / "countries"
+    )
+    assert result["songs_added"] == found["would_add"] == 2
+    assert result["rejected"] == found["rejected"]
+
+
+def test_by_decade_sums_the_years_of_each_decade():
+    assert by_decade({1969: 1, 1960: 2, 1970: 4}) == {1960: 3, 1970: 4}
+    assert by_decade({}) == {}
+
+
+def test_gaps_counts_the_songs_held_and_the_tracks_wanted_by_year(tmp_path):
+    data = tmp_path / "data"
+    country = paths.country_songs_dir(data, "ISL", RUN)
+    write(
+        schemas.COUNTRY_SONGS,
+        country,
+        [
+            held("s1", "a1", "Anna Jons", "Old Song", "h1") | {"year": 1990},
+            held("s2", "a1", "Anna Jons", "Sol sol (Live)", "h2"),
+            held("s3", "a2", "Bára", "Riverside", "h3") | {"year": 1990},
+        ],
+    )
+    roster = [artist("a1", "Anna Jóns") | {"discogs_artist_id": "11"}, artist("a2", "Bára")]
+    write(schemas.COUNTRY_ARTISTS, country, roster)
+    write(schemas.COUNTRY_LINKS, country, [])
+    manifests.write_manifest(
+        data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
+    )
+    write_catalog(data)
+
+    found = gaps(data, "ISL")
+
+    assert found["songs_folder"] == f"lyrics/ISL/songs/{RUN}/"
+    assert (found["songs"], found["held_by_year"], found["held_no_year"]) == (3, {1990: 2}, 1)
+    assert (found["artists"], found["artists_no_discogs_id"]) == (2, 1)
+    assert (found["tracks_in"], found["tracks_no_title_key"], found["pairs"]) == (9, 0, 8)
+    assert (found["pairs_linked"], found["pairs_held"], found["wanted"]) == (0, 2, 6)
+    assert found["wanted_by_year"] == {1995: 3, 1997: 2, 2001: 1}
+    assert found["pairs_linked"] + found["pairs_held"] + found["wanted"] == found["pairs"]
+
+    later = paths.country_songs_dir(data, "ISL", "20260201T000000Z")
+    for table in (schemas.COUNTRY_SONGS, schemas.COUNTRY_ARTISTS):
+        (later / table.file).parent.mkdir(parents=True, exist_ok=True)
+        (later / table.file).write_bytes((country / table.file).read_bytes())
+    link = {"country_iso3": "ISL", "song_id": "s1", "artist_id": "a1", "source": "invented"}
+    write(
+        schemas.COUNTRY_LINKS,
+        later,
+        [link | {"discogs_release_id": "200", "discogs_track_index": "2", "run_id": RUN}],
+    )
+    manifests.write_manifest(
+        data,
+        later,
+        "country_songs",
+        country_iso3="ISL",
+        run_id="20260201T000000Z",
+        inputs=["lyrics/isl/"],
+    )
+    found = gaps(data, "ISL")
+    assert (found["pairs_linked"], found["pairs_held"], found["wanted"]) == (1, 2, 5)
+    assert found["wanted_by_year"] == {1995: 2, 1997: 2, 2001: 1}
+
+
+def test_import_dump_uses_the_newest_catalog_folder_and_names_it_as_an_input(tmp_path):
+    data, countries = tmp_path / "data", tmp_path / "countries"
+    complete_folders(data)
+    with pytest.raises(FileNotFoundError, match="no Discogs tables"):
+        import_dump(data, "kasilyrics", "ISL", countries=countries)
+    assert run_records.read_run_records("ISL", countries) == []
+
+    catalog = write_catalog(data)
+    result = import_dump(data, "kasilyrics", "ISL", countries=countries)
+
+    assert result["songs_added"] == 2
+    manifest = manifests.read_manifest(result["path"])
+    assert manifest.inputs == [
+        "clean/dumps/kasilyrics/20260102/",
+        f"lyrics/ISL/songs/{RUN}/",
+        catalog,
+    ]
+    assert f"Discogs tables: {catalog}." in manifest.notes
+
+
 def test_the_tracked_review_file_loads(tmp_path):
     assert set(load_reviewed_matches().values()) <= {"accept", "reject"}
     bad = tmp_path / "resources" / "lyrics"
@@ -401,3 +537,193 @@ def test_the_tracked_review_file_loads(tmp_path):
     )
     with pytest.raises(ValueError, match="needs a decision"):
         load_reviewed_matches(tmp_path)
+
+
+def test_songs_with_no_roster_artist_are_counted_and_have_no_row(tmp_path):
+    _, country = make_folders(tmp_path)
+    dump = paths.clean_dump_dir(tmp_path, "example", "20260104")
+    write(schemas.DUMP_ARTIST_NAMES, dump, [])
+    write(
+        schemas.DUMP_SONGS,
+        dump,
+        [
+            credit("n1", "Unknown Band", "Far Away", "k1"),
+            credit("n2", "Unknown Band", "???", "k2"),
+            credit("n3", "!!!", "Lost Title", "k3"),
+            credit("n4", "Other Band", "Far Away", "k4", 1),
+            credit("n4", "Third Band", "Far Away", "k4", 2),
+            credit("n5", "Anna Jons", "A New Song", "k5"),
+        ],
+    )
+    result = match_dump(dump, country)
+    assert [row["source_song_id"] for row in result["songs"]] == ["n5"]
+    assert (result["credit_rows_in"], result["songs_in"]) == (6, 5)
+    assert result["counts"] == {"held": 0, "same_title": 0, "roster_new": 1, "not_roster": 2}
+    assert result["left_out"] == {"no_title_key": 1, "no_artist_key": 1}
+    assert result["songs_out"] + sum(result["left_out"].values()) == result["songs_in"]
+    assert result["examples"]["not_roster"] == [
+        ("Other Band", "Far Away"),
+        ("Unknown Band", "Far Away"),
+    ]
+
+
+def test_the_keys_of_a_dump_are_built_one_time_and_again_when_the_key_code_changes(
+    tmp_path, monkeypatch
+):
+    dump, country = make_folders(tmp_path)
+    first = match_dump(dump, country)
+    folder = dump_keys(dump)
+    assert folder.parent == tmp_path / "cache" / "dump_keys" / "example" / "20260102"
+    stamp = (folder / "credits.parquet").stat().st_mtime_ns
+
+    assert match_dump(dump, country) == first
+    assert (folder / "credits.parquet").stat().st_mtime_ns == stamp
+    assert [path.name for path in folder.parent.iterdir()] == [folder.name]
+    assert sorted(path.name for path in dump.iterdir()) == ["artist_names.parquet", "songs.parquet"]
+
+    # A change of the hashed key code gives a new version, so the keys are built again.
+    # The work folder of a build that stopped more than one day ago is removed.
+    stopped = folder.parent / "work-stopped"
+    stopped.mkdir()
+    os.utime(stopped, (0, 0))
+    monkeypatch.setattr(dump_match, "_HOMONYM", dump_match._HOMONYM + "|x")
+    other = dump_match._keys_version()
+    assert other != folder.name
+    assert match_dump(dump, country) == first
+    assert sorted(path.name for path in folder.parent.iterdir()) == sorted([folder.name, other])
+    assert unicodedata.unidata_version in dump_match._keys_text()
+    with pytest.raises(ValueError, match="clean/dumps"):
+        dump_keys(tmp_path / "elsewhere")
+
+
+def test_a_country_with_no_match_and_no_discogs_id_gives_zero_counts(tmp_path):
+    data = tmp_path / "data"
+    dump = paths.clean_dump_dir(data, "example", "20260102")
+    write(schemas.DUMP_ARTIST_NAMES, dump, [])
+    write(schemas.DUMP_SONGS, dump, [credit("n1", "Unknown Band", "Far Away", "k1")])
+    manifests.write_manifest(data, dump, "clean_dump", source="example", inputs=["raw/x/20260101/"])
+    country = paths.country_songs_dir(data, "ISL", RUN)
+    write(schemas.COUNTRY_SONGS, country, [])
+    write(schemas.COUNTRY_ARTISTS, country, [artist("a2", "Bára") | {"songs": 0}])
+    write(schemas.COUNTRY_LINKS, country, [])
+    manifests.write_manifest(
+        data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
+    )
+    write_catalog(data)
+
+    (row,) = survey(data, "ISL", ["example"])
+    assert (row["songs_in"], row["would_add"], row["by_year"]) == (1, 0, {})
+    assert row["rejected"]["not_roster"] == 1
+    plan = would_add(dump, country, data / "clean/catalog/discogs/20260101", "example", "ISL", {})
+    assert (plan["chosen"], plan["songs_in"]) == ({}, 1)
+    found = gaps(data, "ISL")
+    assert (found["songs"], found["wanted"], found["tracks_in"]) == (0, 0, 0)
+    assert (found["artists"], found["artists_no_discogs_id"]) == (1, 1)
+
+
+def write_named_discogs(folder: Path, artists: str) -> None:
+    """Invented Discogs tables where artist 21 has one track, and an `artists` table."""
+    folder.mkdir(parents=True)
+    tables = {
+        "artists": f"SELECT * FROM (VALUES {artists}) AS t(artist_id, name)",
+        "release_artists": "SELECT * FROM (VALUES (500, 21)) AS t(release_id, artist_id)",
+        "release_track_artists": "SELECT * FROM (VALUES (500, 1, 21)) "
+        "AS t(release_id, track_index, artist_id) WHERE false",
+        "release_tracklist": "SELECT * FROM (VALUES (500, 1, 'Night Song')) "
+        "AS t(release_id, track_index, title)",
+        "releases": "SELECT * FROM (VALUES (500, NULL::BIGINT, '1988')) "
+        "AS t(release_id, master_id, released)",
+        "masters": "SELECT * FROM (VALUES (50, 1997)) AS t(master_id, year) WHERE false",
+    }
+    for name, sql in tables.items():
+        duckdb.sql(sql).write_parquet(str(folder / f"{name}.parquet"))
+
+
+def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [
+            artist("a1", "Anna Jóns") | {"discogs_artist_id": "11"},
+            artist("a2", "Bára"),
+            artist("a3", "Dísa"),
+            artist("a4", "Elín"),
+            artist("a5", "Finnur"),
+            artist("a6", "Gunnar"),
+            artist("a7", "Gunnar!"),
+            artist("a8", "..."),
+            artist("a9", "Νίκος"),
+            artist("a10", "Strasse"),
+        ],
+    )
+    # The two Greek names differ only in case and in the final sigma, and the two German
+    # names only in ß against SS: `name_key` gives each pair one key, so each pair blocks.
+    write_named_discogs(
+        tmp_path / "discogs",
+        "(21, 'BÁRA (2)'), (31, 'Disa'), (32, 'Dísa (2)'), (11, 'Elin'), (41, 'Gunnar'), "
+        "(51, 'Bára Band'), (61, 'Νίκος'), (62, 'ΝΙΚΟΣ'), (71, 'Straße'), (72, 'STRASSE')",
+    )
+
+    found = dump_match.discogs_ids(country, tmp_path / "discogs")
+
+    # One artist with the name, with or without the homonym mark: the id is used.
+    assert found["by_name"] == {"a2": (21, "BÁRA (2)")}
+    assert found["ids"] == {"a1": 11, "a2": 21}
+    # Two homonyms block. An id of another roster artist blocks, and so does a shared name.
+    assert (found["more_than_one"], found["id_taken"]) == (3, 3)
+    assert (found["none_found"], found["no_name_key"]) == (1, 1)
+
+    # For a catalog folder of the data folder, the keys of Discogs are built one time in cache/.
+    catalog = paths.clean_catalog_dir(tmp_path / "data", "discogs", "20260101")
+    write_named_discogs(catalog, "(21, 'BÁRA (2)'), (61, 'Νίκος'), (62, 'ΝΙΚΟΣ')")
+    assert dump_match.discogs_ids(country, catalog)["by_name"] == {"a2": (21, "BÁRA (2)")}
+    cache = tmp_path / "data" / "cache" / "discogs_keys" / "discogs" / "20260101"
+    assert [path.name for path in cache.iterdir()] == [dump_match._keys_version()]
+
+    write(schemas.COUNTRY_ARTISTS, tmp_path / "other", [artist("a2", "Bára")])
+    write_discogs(tmp_path / "no_artists_table")
+    assert dump_match.discogs_ids(tmp_path / "other", tmp_path / "no_artists_table")["ids"] == {}
+
+
+def test_a_song_of_an_artist_found_by_name_is_added_with_its_own_method_and_count(tmp_path):
+    data, countries = tmp_path / "data", tmp_path / "countries"
+    dump = paths.clean_dump_dir(data, "kasilyrics", "20260102")
+    write(schemas.DUMP_ARTIST_NAMES, dump, [])
+    write(
+        schemas.DUMP_SONGS,
+        dump,
+        [credit("b1", "Bara", "Night Song", "kb"), credit("b2", "Bara", "No Such Track", "kc")],
+    )
+    manifests.write_manifest(
+        data, dump, "clean_dump", source="kasilyrics", inputs=["raw/x/20260101/"]
+    )
+    country = paths.country_songs_dir(data, "ISL", RUN)
+    write(schemas.COUNTRY_SONGS, country, [])
+    write(schemas.COUNTRY_ARTISTS, country, [artist("a2", "Bára") | {"songs": 0}])
+    write(schemas.COUNTRY_LINKS, country, [])
+    manifests.write_manifest(
+        data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
+    )
+    discogs = tmp_path / "discogs"
+    write_named_discogs(discogs, "(21, 'Bára')")
+
+    plan = would_add(dump, country, discogs, "kasilyrics", "ISL", {})
+    assert (len(plan["chosen"]), plan["by_name"], plan["rejected"]["no_track"]) == (1, 1, 1)
+    found = gaps(data, "ISL", discogs)
+    assert (found["artists_by_name"], found["artists_no_discogs_id"], found["wanted"]) == (1, 0, 1)
+
+    result = import_dump(data, "kasilyrics", "ISL", discogs, countries=countries)
+
+    out = result["path"]
+    assert result["songs_added"] == 1
+    assert duckdb.sql(
+        f"SELECT match_method FROM '{(out / 'links.parquet').as_posix()}'"
+    ).fetchall() == [("dump_discogs_exact_title_artist_by_name",)]
+    assert manifests.read_manifest(out).counts["dump_songs_added_artist_by_name"] == 1
+    (record,) = run_records.read_run_records("ISL", countries)
+    assert "1 songs added for artists whose Discogs id was found by name" in record.notes
+    # The roster of the new folder keeps no id: each run finds it again, so each song is marked.
+    assert duckdb.sql(
+        f"SELECT discogs_artist_id FROM '{(out / 'artists.parquet').as_posix()}'"
+    ).fetchall() == [(None,)]

@@ -82,6 +82,7 @@ tests = [
     "tests/test_lyric_sources.py::test_a_run_record_may_name_only_a_registered_source",
     "tests/test_lyric_sources.py::test_every_committed_run_record_names_a_registered_source",
     "tests/test_campaigns.py::test_a_record_of_schema_version_1_still_loads",
+    "tests/test_campaign_run.py::test_a_failing_import_leaves_the_campaign_open_and_a_failed_run_record",
 ]
 part = "a record written through `record_run` is complete, every committed record is valid, and its source is in `resources/lyric_sources.toml`; a command that writes no record is not found"
 
