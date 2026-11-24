@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T140444Z",
+  "closed_utc": "2026-11-24T14:32:40Z",
+  "iso3": "TUN",
+  "next_time": "Audit TUN roster for no-home-release artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 98/156 (62.8%) exceeds 15%; roster artists lack Tunisia Discogs releases",
+  "schema_version": 1,
+  "songs_after": 1654
+}
