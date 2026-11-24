@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261123T232120Z",
+  "closed_utc": "2026-11-23T23:24:03Z",
+  "iso3": "GRC",
+  "next_time": "lrclib added 3608 and genius 782; stixoi and local_file have no dump. Close pile is large (609). By-name sample included Cypriot Maria Elena Kyriakou. Build stixoi dump and clear close matches before the next campaign.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 199349
+}
