@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T150734Z",
+  "closed_utc": "2026-11-24T15:15:40Z",
+  "iso3": "CPV",
+  "next_time": "Audit CPV roster for no-home-release artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 9/40 (22.5%) exceeds 15%",
+  "schema_version": 1,
+  "songs_after": 2414
+}
