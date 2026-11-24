@@ -17,6 +17,22 @@ The answer format is built in code from the topic ids: a song is lyrics with 38 
 
 `songs.stage_30_topics.scoring_run` sends the requests and stores the scores (`songs score prepare`, `submit` and `collect`). `songs score status` shows how many eligible songs of each country have a current score; `uv run songs score status --write` writes [`docs/status/scoring.md`](../../docs/status/scoring.md). The data layout standard describes the run.
 
+## How to score a country
+
+Run these steps on one computer, in order, for one country or for one decade of a country. An agent can do every step except step 5. Step 5 costs money, so only a person does it.
+
+1. Get the newest songs and scores of the country from the bucket: `uv run songs data pull <ISO3> --no-catalog`.
+2. Read the state of the scores: `uv run songs score status <ISO3>`. A large `other_prompt` count before the first scoring run often means that the old scores are not imported. Then import them first, and do not pay for them again: `uv run songs lyrics import-scores <ISO3>`. That command reads the old data folder from `SONGS_OLD_DATA_ROOT`.
+3. Write the batch file: `uv run songs score prepare <ISO3> --max-requests 1000`. Add `--decade 1980s` to take one decade only. The command copies, at no cost, the scores of songs with the same text and decade. It prints the counts, the run id and the cost estimate in US dollars. It sends nothing.
+4. Read the counts. `requests` is what the run sends, `reused` is what it copied, and `left_for_next_run` and `other_decade` wait for a later run. If the estimate is too high, prepare again with a lower `--max-requests`.
+5. A person starts the batch with a cost limit: `uv run songs score submit <run id> --max-usd 20`. The command asks the person to type the run id.
+6. Collect the answers: `uv run songs score collect <run id>`. While the batch runs, the command prints its state and writes nothing. Run it again later. A batch ends in 24 hours or less.
+7. Build the analysis release from the new scores: `uv run songs analysis release`. The country-year panel (`songs panel countries`) does not read scores, so it does not change.
+8. Upload the new folders: `uv run songs data sync`, read the report, then `uv run songs data sync --write`.
+9. Write the status page, `uv run songs score status --write`, and commit `docs/status/scoring.md` in a pull request.
+
+Repeat steps 3 to 6 until `requests` is 0. Songs with no valid answer are taken again by the next `prepare`.
+
 ## The fixed values
 
 | Setting | Value |
