@@ -932,6 +932,42 @@ def lyrics_copy_check(
     typer.echo(f"wrote {result['folder']}" if write else "dry run: nothing written")
 
 
+@lyrics_app.command("credit-check")
+def lyrics_credit_check(
+    write: Annotated[
+        bool, typer.Option("--write", help="Write the table. Without it, the command only prints.")
+    ] = False,
+) -> None:
+    """Mark the campaign songs of every country whose dump credit does not name their artist.
+
+    With --write, the command writes clean/quality/uncredited_songs/<YYYYMMDD>/ in the data
+    folder.
+    """
+    from songs.common.paths import data_root
+    from songs.stage_10_clean import uncredited_songs
+
+    try:
+        result = uncredited_songs.check_credits(data_root(), write=write)
+    except FileExistsError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    counts = result["counts"]
+    typer.echo(f"countries: {counts['countries']}, campaign songs: {counts['campaign_songs']}")
+    typer.echo(f"left out, not in the newest dump: {counts['not_in_dump']}")
+    typer.echo(f"credited: {counts['credited']}, by a split name: {counts['credited_by_split']}")
+    typer.echo(f"uncredited (rows out): {counts['uncredited']}")
+    for reason in uncredited_songs.REASONS:
+        typer.echo(f"  {reason}: {counts[reason]}")
+    typer.echo("country\tuncredited\tcampaign songs\t" + "\t".join(uncredited_songs.REASONS))
+    rows = [
+        (code, [one.get(reason, 0) for reason in uncredited_songs.REASONS], one["campaign_songs"])
+        for code, one in result["by_country"].items()
+    ]
+    for code, found, campaign in sorted(rows, key=lambda row: -sum(row[1]))[:15]:
+        typer.echo("\t".join(map(str, (code, sum(found), campaign, *found))))
+    typer.echo(f"wrote {result['folder']}" if write else "dry run: nothing written")
+
+
 @campaign_app.command("run")
 def campaign_run_command(
     countries: CountriesArgument,

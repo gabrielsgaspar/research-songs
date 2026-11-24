@@ -35,9 +35,13 @@ filter. The rules, in the order that they are checked:
    the data folder, the newest complete folder) lists the song: a campaign song whose
    text another song of its country already has. With no such folder, no song is
    left out for this reason.
-10. `entered_by_hand`: a person collected the song (route `manual_review`), and its
+10. `uncredited_song`: the table of uncredited songs
+   (`clean/quality/uncredited_songs/<YYYYMMDD>/` in the data folder, the newest
+   complete folder) lists the song: a campaign song whose dump credit does not name
+   its roster artist. With no such folder, no song is left out for this reason.
+11. `entered_by_hand`: a person collected the song (route `manual_review`), and its
    country has no group in the exceptions file.
-11. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
+12. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
 
 A song with no year is eligible. An analysis by year cannot use it, and reports
 how many such songs it leaves out.
@@ -62,7 +66,8 @@ put in the folder of another country. Both are tracked, with ids and codes and n
 names. `load_artist_lists` reads them, and the table of artist countries, which
 `songs.stage_10_clean.artist_country` writes from Discogs evidence.
 `load_text_copies` reads the table of text copies, which
-`songs.stage_10_clean.text_copies` writes.
+`songs.stage_10_clean.text_copies` writes, and the table of uncredited songs, which
+`songs.stage_10_clean.uncredited_songs` writes.
 
 `country_folders` and `read_country_tables` read the songs of every country, and
 `year_counts` and `reason_counts` count the songs that `classify` lets in and
@@ -86,6 +91,7 @@ from songs.common.paths import (
     latest_clean_artist_country_dir,
     latest_clean_song_quarantine_dir,
     latest_clean_text_copies_dir,
+    latest_clean_uncredited_songs_dir,
     latest_country_scores_dir,
     latest_country_songs_dir,
     resolve_project_root,
@@ -112,15 +118,18 @@ MATCHES = {
     "artist_country": "q.artist_id = s.artist_id "
     "AND (q.country_iso3 = s.country_iso3) = q.other_country",
     "text_copy": "q.country_iso3 = s.country_iso3 AND q.song_id = s.song_id",
+    "uncredited_song": "q.country_iso3 = s.country_iso3 AND q.song_id = s.song_id",
 }
+# The lists that `load_text_copies` reads; their rules come after `re_release`.
+SONG_TABLES = ("text_copy", "uncredited_song")
 # Reason -> the condition on a song row that leaves it out. The order is the order of the check.
 RULES = {
     "quality_quarantine": "quality_status = 'quarantine'",
-    **{name: f"on_{name}" for name in MATCHES if name != "text_copy"},
+    **{name: f"on_{name}" for name in MATCHES if name not in SONG_TABLES},
     "suppressed_duplicate": "duplicate_decision = 'suppress_duplicate'",
     "not_canonical": "canonical_song_id IS NOT NULL AND canonical_song_id <> song_id",
     "re_release": "re_release",
-    "text_copy": "on_text_copy",
+    **{name: f"on_{name}" for name in SONG_TABLES},
     "entered_by_hand": "{manual} AND NOT {named}",
     "year_out_of_range": f"year NOT BETWEEN {MIN_SONG_YEAR} AND {MAX_SONG_YEAR}",
 }
@@ -272,16 +281,23 @@ def load_artist_lists(
 def load_text_copies(
     connection: duckdb.DuckDBPyConnection, data: Path | None = None
 ) -> dict[str, duckdb.DuckDBPyRelation]:
-    """Read the songs of the newest complete table of text copies in `data` into `connection`.
+    """Read the songs of the newest complete tables of text copies and of uncredited songs.
 
-    The default is the data folder of `data_root`. With no such table, the list is empty.
+    The default is the data folder of `data_root`. With no such table, its list is empty.
     """
-    folder = latest_clean_text_copies_dir(data or data_root())
-    if folder is None:
+    data = data or data_root()
+    lists = {}
+    for name, table, folder in (
+        ("text_copy", schemas.TEXT_COPIES, latest_clean_text_copies_dir(data)),
+        ("uncredited_song", schemas.UNCREDITED_SONGS, latest_clean_uncredited_songs_dir(data)),
+    ):
         empty = "SELECT NULL::VARCHAR AS country_iso3, NULL::VARCHAR AS song_id WHERE false"
-        return {"text_copy": connection.sql(empty)}
-    table = schemas.read_table(schemas.TEXT_COPIES, folder, connection)
-    return {"text_copy": table.project("country_iso3, song_id")}
+        lists[name] = (
+            connection.sql(empty)
+            if folder is None
+            else schemas.read_table(table, folder, connection).project("country_iso3, song_id")
+        )
+    return lists
 
 
 def _load(
@@ -308,7 +324,8 @@ def load_rule(
 
     Each file defaults to the tracked file in `resources/lyrics/`, and the list of songs
     in quarantine to the newest complete quarantine folder of `data`. The tables of
-    artist countries and of text copies are the newest complete ones of `data`, when
+    artist countries, of text copies and of uncredited songs are the newest complete ones
+    of `data`, when
     `data` has them.
     """
     lists = (

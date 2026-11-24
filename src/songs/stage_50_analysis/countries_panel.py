@@ -195,6 +195,7 @@ def song_inputs(data: Path) -> list[Path]:
         paths.latest_clean_song_quarantine_dir(data),
         paths.latest_clean_artist_country_dir(data),
         paths.latest_clean_text_copies_dir(data),
+        paths.latest_clean_uncredited_songs_dir(data),
     )
     return folders + [folder for folder in found if folder is not None]
 
