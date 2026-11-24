@@ -1,0 +1,40 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 3,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/genius/20261120/",
+  "campaign_id": "20261124T164916Z",
+  "code_commit": "22420407caa0010777cf580a1166aaf60b8c8ddd",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-24T16:51:03Z",
+  "iso3": "CMR",
+  "known_gaps": [
+    "close: 1 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 7 songs to add. 6 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 7,
+  "run_id": "20261124T165045Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 7,
+  "songs_attempted": 5053001,
+  "songs_rejected": {
+    "already_linked": 7,
+    "close": 1,
+    "held": 65,
+    "no_title_key": 705,
+    "no_track": 530,
+    "not_roster": 5050281,
+    "out_of_scope": 1256,
+    "same_title": 144,
+    "short_lyrics": 4,
+    "track_taken": 1
+  },
+  "source": "genius",
+  "started_utc": "2026-11-24T16:50:45Z",
+  "state": "complete"
+}

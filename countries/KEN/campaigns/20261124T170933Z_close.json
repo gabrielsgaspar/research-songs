@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T170933Z",
+  "closed_utc": "2026-11-24T17:39:00Z",
+  "iso3": "KEN",
+  "next_time": "Audit KEN roster for no-home-release artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 7/31 (22.6%) exceeds 15%",
+  "schema_version": 1,
+  "songs_after": 4854
+}

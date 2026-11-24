@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T170510Z",
+  "closed_utc": "2026-11-24T17:38:59Z",
+  "iso3": "GLP",
+  "next_time": "Audit GLP roster for no-home-release artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 12/76 (15.8%) exceeds 15%",
+  "schema_version": 1,
+  "songs_after": 377
+}

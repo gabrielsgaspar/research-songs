@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T173241Z",
+  "closed_utc": "2026-11-24T17:39:03Z",
+  "iso3": "MOZ",
+  "next_time": "Audit MOZ roster for no-home-release artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 16/25 (64%) exceeds 15%",
+  "schema_version": 1,
+  "songs_after": 245
+}
