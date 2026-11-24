@@ -36,6 +36,7 @@ CASES = {
         {"inputs": ["clean/catalog/discogs/20261101/", "lyrics/BRA/songs/20261105T140000Z/"]},
         None,
     ),
+    "clean_text_copies": ((DAY,), {"inputs": ["lyrics/BRA/songs/20261105T140000Z/"]}, None),
     "country_songs": (
         ("BRA", RUN),
         {"country_iso3": "BRA", "run_id": RUN, "inputs": ["clean/dumps/letras/20261105/"]},

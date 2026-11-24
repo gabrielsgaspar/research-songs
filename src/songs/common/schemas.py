@@ -75,6 +75,7 @@ SCORES_FOLDER = "lyrics/<ISO3>/scores/<run id>/"
 DUMP_FOLDER = "clean/dumps/<source>/<YYYYMMDD>/"
 ANALYSIS_FOLDER = "analysis/<YYYYMMDD>/"
 ARTIST_COUNTRY_FOLDER = "clean/quality/artist_country/<YYYYMMDD>/"
+TEXT_COPIES_FOLDER = "clean/quality/text_copies/<YYYYMMDD>/"
 
 RAW_MEMBERS = Table(
     file="members.parquet",
@@ -510,6 +511,40 @@ ARTIST_COUNTRY = Table(
     ),
 )
 
+# The reasons of `text_copies.parquet`.
+SAME_TEXT, SAME_ARTIST_START = "same_text", "same_artist_start"
+
+TEXT_COPIES = Table(
+    file="text_copies.parquet",
+    folder=TEXT_COPIES_FOLDER,
+    rows="one row per campaign song that is a text copy of another song of its country",
+    key=("country_iso3", "song_id"),
+    columns=(
+        Column("country_iso3", "string", True, "Country of the song"),
+        Column(
+            "song_id",
+            "string",
+            True,
+            "The copy: a song with the route `dump_name` in `songs.parquet` of the country",
+        ),
+        Column(
+            "kept_song_id",
+            "string",
+            True,
+            "The song of the same country that represents the group: an older song when "
+            "the group has one, else the campaign song with the smallest `run_id`, then "
+            "the smallest `song_id`",
+        ),
+        Column(
+            "reason",
+            "string",
+            True,
+            f"`{SAME_TEXT}`: the same `text_key` as the kept song (`songs.common.lyric_hash`). "
+            f"`{SAME_ARTIST_START}`: the same artist and the same `start_key`",
+        ),
+    ),
+)
+
 # Name of a generated part of the standard -> the tables that it shows.
 GROUPS: dict[str, tuple[Table, ...]] = {
     "raw_tables": (RAW_MEMBERS,),
@@ -517,7 +552,7 @@ GROUPS: dict[str, tuple[Table, ...]] = {
     "score_tables": (SCORE_TOPICS, SCORE_PROVENANCE),
     "dump_tables": (DUMP_SONGS, DUMP_ARTIST_NAMES),
     "analysis_tables": (ANALYSIS_COUNTRY_YEAR, ANALYSIS_SONGS),
-    "quality_tables": (ARTIST_COUNTRY,),
+    "quality_tables": (ARTIST_COUNTRY, TEXT_COPIES),
 }
 TABLES: tuple[Table, ...] = tuple(table for tables in GROUPS.values() for table in tables)
 

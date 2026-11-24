@@ -186,6 +186,7 @@ def test_every_table_has_a_key_and_known_types():
         "country_year.parquet",
         "songs.parquet",
         "artist_country.parquet",
+        "text_copies.parquet",
     ]
 
 

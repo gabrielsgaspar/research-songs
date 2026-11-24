@@ -96,7 +96,8 @@ def all_lists(tmp_path: Path) -> dict[str, duckdb.DuckDBPyRelation]:
     connection = duckdb.default_connection()
     hashes = eligible_songs.load_hash_lists(connection, *invented_lists(tmp_path))
     artists = artist_files(tmp_path, "a_out,spoken_word\n", "a_moved,GHA\n")
-    return hashes | eligible_songs.load_artist_lists(connection, *artists)
+    lists = hashes | eligible_songs.load_artist_lists(connection, *artists)
+    return lists | eligible_songs.load_text_copies(connection, tmp_path)
 
 
 def old_quarantine(tmp_path: Path, rows: str) -> Path:
@@ -191,9 +192,52 @@ def test_the_table_of_artist_countries_leaves_out_an_artist_of_another_country(
     lists |= eligible_songs.load_artist_lists(
         connection, *artist_files(tmp_path, countries="a_moved,GHA\n"), data
     )
+    lists |= eligible_songs.load_text_copies(connection, data)
     songs = frame(schemas.COUNTRY_SONGS, [song(song_id, **over)])
     result = eligible_songs.classify(songs, [], lists)
     assert result.project("ineligible_reason").fetchall() == [(reason,)]
+
+
+def write_text_copies(data: Path, day: str, rows: list[tuple[str, str]]) -> None:
+    """Write a table of text copies from (country, song id) rows."""
+    folder = paths.clean_text_copies_dir(data, day)
+    folder.mkdir(parents=True)
+    full = [
+        {"country_iso3": code, "song_id": song_id, "kept_song_id": "k", "reason": "same_text"}
+        for code, song_id in rows
+    ]
+    schemas.write_table(schemas.TEXT_COPIES, frame(schemas.TEXT_COPIES, full), folder)
+    manifests.write_manifest(data, folder, "clean_text_copies", inputs=["z"])
+
+
+COPIES = [
+    ("listed", {}, "text_copy"),
+    ("listed_in_another_country", {"country_iso3": "BEN"}, None),
+    ("only_in_the_older_table", {}, None),
+    # The duplicate rules come first.
+    ("listed_and_re_release", {"re_release": True}, "re_release"),
+    ("listed_and_too_old", {"year": 1899}, "text_copy"),
+]
+
+
+@pytest.mark.parametrize(("song_id", "over", "reason"), COPIES, ids=[c[0] for c in COPIES])
+def test_the_newest_table_of_text_copies_leaves_out_a_listed_song(tmp_path, song_id, over, reason):
+    data = tmp_path / "data"
+    write_text_copies(data, "20260101", [("TGO", "only_in_the_older_table")])
+    listed = ("listed", "listed_in_another_country", "listed_and_re_release", "listed_and_too_old")
+    write_text_copies(data, "20260102", [("TGO", name) for name in listed])
+    connection = duckdb.default_connection()
+    lists = eligible_songs.load_hash_lists(connection, *list_files(tmp_path))
+    lists |= eligible_songs.load_artist_lists(connection, *artist_files(tmp_path), data)
+    lists |= eligible_songs.load_text_copies(connection, data)
+    songs = frame(schemas.COUNTRY_SONGS, [song(song_id, **over)])
+    result = eligible_songs.classify(songs, [], lists)
+    assert result.project("ineligible_reason").fetchall() == [(reason,)]
+
+
+def test_with_no_table_of_text_copies_no_song_is_a_copy(tmp_path):
+    lists = eligible_songs.load_text_copies(duckdb.default_connection(), tmp_path)
+    assert lists["text_copy"].fetchall() == []
 
 
 CASES = [
@@ -265,6 +309,7 @@ def test_with_no_group_a_song_by_hand_is_left_out(tmp_path):
     connection = duckdb.default_connection()
     lists = eligible_songs.load_hash_lists(connection, *list_files(tmp_path))
     lists |= eligible_songs.load_artist_lists(connection, *artist_files(tmp_path))
+    lists |= eligible_songs.load_text_copies(connection, tmp_path)
     result = eligible_songs.classify(songs, [], lists).project("ineligible_reason, by_exception")
     assert result.fetchall() == [("entered_by_hand", False)]
 
@@ -412,6 +457,7 @@ def built(tmp_path):
             song("t8", artist_id="a_out"),
             song("t9", artist_id="a_moved"),
             song("t10", artist_id="a_checked"),
+            song("t11"),
         ],
         [score("t1", 10), score("t2", 20), score("t3", 30), score("gone", 40), score("t4", 50)],
     )
@@ -427,6 +473,7 @@ def built(tmp_path):
     old = old_quarantine(tmp_path, f"quarantined,TGO,a1,Invented,{ZEROS},quarantine,x,c,y,z\n")
     eligible_songs.import_old_song_quarantine(old, data, date(2026, 1, 2))
     write_artist_countries(data, "20260103", [("TGO", "a_checked", schemas.OTHER_COUNTRY)])
+    write_text_copies(data, "20260104", [("TGO", "t11")])
     suspect, _ = invented_lists(tmp_path)
     excluded, countries = artist_files(tmp_path, "a_out,spoken_word\n", "a_moved,GHA\n")
     result = release.build(
@@ -448,12 +495,13 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         "clean/countries/20260101/",
         "clean/quality/song_quarantine/20260102/",
         "clean/quality/artist_country/20260103/",
+        "clean/quality/text_copies/20260104/",
         f"lyrics/BEN/songs/{SONGS_RUN}/",
         f"lyrics/TGO/songs/{SONGS_RUN}/",
         f"lyrics/TGO/scores/{SCORES_RUN}/",
     ]
     assert manifest.counts == {
-        "songs": 13,
+        "songs": 14,
         "eligible_songs": 6,
         "songs_by_exception": 1,
         "songs_by_exception_BEN": 1,
@@ -473,6 +521,7 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         "left_out_suppressed_duplicate": 0,
         "left_out_not_canonical": 0,
         "left_out_re_release": 1,
+        "left_out_text_copy": 1,
         "left_out_entered_by_hand": 0,
         "left_out_year_out_of_range": 0,
         "countries": 2,

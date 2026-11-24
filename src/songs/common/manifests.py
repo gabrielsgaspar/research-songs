@@ -104,7 +104,15 @@ KINDS: dict[str, Kind] = {
         None,
         "day",
         ("inputs",),
-        _files("quality_tables"),
+        (schemas.ARTIST_COUNTRY.file,),
+    ),
+    "clean_text_copies": Kind(
+        schemas.TEXT_COPIES_FOLDER,
+        paths.clean_text_copies_dir,
+        None,
+        "day",
+        ("inputs",),
+        (schemas.TEXT_COPIES.file,),
     ),
     "country_songs": Kind(
         schemas.COUNTRY_FOLDER,
