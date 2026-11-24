@@ -149,6 +149,22 @@ Some rosters hold artists of other countries. `uv run songs lyrics roster-check`
 
 The rule looks at each roster artist with a Discogs id, also an id found by name. The artist gets the decision `other_country` only when three conditions hold: the start of the Discogs profile states another country, the same text has no word of a home country, and fewer than 20% of the releases of the artist are in a home release country while another country has the most releases. Every other artist gets `keep`. No person checks a row. An import of a dump does not add a song of an artist with `other_country` in the newest table; the run record counts the song as `artist_other_country`. The rule for eligible songs leaves out the songs that the country already holds of such an artist, with the reason `artist_country`. The tracked list `resources/lyrics/artist_countries.csv` wins over the table for an artist that it names. [The data layout](../docs/standards/data_layout.md) gives the rule in full and the columns of the table. The country words are in `resources/lyrics/country_words.csv`.
 
+### Limits of a campaign
+
+An audit on 2026-11-24 read the 978,744 songs that campaigns added to 74 countries. It found these limits. Read them before you report the result of a campaign.
+
+- `rows_added` is not the number of new lyrics. About 72% of the added songs were a new text with no doubt. About 19% had the same text as an older song of the same artist in the same country, when only letters and digits are compared.
+- An import holds back a text only when its hash is the same as the hash of a held text. The hash changes with punctuation and with small differences between two sources. The same lyrics from a second source pass this check.
+- The title checks cannot see an older song that has no title. In the audit, 53% of the older songs had no title, and 95% of the older copies were such songs.
+- A title with a suffix after a dash, such as "- Remastered" or "- Live", counts as a new title. About 2% of the added songs repeat the text of another added song of the same artist.
+- About 2% of the added songs have a text that another country also holds. Most are one artist on the rosters of two countries.
+- About 78% of the added songs belong to an artist whose Discogs id was found by name. In a sample of 30 such artists, 27 were right for their country.
+- The dumps `lrclib` and `genius` hold the lyrics of a song under each recording of it. An instrumental recording of a standard can get the lyrics of the song.
+- A remaster or a live version can give a song a year that is too late, because the year comes from the matched Discogs track.
+- A dump campaign adds little to a country with a small roster or with few Discogs ids. On 2026-11-24 the survey estimate for the 30 best countries with no campaign was about 16,600 songs in total. Such a country needs a new source first.
+
+After a campaign, compare the added songs with the older songs of the same artist on a text with letters and digits only. Report that count next to `rows_added`.
+
 ## Collect a lyric site
 
 A site with no dump on this disk is collected first. One collector exists, for `dainutekstai` (LTU). Only a person starts it, because it sends requests to the site:
