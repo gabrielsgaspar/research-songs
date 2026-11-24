@@ -22,6 +22,7 @@ from pathlib import Path
 import duckdb
 
 from songs.common import manifests, paths, run_records, schemas
+from songs.stage_30_topics.scoring_prompt import PROMPT_SHA256
 from songs.stage_30_topics.topic_ids import TOPIC_IDS
 
 OLD_DATA_ENV = "SONGS_OLD_DATA_ROOT"
@@ -29,7 +30,9 @@ OLD_DATA_ENV = "SONGS_OLD_DATA_ROOT"
 # provenance.parquet is the older file. It is the source only when the newer file is absent.
 PROVENANCE_FILES = ("topic_provenance.parquet", "provenance.parquet")
 # These columns are required in the new tables. A blank cell stops the import.
-REQUIRED = ("lyrics_sha256", "prompt_sha256", "model", "text_kind", "measurement_status")
+# The old `prompt_sha256` hashes the prompt of one song. The old `instrument_sha256` is the
+# identity of the prompt and model, the value that `PROMPT_SHA256` pins.
+REQUIRED = ("lyrics_sha256", "instrument_sha256", "model", "text_kind", "measurement_status")
 OLD_TOPIC_COLUMNS = tuple(f"t{index}" for index in range(1, len(TOPIC_IDS) + 1))
 COUNT_NAMES = (
     "scores",
@@ -37,6 +40,7 @@ COUNT_NAMES = (
     "scores_text_changed",
     "scores_null_topics",
     "scores_country_differs",
+    "scores_other_prompt",
     "scores_song_lyrics",
     "scores_non_song",
     "scores_uncertain",
@@ -139,6 +143,7 @@ def _counts(connection: duckdb.DuckDBPyConnection) -> dict[str, int]:
             count(*) FILTER (WHERE text_changed),
             count(*) FILTER (WHERE coalesce({topic_list}) IS NULL),
             count(*) FILTER (WHERE country_differs),
+            count(*) FILTER (WHERE prompt_sha256 <> '{PROMPT_SHA256}'),
             count(*) FILTER (WHERE text_kind = 'song_lyrics'),
             count(*) FILTER (WHERE text_kind = 'non_song'),
             count(*) FILTER (WHERE text_kind = 'uncertain'),
@@ -232,7 +237,7 @@ def import_scores(
                 t.song_id,
                 p.lyrics_sha256,
                 {topic_as},
-                p.prompt_sha256,
+                p.instrument_sha256 AS prompt_sha256,
                 p.model,
                 p.text_kind,
                 p.measurement_status AS status,
