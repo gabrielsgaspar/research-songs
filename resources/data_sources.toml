@@ -328,6 +328,18 @@ checked = false
 notes = "The overrides must move to a tracked file with the code that applies them."
 
 [[source]]
+id = "independence_years_old_pipeline"
+concept = "Independence year"
+status = "canonical"
+columns = []
+source = "Old songs pipeline, lyrics_country_outputs.py: POST_1950_INDEPENDENCE_YEARS and FORMER_USSR_OR_YUGOSLAVIA_COUNTRIES, typed by hand"
+version = "old repository, commit d1cb5449 of 2026-11-14"
+url = ""
+raw_path = ""
+checked = false
+notes = "Tracked as resources/independence_years.csv. Only the sample tier (analysis_tier) reads it, through songs.stage_50_analysis.sample_tiers. The years were not checked against a published list."
+
+[[source]]
 id = "land_area_wdi"
 concept = "Land area"
 status = "supplementary"
