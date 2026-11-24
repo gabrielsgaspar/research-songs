@@ -1,0 +1,39 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 156,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/tekstovi/20261120/",
+  "campaign_id": "20261124T000917Z",
+  "code_commit": "2fa52e5b95de9b47184fac9c2db211fded7b39a3",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-24T00:09:42Z",
+  "iso3": "HRV",
+  "known_gaps": [
+    "close: 79 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 972 songs to add. 809 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 972,
+  "run_id": "20261124T000933Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 972,
+  "songs_attempted": 76036,
+  "songs_rejected": {
+    "already_linked": 189,
+    "close": 79,
+    "held": 4,
+    "held_loose_title": 329,
+    "no_track": 1168,
+    "not_roster": 63540,
+    "out_of_scope": 361,
+    "same_title": 9392,
+    "short_lyrics": 2
+  },
+  "source": "tekstovi",
+  "started_utc": "2026-11-24T00:09:33Z",
+  "state": "complete"
+}
