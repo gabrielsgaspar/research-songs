@@ -47,6 +47,8 @@ Each run that starts while the campaign is open carries its id in `campaign_id`.
 
 The close command refuses an empty `--next-time`. That text is what a later campaign reads first, so write what to try next, or why no more work is useful. The outcomes `stopped` and `abandoned` also need `--reason`.
 
+Close a campaign as `stopped` when its songs failed a check after its runs, for example the roster check. While the newest campaign of a country is `stopped` and `songs_after` is more than `songs_before`, the rule for eligible songs leaves out every campaign song (route `dump_name`) of the country with the reason `held_country`. The older songs of the country stay eligible. A stopped campaign that added no songs holds nothing. To end the hold, fix the cause and close a later campaign as `complete` or `abandoned`. On 2026-11-24, 14 countries were held with 1,928 campaign songs. The rule gave 1,899 of them the reason `held_country`; the other 29 songs (PHL) have the earlier reason `artist_country`.
+
 A campaign has two files in `countries/<ISO3>/campaigns/`: `<campaign id>_open.json` and `<campaign id>_close.json`. Each file is written one time and never changed. A campaign with no close file is open. The name of a campaign never appears in a folder name of the data.
 
 | Field | File | Meaning |

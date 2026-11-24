@@ -7,7 +7,7 @@ import duckdb
 import pandas as pd
 import pytest
 
-from songs.common import manifests, paths, run_records, schemas
+from songs.common import campaigns, manifests, paths, run_records, schemas
 from songs.stage_30_topics.topic_ids import TOPIC_IDS
 from songs.stage_50_analysis import eligible_songs, release
 from songs.stage_50_analysis.countries_panel import COUNTRY_COLUMNS
@@ -97,7 +97,18 @@ def all_lists(tmp_path: Path) -> dict[str, duckdb.DuckDBPyRelation]:
     hashes = eligible_songs.load_hash_lists(connection, *invented_lists(tmp_path))
     artists = artist_files(tmp_path, "a_out,spoken_word\n", "a_moved,GHA\n")
     lists = hashes | eligible_songs.load_artist_lists(connection, *artists)
+    lists |= eligible_songs.load_held_countries(connection, held_countries(tmp_path))
     return lists | eligible_songs.load_text_copies(connection, tmp_path)
+
+
+def held_countries(tmp_path: Path) -> Path:
+    """Write campaign records in which NER stopped after it added songs; return the folder."""
+    countries = tmp_path / "countries"
+    campaigns.open_campaign("NER", "An invented goal", songs_before=10, countries=countries)
+    campaigns.close_campaign(
+        "NER", "stopped", "Check the roster.", reason="roster", songs_after=12, countries=countries
+    )
+    return countries
 
 
 def old_quarantine(tmp_path: Path, rows: str) -> Path:
@@ -193,6 +204,7 @@ def test_the_table_of_artist_countries_leaves_out_an_artist_of_another_country(
         connection, *artist_files(tmp_path, countries="a_moved,GHA\n"), data
     )
     lists |= eligible_songs.load_text_copies(connection, data)
+    lists |= eligible_songs.load_held_countries(connection, tmp_path)
     songs = frame(schemas.COUNTRY_SONGS, [song(song_id, **over)])
     result = eligible_songs.classify(songs, [], lists)
     assert result.project("ineligible_reason").fetchall() == [(reason,)]
@@ -230,6 +242,7 @@ def test_the_newest_table_of_text_copies_leaves_out_a_listed_song(tmp_path, song
     lists = eligible_songs.load_hash_lists(connection, *list_files(tmp_path))
     lists |= eligible_songs.load_artist_lists(connection, *artist_files(tmp_path), data)
     lists |= eligible_songs.load_text_copies(connection, data)
+    lists |= eligible_songs.load_held_countries(connection, tmp_path)
     songs = frame(schemas.COUNTRY_SONGS, [song(song_id, **over)])
     result = eligible_songs.classify(songs, [], lists)
     assert result.project("ineligible_reason").fetchall() == [(reason,)]
@@ -256,6 +269,9 @@ CASES = [
     ("excluded", {"artist_id": "a_out"}, "excluded_artist", False),
     ("moved", {"artist_id": "a_moved"}, "artist_country", False),
     ("moved_home", {"artist_id": "a_moved", "country_iso3": "GHA"}, None, False),
+    ("held", {"country_iso3": "NER", "route": "dump_name"}, "held_country", False),
+    ("held_older_song", {"country_iso3": "NER"}, None, False),
+    ("campaign_not_held", {"route": "dump_name"}, None, False),
     ("quarantine", {"quality_status": "quarantine"}, "quality_quarantine", False),
     ("unverified", {"quality_status": "source_only_unverified"}, None, False),
     ("suppressed", {"duplicate_decision": "suppress_duplicate"}, "suppressed_duplicate", False),
@@ -310,6 +326,7 @@ def test_with_no_group_a_song_by_hand_is_left_out(tmp_path):
     lists = eligible_songs.load_hash_lists(connection, *list_files(tmp_path))
     lists |= eligible_songs.load_artist_lists(connection, *artist_files(tmp_path))
     lists |= eligible_songs.load_text_copies(connection, tmp_path)
+    lists |= eligible_songs.load_held_countries(connection, tmp_path)
     result = eligible_songs.classify(songs, [], lists).project("ineligible_reason, by_exception")
     assert result.fetchall() == [("entered_by_hand", False)]
 
@@ -518,6 +535,7 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         "left_out_quarantined_song": 1,
         "left_out_excluded_artist": 1,
         "left_out_artist_country": 2,
+        "left_out_held_country": 0,
         "left_out_suppressed_duplicate": 0,
         "left_out_not_canonical": 0,
         "left_out_re_release": 1,
