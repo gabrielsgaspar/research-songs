@@ -1020,12 +1020,16 @@ def score_prepare(
     max_requests: Annotated[
         int, typer.Option(help="Most requests in the batch. The other songs wait.")
     ] = 1_000,
+    decade: Annotated[
+        list[str] | None,
+        typer.Option(help="Take only the songs of this decade, such as 1980s. Repeat for more."),
+    ] = None,
 ) -> None:
     """Write the batch file of the eligible songs that have no current score. Sends nothing."""
     from songs.common.paths import data_root
     from songs.stage_30_topics import scoring_run
 
-    plan = scoring_run.prepare(data_root(), countries, max_requests)
+    plan = scoring_run.prepare(data_root(), countries, max_requests, decades=decade)
     for code, counts in plan["countries"].items():
         typer.echo(
             f"{code}: "
