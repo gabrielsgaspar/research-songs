@@ -15,7 +15,7 @@ Topic labels and definitions are not in this folder. They are in [`resources/top
 
 The answer format is built in code from the topic ids: a song is lyrics with 38 scores, or it is not lyrics and every topic is `unknown`.
 
-`songs.stage_30_topics.scoring_run` sends the requests and stores the scores (`songs score prepare`, `submit` and `collect`). `songs score status` shows how many eligible songs of each country have a current score; `uv run songs score status --write` writes [`docs/status/scoring.md`](../../docs/status/scoring.md). The data layout standard describes the run.
+`songs.stage_30_topics.scoring_run` sends the requests and stores the scores (`songs score prepare`, `submit` and `collect`). `songs score status` shows how many eligible songs of each country have a current score; `uv run songs score status --write` writes [`docs/status/scoring.md`](../../docs/status/scoring.md). The data layout standard describes the run. `uv run songs score agreement --write` writes [`docs/status/prompt_agreement.md`](../../docs/status/prompt_agreement.md): for songs of one country with the same text and decade, it compares the scores of the current prompt with the scores of each other prompt. These pairs cost nothing, because both songs got the same request.
 
 ## How to score a country
 
