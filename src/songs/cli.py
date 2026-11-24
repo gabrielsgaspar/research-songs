@@ -556,7 +556,8 @@ def dumps_build(
         typer.echo(f"skipped {result['source']}: {result['reason']}")
         return
     typer.echo(
-        f"wrote {result['path']} ({result['rows_out']} songs, {result['artists_out']} artists, "
+        f"wrote {result['path']} ({result['songs_out']} songs, "
+        f"{result['rows_out']} song credit rows, {result['artists_out']} artists, "
         f"family {result['family']})"
     )
     for reason, count in result["dropped"].items():
