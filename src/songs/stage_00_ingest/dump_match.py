@@ -121,6 +121,14 @@ DISCOGS_METHODS = {
 CLOSE_CUTOFF = 0.9
 # Added to the match method of a song whose artist got its Discogs id by name.
 BY_NAME = "_artist_by_name"
+# Of several Discogs artists with one name key, the one with this many home releases or
+# more is taken when no other has one. In a sample of 100, 3 of the 16 artists with one
+# home release were wrong, and 1 of the 84 with two or more (2026-11-24).
+MIN_HOME_RELEASES = 2
+# Its home releases must also be this share of its releases or more. Madonna, Michael
+# Jackson, Mariah Carey and Céline Dion are below 0.1% for DZA; the lowest artist of the
+# country above them, Trevor Jones for ZAF, is at 0.7% (2026-11-24).
+MIN_HOME_SHARE = 0.005
 # Discogs marks the second artist of one name as "Name (2)".
 _HOMONYM = r"\s\(\d+\)$"
 # The order in which the result of one roster artist wins over that of another.
@@ -662,13 +670,16 @@ def load_home_countries(root: Path | None = None) -> dict[str, frozenset[str]]:
     return {iso3: frozenset(names) for iso3, names in home.items()}
 
 
-def _with_home_release(discogs: Path, artist_ids: list[int], home: frozenset[str]) -> set[int]:
-    """Return the Discogs artists that a release of a country in `home` credits.
+def _home_releases(
+    discogs: Path, artist_ids: list[int], home: frozenset[str]
+) -> dict[int, tuple[int, int]]:
+    """Return, for each Discogs artist, the releases of a country in `home` and all releases.
 
-    The credit is on the release or on one of its tracks.
+    The releases are those that credit the artist, on the release or on one of its
+    tracks. An artist with no release of a country in `home` has no item.
     """
     if not artist_ids or not home:
-        return set()
+        return {}
     table = {
         name: _quoted(discogs / f"{name}.parquet")
         for name in ("release_artists", "release_track_artists", "releases")
@@ -689,14 +700,15 @@ def _with_home_release(discogs: Path, artist_ids: list[int], home: frozenset[str
         )
         rows = connection.sql(
             f"""
-            SELECT DISTINCT artist_id FROM credited WHERE release_id IN (
+            SELECT artist_id, count(DISTINCT release_id) FILTER (WHERE release_id IN (
                 SELECT release_id FROM {table["releases"]}
                 WHERE release_id IN (SELECT release_id FROM credited)
                     AND country IN (SELECT value FROM home)
-            )
+            )), count(DISTINCT release_id)
+            FROM credited GROUP BY artist_id
             """
         ).fetchall()
-    return {row[0] for row in rows}
+    return {artist: (number, total) for artist, number, total in rows if number}
 
 
 @functools.lru_cache(maxsize=8)
@@ -708,7 +720,11 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
     has the same `name_key` (without the homonym mark " (2)"), no other roster artist
     has that id, no other roster artist without an id has that key, and a release
     of a home country of `iso3` credits that artist (`load_home_countries`). The
-    last rule keeps out an artist of another country with the same name. The roster
+    last rule keeps out an artist of another country with the same name. When several
+    Discogs artists have the key, the one that `MIN_HOME_RELEASES` or more releases of
+    a home country credit, at least `MIN_HOME_SHARE` of its releases, is taken when no
+    other of them has a home release, and the
+    other conditions hold; `by_home_release` counts these artists. The roster
     of the folder is not changed: `import_dump` writes the id of an artist that gets
     a song, or that has a link of an earlier import, to the roster of its new folder.
     Such an artist stays an artist found by name in each later folder, because a link
@@ -754,7 +770,7 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
     result["no_name_key"] = sum(not key for key in missing.values())
     shared = Counter(missing.values())
     taken = set(ids.values())
-    alone = {}
+    alone, several = {}, {}
     for artist_id, key in missing.items():
         hits = found.get(key, {})
         if not key:
@@ -762,15 +778,31 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
         if not hits:
             result["none_found"] += 1
         elif len(hits) > 1:
-            result["more_than_one"] += 1
+            several[artist_id] = hits
         elif shared[key] > 1 or next(iter(hits)) in taken:
             result["id_taken"] += 1
         else:
             alone[artist_id] = next(iter(hits.items()))
     home = load_home_countries().get(iso3, frozenset())
-    at_home = _with_home_release(discogs, sorted(pair[0] for pair in alone.values()), home)
+    wanted = {pair[0] for pair in alone.values()} | {n for hits in several.values() for n in hits}
+    at_home = _home_releases(discogs, sorted(wanted), home)
     found_now = {key: pair for key, pair in alone.items() if pair[0] in at_home}
     result["no_home_release"] = len(alone) - len(found_now)
+    result["by_home_release"] = 0
+    for artist_id, hits in several.items():
+        homed = [number for number in hits if number in at_home]
+        one = homed[0] if len(homed) == 1 else None
+        if (
+            one
+            and at_home[one][0] >= MIN_HOME_RELEASES
+            and at_home[one][0] >= MIN_HOME_SHARE * at_home[one][1]
+            and shared[missing[artist_id]] == 1
+            and one not in taken
+        ):
+            found_now[artist_id] = (one, hits[one])
+            result["by_home_release"] += 1
+        else:
+            result["more_than_one"] += 1
     result["by_name"] = stored | found_now
     result["ids"] = ids | {artist_id: pair[0] for artist_id, pair in found_now.items()}
     return result

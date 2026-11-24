@@ -746,6 +746,46 @@ def write_named_discogs(folder: Path, artists: str) -> None:
         duckdb.sql(sql).write_parquet(str(folder / f"{name}.parquet"))
 
 
+def test_of_artists_with_one_name_the_only_one_with_home_releases_gets_the_id(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [
+            artist("a1", "Thanh Tuyền"),
+            artist("a2", "Elín"),
+            artist("a3", "Finnur"),
+            artist("a4", "Madonna"),
+        ],
+    )
+    folder = tmp_path / "discogs"
+    write_named_discogs(
+        folder,
+        "(31, 'Thanh Tuyền'), (32, 'Thanh Tuyen (2)'), (41, 'Elin'), (42, 'Elín (2)'), "
+        "(51, 'Finnur'), (52, 'Finnur (2)'), (61, 'Madonna'), (62, 'Madonna (2)')",
+    )
+    # 31 has two releases in Iceland and 32 one elsewhere; 41 has only one home release;
+    # 51 and 52 both have a home release; 61 has two home releases of 500, under 0.5%.
+    credits = "(1, 31), (2, 31), (3, 32), (4, 41), (5, 51), (5, 52), (6, 52), (1, 61), (2, 61)"
+    duckdb.sql(
+        f"SELECT * FROM (VALUES {credits}) AS t(release_id, artist_id) "
+        "UNION ALL SELECT range, 61 FROM range(100, 598)"
+    ).write_parquet(str(folder / "release_artists.parquet"))
+    countries = (
+        "(1, 'Iceland'), (2, 'Iceland'), (3, 'US'), (4, 'Iceland'), (5, 'Iceland'), (6, 'US')"
+    )
+    duckdb.sql(
+        f"SELECT release_id, NULL::BIGINT AS master_id, '1990' AS released, country "
+        f"FROM (VALUES {countries}) AS t(release_id, country) "
+        "UNION ALL SELECT range, NULL, '1990', 'US' FROM range(100, 598)"
+    ).write_parquet(str(folder / "releases.parquet"))
+
+    found = dump_match.discogs_ids(country, folder, "ISL")
+
+    assert found["by_name"] == {"a1": (31, "Thanh Tuyền")}
+    assert (found["by_home_release"], found["more_than_one"]) == (1, 3)
+
+
 def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_path):
     country = tmp_path / "country"
     write(
