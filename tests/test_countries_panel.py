@@ -324,17 +324,20 @@ def country_root(tmp_path: Path, codes: list[str]) -> Path:
 
 def test_the_registry_is_the_country_folders_with_world_bank_names(tmp_path):
     root = country_root(tmp_path, ["BRA", "ROM", "TWN"])
-    registry = panel.registry_from_countries(root, FIXTURES / "world_bank_countries.json")
+    workbook = tmp_path / "income.xlsx"
+    sheet = pd.DataFrame({"Economy": ["Brazil", "Romania"], "Code": ["BRA", "ROU"]})
+    sheet.to_excel(workbook, sheet_name=world_bank_countries.INCOME_SHEET, index=False)
+    registry = panel.registry_from_countries(root, workbook)
     assert list(registry.columns) == ["country_iso3", "country_name", "in_wvs", "in_evs"]
     assert registry["country_iso3"].tolist() == ["BRA", "TWN"]  # ROM is an old code
     assert registry["country_name"].iloc[0] == "Brazil"
-    assert registry["country_name"].isna().tolist() == [False, True]  # TWN is not on the list
+    assert registry["country_name"].isna().tolist() == [False, True]  # TWN is not in the workbook
     assert registry[["in_wvs", "in_evs"]].isna().all().all()
     assert panel.registry_from_countries(root, None)["country_name"].isna().all()
 
 
 def write_songs(data: Path) -> None:
-    """Write BRA with 100 eligible songs in each decade from the 1950s to the 2010s, and ROU."""
+    """Write BRA with 100 eligible songs in each decade from the 1950s to the 2010s, ROU and ARG."""
     core = [
         song(f"c{n}", country_iso3="BRA", artist_id=f"a{n % 3}", year=1950 + n // 100 * 10)
         for n in range(700)
@@ -345,6 +348,7 @@ def write_songs(data: Path) -> None:
     ]
     write_country(data, "BRA", core, None)
     write_country(data, "ROU", [song("r1", country_iso3="ROU")], None)
+    write_country(data, "ARG", [], None)
     eligible_songs.import_old_song_quarantine(old_quarantine(data, ""), data, date(2026, 1, 1))
 
 
@@ -352,7 +356,7 @@ def test_the_song_tables_count_the_eligible_songs_and_give_the_tier(tmp_path):
     assert panel.song_tables(tmp_path) == ({}, {"countries_with_songs": 0})
     write_songs(tmp_path)
     tables, counts = panel.song_tables(tmp_path)
-    assert counts["countries_with_songs"] == 2
+    assert counts["countries_with_songs"] == 3
     assert (counts["songs"], counts["eligible_songs"], counts["eligible_songs_no_year"]) == (
         703,
         702,
@@ -361,7 +365,8 @@ def test_the_song_tables_count_the_eligible_songs_and_give_the_tier(tmp_path):
     assert counts["left_out_quality_quarantine"] == 1
     assert (counts["sample_tier_core"], counts["sample_tier_total"]) == (1, 1)
     songs = tables["songs"].set_index(["country_iso3", "year"])["num_songs"]
-    assert len(songs) == 2 * 127  # every year of a country with songs, 0 in a year with none
+    assert len(songs) == 3 * 127  # every year of a country with a songs folder, 0 with no song
+    assert songs["ARG"].eq(0).all()
     assert songs["BRA", 1950] == 100 and songs["BRA", 1955] == 0
     assert songs["ROU", 1990] == 1 and songs["ROU", 1991] == 0
     artists = tables["artists"].set_index(["country_iso3", "year"])
@@ -369,7 +374,7 @@ def test_the_song_tables_count_the_eligible_songs_and_give_the_tier(tmp_path):
     assert set(artists["artist_count_method"]) == {panel.ARTIST_COUNT_METHOD}
     sample = tables["sample"]
     tiers = dict(zip(sample["country_iso3"], sample["analysis_tier"], strict=True))
-    assert tiers == {"BRA": sample_tiers.CORE, "ROU": sample_tiers.TOTAL}
+    assert tiers == {"BRA": sample_tiers.CORE, "ROU": sample_tiers.TOTAL}  # ARG has no song
 
 
 def test_build_stops_on_absent_inputs_and_never_writes_over_a_panel(tmp_path):
@@ -386,8 +391,8 @@ def test_build_stops_on_absent_inputs_and_never_writes_over_a_panel(tmp_path):
     bra = "country_iso3 = 'BRA' AND year = 1950"
     assert rows(written, bra, "num_songs, num_artists, analysis_tier") == [(100, 3, "Core")]
     # A country of the registry with no songs folder has empty counts and no tier.
-    arg = "country_iso3 = 'ARG' AND year = 1950"
-    assert rows(written, arg, "num_songs, analysis_tier") == [(None, None)]
+    chl = "country_iso3 = 'CHL' AND year = 1950"
+    assert rows(written, chl, "num_songs, analysis_tier") == [(None, None)]
     # The tracked hyperinflation episodes need no raw file.
     assert rows(written, "country_iso3 = 'BRA' AND hyperinflation_onset = 1", "year") == [(1989,)]
     with pytest.raises(FileExistsError):
@@ -413,6 +418,7 @@ def test_build_writes_a_manifest_that_names_the_inputs_it_read(tmp_path):
     assert (manifest.kind, manifest.path) == ("clean_countries", "clean/countries/20260102/")
     assert manifest.inputs == [  # the only inputs that are present
         "clean/quality/song_quarantine/20260101/",
+        f"lyrics/ARG/songs/{SONGS_RUN}/",
         f"lyrics/BRA/songs/{SONGS_RUN}/",
         f"lyrics/ROU/songs/{SONGS_RUN}/",
     ]

@@ -57,23 +57,31 @@ def load_income_groups(path: Path) -> pd.DataFrame:
     return pd.concat([groups, pd.DataFrame(extra, columns=groups.columns)], ignore_index=True)
 
 
-def _records(path: Path) -> list[dict]:
-    """Return the country records of the stored World Bank country list, without aggregates."""
-    pages = json.loads(path.read_text(encoding="utf-8"))["pages"]
-    records = (record for page in pages for record in page["records"])
-    return [record for record in records if record["region"]["id"] != "NA"]
-
-
 def load_names(path: Path) -> pd.DataFrame:
-    """Return `country_iso3`, `country_name` from the stored World Bank country list."""
-    names = {record["id"].upper(): record["name"].strip() for record in _records(path)}
-    return pd.DataFrame(sorted(names.items()), columns=["country_iso3", "country_name"])
+    """Return `country_iso3`, `country_name` from the classification workbook."""
+    sheet = pd.read_excel(path, sheet_name=INCOME_SHEET)
+    missing = sorted({"Code", "Economy"} - set(sheet.columns))
+    if missing:
+        raise ValueError(f"the income workbook lacks columns: {missing}")
+    rows = sheet.dropna(subset=["Code", "Economy"])
+    names = pd.DataFrame(
+        {
+            "country_iso3": rows["Code"].astype(str).str.strip().str.upper(),
+            "country_name": rows["Economy"].astype(str).str.strip(),
+        }
+    )
+    if names["country_iso3"].duplicated().any():
+        raise ValueError("the income workbook has duplicate codes")
+    return names
 
 
 def load_regions(path: Path) -> pd.DataFrame:
     """Return `country_iso3`, `region_name` from the stored World Bank country list."""
+    pages = json.loads(path.read_text(encoding="utf-8"))["pages"]
     regions = {}
-    for record in _records(path):
+    for record in (record for page in pages for record in page["records"]):
+        if record["region"]["id"] == "NA":  # an aggregate, not a country
+            continue
         name = record["region"]["value"].strip()
         regions[record["id"].upper()] = REGION_SHORT_NAMES.get(name, name)
     regions.update(REGION_OVERRIDES)

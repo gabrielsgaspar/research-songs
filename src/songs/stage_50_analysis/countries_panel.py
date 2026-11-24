@@ -6,7 +6,7 @@ exists. The manifest names every input file that the build read and counts the s
 in, out and left out (`docs/standards/data_layout.md`).
 
 The registry is every country with a folder in `countries/`, named as in the World
-Bank country list. The song and artist counts and the analysis tier come from the
+Bank income workbook. The song and artist counts and the analysis tier come from the
 eligible songs: `eligible_songs.classify` over the newest complete songs folder of
 each country, with the same rule and counts as the analysis release. `sample_tiers`
 gives the tier. Sources that are not lyrics are read from their raw files, at the
@@ -169,9 +169,9 @@ def _read_clean(name: str, path: Path) -> pd.DataFrame:
 def registry_from_countries(root: Path, names: Path | None) -> pd.DataFrame:
     """Return one row per country folder in `countries/` of `root`, less the old codes.
 
-    The name comes from the World Bank country list at `names`. A country that the
-    list lacks, or every country when `names` is None, has an empty name. The survey
-    columns are empty (`NO_SOURCE`).
+    The name comes from the World Bank income workbook at `names`. A country that the
+    workbook lacks, or every country when `names` is None, has an empty name. The
+    survey columns are empty (`NO_SOURCE`).
     """
     codes = sorted(
         folder.name
@@ -211,6 +211,8 @@ def song_tables(data: Path) -> tuple[dict[str, pd.DataFrame], dict[str, int]]:
     if not countries:
         return {}, {"countries_with_songs": 0}
     connection = duckdb.connect()
+    covered = pd.DataFrame({"country_iso3": [code for code, _, _ in countries]})
+    connection.register("covered", covered)
     eligible_songs.read_country_tables(
         connection,
         "songs",
@@ -226,7 +228,7 @@ def song_tables(data: Path) -> tuple[dict[str, pd.DataFrame], dict[str, int]]:
         f"""
         SELECT country_iso3, CAST(year AS INTEGER) AS year,
             coalesce(num_songs, 0) AS num_songs, coalesce(num_artists, 0) AS num_artists
-        FROM (SELECT DISTINCT country_iso3 FROM songs)
+        FROM covered
         CROSS JOIN range({MIN_SONG_YEAR}, {MAX_SONG_YEAR + 1}) AS years(year)
         LEFT JOIN year_counts USING (country_iso3, year)
         """
@@ -267,7 +269,8 @@ def read_tables(
     """
     absent = sorted(name for name, path in inputs.items() if path is None or not path.exists())
     registry = registry_from_countries(
-        paths.resolve_project_root(root), None if "regions" in absent else inputs["regions"]
+        paths.resolve_project_root(root),
+        None if "income_groups" in absent else inputs["income_groups"],
     )
     song, counts = song_tables(data)
     absent = sorted([*absent, *([] if song else ["songs"]), *NO_SOURCE])
