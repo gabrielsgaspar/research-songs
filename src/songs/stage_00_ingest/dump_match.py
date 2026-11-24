@@ -94,7 +94,7 @@ import pandas as pd
 
 from songs.common import lyric_hash, manifests, paths, run_records, schemas
 from songs.common.years import is_admissible_year
-from songs.stage_00_ingest import review_workbooks
+from songs.stage_00_ingest import discogs_roster, review_workbooks
 
 CLASSES = ("held", "same_title", "roster_new", "not_roster")
 NEW_CLASSES = CLASSES[1:]
@@ -373,7 +373,9 @@ def _discogs_keys(connection: duckdb.DuckDBPyConnection, discogs: Path) -> str:
     return _quoted(folder / "artist_keys.parquet")
 
 
-def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
+def match_dump(
+    dump: Path, country: Path, *, examples: int = 10, new_artists: dict | None = None
+) -> dict:
     """Classify each song of the dump folder `dump` against the country folder `country`.
 
     Return the counts, the songs left out with their reasons, up to `examples`
@@ -382,6 +384,7 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
     lead key that is the key of a roster artist or of the artist of a held song.
     Only the candidates are read into Python. Every other song is counted in SQL as
     not_roster, no_title_key or no_artist_key, and has no row in `songs`.
+    `new_artists` (`discogs_roster.new_artists`) counts as more roster artists.
     """
     keys = dump_keys(dump)
     credits_file, alias_file, songs_file, lengths_file = (
@@ -396,7 +399,7 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
         roster = _rows(
             schemas.read_table(schemas.COUNTRY_ARTISTS, country, connection),
             "artist_id, artist_name",
-        )
+        ) + [(artist_id, pair[0]) for artist_id, pair in (new_artists or {}).items()]
         roster_ids: dict[str, set[str]] = {}
         roster_name: dict[str, str] = {}
         for artist_id, name in roster:
@@ -753,7 +756,9 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
     return result
 
 
-def match_discogs(songs: list[dict], country: Path, discogs: Path, iso3: str) -> list[dict]:
+def match_discogs(
+    songs: list[dict], country: Path, discogs: Path, iso3: str, new_artists: dict | None = None
+) -> list[dict]:
     """Look for each roster_new song of `match_dump` in the Discogs tracks of its artist.
 
     `songs` is the `songs` list of `match_dump`. Return one row for each roster_new
@@ -769,9 +774,11 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path, iso3: str) ->
     with the shortest title is added, and the first one when two are equally short.
     A song with more than one roster artist is looked up for each artist that has a
     Discogs id; `_ARTIST_ORDER` chooses the artist, and `roster_artist_id` names it.
+    An artist of `new_artists` has the Discogs id that it gives.
     """
     resolved = discogs_ids(country.resolve(), discogs.resolve(), iso3)
     discogs_of, by_name = resolved["ids"], resolved["by_name"]
+    discogs_of = discogs_of | {key: int(pair[1]) for key, pair in (new_artists or {}).items()}
     with duckdb.connect() as connection:
         held_loose = {
             (artist_id, loose_key(title))
@@ -874,7 +881,13 @@ def match_discogs(songs: list[dict], country: Path, discogs: Path, iso3: str) ->
 
 
 def _added_frames(
-    dump: Path, country: Path, iso3: str, source: str, chosen: dict[str, dict], songs: dict
+    dump: Path,
+    country: Path,
+    iso3: str,
+    source: str,
+    chosen: dict[str, dict],
+    songs: dict,
+    new_artists: dict | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Return the rows of `songs.parquet` and of `links.parquet` for the chosen dump songs."""
     with duckdb.connect() as connection:
@@ -883,6 +896,9 @@ def _added_frames(
             for row in schemas.read_table(schemas.COUNTRY_ARTISTS, country, connection)
             .project("artist_id, artist_name, discogs_artist_id, country_tag")
             .fetchall()
+        } | {
+            key: (name, number, discogs_roster.COUNTRY_TAG)
+            for key, (name, number) in (new_artists or {}).items()
         }
         _table(connection, "chosen_ids", "str", sorted(chosen))
         connection.execute(
@@ -1070,6 +1086,7 @@ def would_add(
     iso3: str,
     reviewed: dict[tuple[str, ...], str] | None = None,
     other_country: frozenset[str] = frozenset(),
+    new_artists: dict | None = None,
 ) -> dict:
     """Decide which songs of the dump folder `dump` an import adds to the folder `country`.
 
@@ -1083,10 +1100,12 @@ def would_add(
     the chosen songs counted by
     year (`by_year`, and `no_year` for a song with no year). `by_name` counts the
     chosen songs whose artist got its Discogs id by name (`discogs_ids`). The chosen
-    songs and the rejected songs add up to `songs_in`.
+    songs and the rejected songs add up to `songs_in`. The artists of `new_artists`
+    (`discogs_roster.new_artists`) count as roster artists; `new_artists` of the result
+    holds those of them that get a song.
     """
-    result = match_dump(dump, country)
-    found = match_discogs(result["songs"], country, discogs, iso3)
+    result = match_dump(dump, country, new_artists=new_artists)
+    found = match_discogs(result["songs"], country, discogs, iso3, new_artists)
     reviewed = load_reviewed_matches() if reviewed is None else reviewed
 
     def accepted(row: dict) -> bool:
@@ -1119,6 +1138,11 @@ def would_add(
         "chosen": chosen,
         "close_accepted": close_accepted,
         "by_name": sum(row["artist_by_name"] for row in chosen.values()),
+        "new_artists": {
+            row["roster_artist_id"]: new_artists[row["roster_artist_id"]]
+            for row in chosen.values()
+            if row["roster_artist_id"] in (new_artists or {})
+        },
         "rejected": {
             **{name: result["counts"][name] for name in CLASSES if name != "roster_new"},
             **result["left_out"],
@@ -1158,15 +1182,17 @@ def survey(data: Path, iso3: str, sources: list[str], discogs: Path | None = Non
     folder has `dump` None and no counts. Every other row has the dump folder, the
     songs read (`songs_in`), the songs that `import_dump` would add (`would_add`),
     how many of them have an artist whose Discogs id was found by name
-    (`would_add_by_name`), those songs by year (`by_year`, `no_year`), every other song by class
-    (`rejected`), and the seconds that the estimate took. `discogs` defaults to the
-    newest complete `clean/catalog/discogs/<YYYYMMDD>/`.
+    (`would_add_by_name`), the artists of `discogs_roster.new_artists` that would join
+    the roster (`would_add_new_artists`), those songs by year (`by_year`, `no_year`),
+    every other song by class (`rejected`), and the seconds that the estimate took.
+    `discogs` defaults to the newest complete `clean/catalog/discogs/<YYYYMMDD>/`.
     """
     country = paths.latest_country_songs_dir(data, iso3)
     if country is None:
         raise FileNotFoundError(f"no songs folder of {iso3}")
     discogs = _discogs_folder(data, discogs)
     _, other_country = other_country_artists(data, iso3)
+    new_artists = discogs_roster.new_artists(data, discogs, iso3)
     rows = []
     for source in sources:
         dump = paths.latest_clean_dump_dir(data, source)
@@ -1174,7 +1200,7 @@ def survey(data: Path, iso3: str, sources: list[str], discogs: Path | None = Non
             rows.append({"source": source, "dump": None})
             continue
         start = time.monotonic()
-        plan = would_add(dump, country, discogs, source, iso3, other_country=other_country)
+        plan = would_add(dump, country, discogs, source, iso3, None, other_country, new_artists)
         rows.append(
             {
                 "source": source,
@@ -1182,6 +1208,7 @@ def survey(data: Path, iso3: str, sources: list[str], discogs: Path | None = Non
                 "songs_in": plan["songs_in"],
                 "would_add": len(plan["chosen"]),
                 "would_add_by_name": plan["by_name"],
+                "would_add_new_artists": len(plan["new_artists"]),
                 "by_year": plan["by_year"],
                 "no_year": plan["no_year"],
                 "rejected": plan["rejected"],
@@ -1329,13 +1356,16 @@ def import_dump(
         manifests.read_manifest(dump)
         manifests.read_manifest(earlier)
         table, other_country = other_country_artists(data, iso3)
-        plan = would_add(dump, earlier, discogs, source, iso3, reviewed, other_country)
+        new_artists = discogs_roster.new_artists(data, discogs, iso3)
+        plan = would_add(dump, earlier, discogs, source, iso3, reviewed, other_country, new_artists)
         rejected, close_accepted, by_name = (
             plan["rejected"],
             plan["close_accepted"],
             plan["by_name"],
         )
-        added, links = _added_frames(dump, earlier, iso3, source, plan["chosen"], plan["songs"])
+        added, links = _added_frames(
+            dump, earlier, iso3, source, plan["chosen"], plan["songs"], plan["new_artists"]
+        )
         out = paths.country_songs_dir(data, iso3, record.run_id)
         out.mkdir(parents=True, exist_ok=False)
         named = discogs_ids(earlier.resolve(), discogs, iso3)["by_name"]
@@ -1358,7 +1388,8 @@ def import_dump(
             counts=counts
             | {f"dump_songs_{name}": value for name, value in rejected.items()}
             | {"dump_songs_close_accepted": close_accepted}
-            | {"dump_songs_added_artist_by_name": by_name},
+            | {"dump_songs_added_artist_by_name": by_name}
+            | {"artists_added_by_discogs_home_rule": len(plan["new_artists"])},
             notes=(
                 f"Songs of {bulk_file} that match a Discogs track of their roster artist. "
                 f"Discogs tables: {discogs_label}."
@@ -1380,6 +1411,11 @@ def import_dump(
             record.notes = (
                 f"{record.notes} {by_name} songs added for artists whose Discogs id was "
                 f"found by name (their match method ends with {BY_NAME})."
+            ).strip()
+        if plan["new_artists"]:
+            record.notes = (
+                f"{record.notes} {len(plan['new_artists'])} artists joined the roster by the "
+                f"Discogs home rule (country tag {discogs_roster.COUNTRY_TAG})."
             ).strip()
         if close_accepted:
             record.notes = (

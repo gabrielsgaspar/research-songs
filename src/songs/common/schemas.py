@@ -123,8 +123,9 @@ COUNTRY_ARTISTS = Table(
             "country_tag",
             "string",
             False,
-            "Why the artist belongs to the country, as recorded (the old `country_basis`, or "
-            'the "Nationality / country in our file" value of a review workbook)',
+            "Why the artist belongs to the country, as recorded (the old `country_basis`, "
+            'the "Nationality / country in our file" value of a review workbook, or '
+            "`discogs_home_releases` for an artist that a campaign added from Discogs)",
         ),
         Column("attempted", "boolean", True, "True when a collection run tried this artist"),
         Column("last_attempt_utc", "string", False, "Time of the last attempt"),
