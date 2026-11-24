@@ -568,6 +568,37 @@ def dumps_build(
         typer.echo("note: the crawl is incomplete")
 
 
+@dumps_app.command("parse")
+def dumps_parse(
+    source: Annotated[str, typer.Argument(help="Source key, lower case.")],
+    raw_input: Annotated[
+        str,
+        typer.Argument(help="raw/<source>/<YYYYMMDD>/ of the saved pages, relative to the data."),
+    ],
+) -> None:
+    """Read the saved pages of a site into a lyric table in a new raw/<source>/<YYYYMMDD>/.
+
+    `songs dumps build` reads the new folder. The command only reads the pages folder.
+    """
+    from songs.common.paths import data_root
+    from songs.stage_00_ingest import textpesenok
+
+    if source != textpesenok.SOURCE:
+        typer.echo(f"error: no page parser for {source}; one exists for {textpesenok.SOURCE}")
+        raise typer.Exit(1)
+    data = data_root()
+    try:
+        result = textpesenok.parse_folder(data, raw_input)
+    except (FileExistsError, ValueError) as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    path = result.pop("path")
+    for name, number in result.items():
+        typer.echo(f"{name}: {number}")
+    typer.echo(f"wrote {path}. Next:")
+    typer.echo(f'uv run songs dumps build {source} "{data / path}" {path}')
+
+
 @dumps_app.command("match")
 def dumps_match(
     source: Annotated[str, typer.Argument(help="Source key of the dump, lower case.")],
