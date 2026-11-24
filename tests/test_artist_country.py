@@ -281,3 +281,16 @@ def test_a_bad_word_list_is_refused(tmp_path, rows):
     path.write_text("country_iso3,word\n" + rows, encoding="utf-8")
     with pytest.raises(ValueError):
         artist_country.load_country_words(tmp_path)
+
+
+def test_a_country_word_in_the_name_of_the_artist_is_no_evidence():
+    text = "Hong Kong Radio is a punk band. The singer is a Mexican drummer."
+    assert profile_evidence(text, frozenset({"MEX"})) == ("HKG", True)
+    assert profile_evidence(text, frozenset({"MEX"}), ("Hong Kong Radio",)) == ("MEX", True)
+    assert profile_evidence(text, frozenset({"HKG"}), ("", "HONG KONG RADIO")) == ("MEX", False)
+
+
+def test_a_role_of_another_person_is_no_statement():
+    assert profile_evidence("Orchestra founded by the German composer", frozenset())[0] == ""
+    assert profile_evidence("The German composer and pianist", frozenset())[0] == ""
+    assert profile_evidence("German composer and pianist", frozenset())[0] == "DEU"

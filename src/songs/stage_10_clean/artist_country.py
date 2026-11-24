@@ -16,6 +16,10 @@ for every other artist:
    word that describes a role noun within a few words ("Syrian traditional singer"),
    or a country word that follows "from" within 40 characters with no sentence break
    ("from Dublin, Ireland"). A word followed by "-born" or " born" is no statement.
+   A country word before a role noun is no statement when "the" comes before it
+   ("founded by the German composer"): such a phrase describes another person. A
+   country word that is in the name of the artist ("Hong Kong" in the name of a
+   band) is no statement and no home word.
 2. No word of a home country is anywhere in that text. A home country is the country
    itself, each country whose Discogs release names are all release names of this
    country in `resources/lyrics/discogs_countries.csv` (the USSR is a home of
@@ -113,7 +117,8 @@ def _patterns(root: Path | None = None) -> tuple[re.Pattern[str], re.Pattern[str
         for text in sorted(words, key=lambda text: (-len(text), text))
     )
     stated = (
-        rf"(?<!\w)({word})(?![- ]born)(?:[ /,&-]+[\w'’]+){{0,4}}?[ /-]+(?i:{ROLES})(?!\w)"
+        rf"(?<!\w)(?<![Tt]he )({word})(?![- ]born)"
+        rf"(?:[ /,&-]+[\w'’]+){{0,4}}?[ /-]+(?i:{ROLES})(?!\w)"
         rf"|(?i:\bfrom)\s+[^.;()\[\]]{{0,40}}?(?<!\w)({word})(?!\w)"
     )
     codes = {text.casefold(): code for text, code in words.items()}
@@ -128,17 +133,35 @@ def home_codes(iso3: str) -> frozenset[str]:
     return frozenset({iso3, *inside, *ALSO_HOME.get(iso3, ())})
 
 
-def profile_evidence(profile: str | None, home: frozenset[str]) -> tuple[str, bool]:
+def profile_evidence(
+    profile: str | None, home: frozenset[str], names: tuple[str, ...] = ()
+) -> tuple[str, bool]:
     """Return what the start of a Discogs profile says about the country of the artist.
 
     The first value is the country that the first statement names, or "" for no
     statement. The second is true when a word of a country in `home` is in the text.
+    A country word that is in one of `names`, the names of the artist, counts for neither.
     """
     text = _IGNORED.sub(" ", " ".join((profile or "").split())[:PROFILE_CHARS])
     any_word, statement, codes = _patterns()
-    home_word = any(codes[found.group(1).casefold()] in home for found in any_word.finditer(text))
-    found = statement.search(text)
-    stated = codes[(found.group(1) or found.group(2)).casefold()] if found else ""
+    in_name = {
+        found.group(1).casefold() for name in names for found in any_word.finditer(name or "")
+    }
+    home_word = any(
+        codes[word] in home
+        for word in (found.group(1).casefold() for found in any_word.finditer(text))
+        if word not in in_name
+    )
+    stated = next(
+        (
+            codes[word]
+            for word in (
+                (found.group(1) or found.group(2)).casefold() for found in statement.finditer(text)
+            )
+            if word not in in_name
+        ),
+        "",
+    )
     return stated, home_word
 
 
@@ -161,7 +184,7 @@ def decide(
 
 
 def _release_countries(discogs: Path, numbers: list[int]) -> tuple[dict, dict]:
-    """Return, for each Discogs artist id, its releases by release country, and its profile."""
+    """Return the releases by release country, and the name and profile, of each Discogs id."""
     table = {
         name: dump_match._quoted(discogs / f"{name}.parquet")
         for name in ("artists", "release_artists", "release_track_artists", "releases")
@@ -187,12 +210,13 @@ def _release_countries(discogs: Path, numbers: list[int]) -> tuple[dict, dict]:
             ) AS r USING (release_id) GROUP BY ALL
             """
         ).fetchall()
-        profiles = dict(
-            connection.sql(
-                f"SELECT artist_id, profile FROM {table['artists']} "
+        profiles = {
+            number: (name, profile)
+            for number, name, profile in connection.sql(
+                f"SELECT artist_id, name, profile FROM {table['artists']} "
                 "WHERE artist_id IN (SELECT value FROM ids)"
             ).fetchall()
-        )
+        }
     by_country: dict[int, dict[str, int]] = {}
     for number, country, releases in counted:
         by_country.setdefault(number, {})[country] = releases
@@ -212,7 +236,12 @@ def country_rows(folder: Path, discogs: Path, iso3: str) -> tuple[list[dict], di
             .aggregate("artist_id, count(*)", "artist_id")
             .fetchall()
         )
-        artists = len(connection.read_parquet(str(folder / schemas.COUNTRY_ARTISTS.file)))
+        roster_names = dict(
+            connection.read_parquet(str(folder / schemas.COUNTRY_ARTISTS.file))
+            .project("artist_id, artist_name")
+            .fetchall()
+        )
+        artists = len(roster_names)
     by_country, profiles = _release_countries(discogs, sorted({int(n) for n in ids.values()}))
     home_names = dump_match.load_home_countries().get(iso3, frozenset())
     home = home_codes(iso3)
@@ -222,7 +251,10 @@ def country_rows(folder: Path, discogs: Path, iso3: str) -> tuple[list[dict], di
         total = sum(releases.values())
         at_home = sum(count for name, count in releases.items() if name in home_names)
         top = top_country(releases, home_names)
-        stated, home_word = profile_evidence(profiles.get(int(number)), home)
+        discogs_name, profile = profiles.get(int(number), ("", None))
+        stated, home_word = profile_evidence(
+            profile, home, (roster_names.get(artist_id) or "", discogs_name or "")
+        )
         rows.append(
             {
                 "country_iso3": iso3,
