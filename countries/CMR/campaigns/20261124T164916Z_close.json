@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T164916Z",
+  "closed_utc": "2026-11-24T16:58:31Z",
+  "iso3": "CMR",
+  "next_time": "Audit CMR roster for no-home-release artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 11/38 (28.9%) exceeds 15%",
+  "schema_version": 1,
+  "songs_after": 1421
+}

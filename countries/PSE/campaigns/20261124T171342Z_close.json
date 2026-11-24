@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T171342Z",
+  "closed_utc": "2026-11-24T17:39:01Z",
+  "iso3": "PSE",
+  "next_time": "Audit PSE roster for no-home-release artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 13/36 (36.1%) exceeds 15%",
+  "schema_version": 1,
+  "songs_after": 1319
+}

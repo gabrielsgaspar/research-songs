@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T170112Z",
+  "closed_utc": "2026-11-24T17:38:58Z",
+  "iso3": "COG",
+  "next_time": "Audit COG roster for no-home-release artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 44/46 (95.7%) exceeds 15%",
+  "schema_version": 1,
+  "songs_after": 410
+}
