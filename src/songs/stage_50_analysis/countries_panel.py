@@ -6,10 +6,10 @@ exists. The manifest names every input file that the build read
 (`docs/standards/data_layout.md`).
 
 Sources that are not lyrics are read from their raw files, at the paths in
-`resources/data_sources.toml`. Four inputs come from the lyrics corpus and are
-read as clean files that another stage writes: the country registry, the analysis
-sample, the song counts and the artist counts. The populism series is also read
-as a clean file, because its raw file is not in the data folder yet.
+`resources/data_sources.toml`. Five inputs are files of the old pipeline, kept as
+received in `raw/<source>/<YYYYMMDD>/`: the country registry, the analysis sample,
+the song counts, the artist counts and the populism series. The build reads the
+newest complete folder of each source.
 """
 
 from collections.abc import Callable
@@ -107,13 +107,13 @@ OLD_CODES = {
     "ZAR": "COD",
 }
 
-# Clean files that this module does not build: (input name, path under the data folder).
-CLEAN_FILES = {
-    "registry": "extraction/countries.parquet",
-    "sample": "clean/analysis_sample.parquet",
-    "songs": "clean/country_year_song_counts.parquet",
-    "artists": "clean/country_year_artist_counts.parquet",
-    "populism": "clean/populism.parquet",
+# Files of the old pipeline: input name -> (source in `raw/`, file name in its version folder).
+OLD_PIPELINE_FILES = {
+    "registry": ("country_registry", "countries.parquet"),
+    "sample": ("analysis_sample", "analysis_sample.parquet"),
+    "songs": ("country_year_song_counts", "country_year_song_counts.parquet"),
+    "artists": ("country_year_artist_counts", "country_year_artist_counts.parquet"),
+    "populism": ("populism_fst", "populism.parquet"),
 }
 # Raw files: (input name, concept in the data source file, file name in its raw folder).
 RAW_FILES = {
@@ -145,8 +145,11 @@ CLEAN_SELECT = {
 
 
 def default_inputs(data: Path) -> dict[str, Path | None]:
-    """Return where each input is. None means the data source file names no raw folder."""
-    inputs: dict[str, Path | None] = {name: data / path for name, path in CLEAN_FILES.items()}
+    """Return where each input is. None means that the input has no raw folder."""
+    inputs: dict[str, Path | None] = {}
+    for name, (source, file_name) in OLD_PIPELINE_FILES.items():
+        folder = paths.latest_raw_dir(data, source)
+        inputs[name] = folder / file_name if folder else None
     for name, (concept, file_name) in RAW_FILES.items():
         raw_path = canonical(concept).raw_path
         inputs[name] = data / raw_path / file_name if raw_path else None
@@ -189,7 +192,8 @@ def read_tables(
     """
     absent = sorted(name for name, path in inputs.items() if path is None or not path.exists())
     if "registry" in absent:
-        raise FileNotFoundError(f"the country registry is absent: {inputs['registry']}")
+        where = inputs["registry"] or f"raw/{OLD_PIPELINE_FILES['registry'][0]}/<YYYYMMDD>/"
+        raise FileNotFoundError(f"the country registry is absent: {where}")
     registry, no_survey = _read_registry(inputs["registry"])
     absent += no_survey
     if absent and not allow_missing:
