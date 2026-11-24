@@ -87,7 +87,9 @@ def test_a_derived_folder_with_a_newer_input_is_stale(tmp_path, monkeypatch):
     panel = paths.clean_countries_dir(data, "20261101")
     panel.mkdir(parents=True)
     duckdb.sql("SELECT 1 AS x").write_parquet(str(panel / manifests.COUNTRIES_FILE))
-    manifests.write_manifest(data, panel, "clean_countries", inputs=["raw/gdp/20261001/gdp.csv"])
+    # The panel counts the eligible songs, so a songs folder is an input too.
+    inputs = ["raw/gdp/20261001/gdp.csv", old]
+    manifests.write_manifest(data, panel, "clean_countries", inputs=inputs)
     release = tables(
         data,
         paths.analysis_dir(data, "20261102"),
@@ -102,10 +104,12 @@ def test_a_derived_folder_with_a_newer_input_is_stale(tmp_path, monkeypatch):
     assert sync.stale(data) == []
 
     new = songs(data, "ISL", NEW)
-    songs(data, "NOR", OLD)
+    other = songs(data, "NOR", OLD)
     read["gdp"] = data / "raw" / "gdp" / "20261101" / "gdp.csv"
     touch(read["gdp"])
     assert sync.stale(data) == [
+        ("clean/countries/20261101/", f"a build now reads `{new}`", sync.PANEL_COMMAND),
+        ("clean/countries/20261101/", f"a build now reads `{other}`", sync.PANEL_COMMAND),
         (
             "clean/countries/20261101/",
             "a build now reads `raw/gdp/20261101/gdp.csv`",
