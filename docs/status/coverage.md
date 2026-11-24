@@ -144,7 +144,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [MOZ](../../countries/MOZ/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 245 |
 | [MRT](../../countries/MRT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 21 |
 | [MSR](../../countries/MSR/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
-| [MTQ](../../countries/MTQ/) | 2 | 2026-11-21 | old_layout | old_pipeline | 83 |
+| [MTQ](../../countries/MTQ/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 108 |
 | [MUS](../../countries/MUS/) | 2 | 2026-11-21 | old_layout | old_pipeline | 104 |
 | [MWI](../../countries/MWI/) | 2 | 2026-11-21 | old_layout | old_pipeline | 89 |
 | [MYS](../../countries/MYS/) | 4 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline | 9173 |
