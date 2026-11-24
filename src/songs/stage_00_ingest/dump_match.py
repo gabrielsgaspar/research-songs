@@ -59,6 +59,12 @@ A song that the import would add is left out as `artist_other_country` when the
 newest complete table of artist countries (`clean/quality/artist_country/<YYYYMMDD>/`,
 written by `songs.stage_10_clean.artist_country`) gives its roster artist the
 decision `other_country` for the country. With no such table, no song is left out.
+A song that the import would add is left out as `held_text` when it is a text copy
+(`songs.common.lyric_hash`) of a song that the country holds, or of a song that the
+same import adds: the two songs have the same `text_key`, for any artists, or the
+same roster artist and the same `start_key`. Of two such songs of one import, the
+one with the lower `source_song_id` is added. Only the added songs and the held
+songs of the country are read for their text, never a whole dump.
 The import reads the lyric text of the added songs from the dump; lyric text never
 goes to Git, to a manifest or to a run record.
 
@@ -86,7 +92,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from songs.common import manifests, paths, run_records, schemas
+from songs.common import lyric_hash, manifests, paths, run_records, schemas
 from songs.common.years import is_admissible_year
 from songs.stage_00_ingest import review_workbooks
 
@@ -121,6 +127,8 @@ _ARTIST_ORDER = ("held_loose_title", "already_linked", "exact", "loose", "close"
 ADDED = ("exact", "loose")
 # The class of a song that the import would add, of a roster artist of another country.
 ARTIST_OTHER_COUNTRY = "artist_other_country"
+# The class of a song that the import would add, whose text the country holds or the import adds.
+HELD_TEXT = "held_text"
 ROUTE = "dump_name"
 # A person's decision on each close match: accept adds the song, reject leaves it out.
 REVIEWED_FILE = Path("resources") / "lyrics" / "reviewed_close_matches.csv"
@@ -998,6 +1006,62 @@ def other_country_artists(data: Path, iso3: str) -> tuple[Path | None, frozenset
     return folder, frozenset(row[0] for row in rows)
 
 
+def held_text(dump: Path, country: Path, artists: dict[str, str]) -> set[str]:
+    """Return the songs of `artists` that are text copies of a held song or of an earlier song.
+
+    `artists` maps a `source_song_id` of the dump folder `dump` to its roster artist.
+    A song is a copy when a song of the folder `country` has its `text_key`, or its
+    artist and its `start_key`. An earlier song is a song of `artists` with a lower
+    `source_song_id` that is not a copy itself. The text of the held songs streams
+    through two threads, and only the keys of the songs of `artists` stay in memory.
+    """
+    if not artists:
+        return set()
+    keys = lyric_hash.text_keys_sql()
+    with duckdb.connect() as connection:
+        connection.execute("SET memory_limit = '4GB'")
+        connection.execute("SET threads = 2")
+        connection.execute("SET preserve_insertion_order = false")
+        frame = pd.DataFrame({"source_song_id": list(artists), "artist_id": list(artists.values())})
+        connection.register("wanted", frame)
+        schemas.read_table(schemas.DUMP_SONGS, dump, connection).filter(
+            "credit_position = 1"
+        ).create_view("dumped")
+        connection.execute(
+            f"CREATE TEMP TABLE new AS SELECT w.source_song_id, w.artist_id, {keys} "
+            "FROM dumped JOIN wanted AS w USING (source_song_id)"
+        )
+        schemas.read_table(
+            schemas.COUNTRY_SONGS, country, connection, fill_absent=True
+        ).create_view("held")
+        connection.execute(
+            f"""
+            CREATE TEMP TABLE held_keys AS
+            SELECT * FROM (SELECT artist_id, {keys} FROM held)
+            WHERE text_key IN (SELECT text_key FROM new)
+                OR start_key IN (SELECT start_key FROM new)
+            """
+        )
+        rows = connection.sql(
+            """
+            SELECT source_song_id, artist_id, text_key, start_key,
+                text_key IN (SELECT text_key FROM held_keys)
+                OR (artist_id, start_key) IN (SELECT (artist_id, start_key) FROM held_keys)
+            FROM new ORDER BY source_song_id
+            """
+        ).fetchall()
+    copies, texts, starts = set(), set(), set()
+    for song_id, artist_id, text, start, held in rows:
+        if text is None:
+            continue
+        if held or text in texts or (artist_id, start) in starts:
+            copies.add(song_id)
+        else:
+            texts.add(text)
+            starts.add((artist_id, start))
+    return copies
+
+
 def would_add(
     dump: Path,
     country: Path,
@@ -1013,7 +1077,8 @@ def would_add(
     the class `close` and `REVIEWED_FILE` accepts it for the same Discogs track.
     `reviewed` replaces the decisions of that file (for tests). Such a song of a roster
     artist in `other_country` (`other_country_artists`) is not added; it gets the class
-    `ARTIST_OTHER_COUNTRY`. Return the songs read (`songs_in`), the chosen songs with
+    `ARTIST_OTHER_COUNTRY`. Of the songs left, a text copy (`held_text`) gets the class
+    `HELD_TEXT`. Return the songs read (`songs_in`), the chosen songs with
     their Discogs rows (`chosen`), every other song counted by class (`rejected`), and
     the chosen songs counted by
     year (`by_year`, and `no_year` for a song with no year). `by_name` counts the
@@ -1034,6 +1099,14 @@ def would_add(
     for row in found:
         if row.get("roster_artist_id") in other_country and adds(row):
             row["discogs_class"] = ARTIST_OTHER_COUNTRY
+    copies = held_text(
+        dump,
+        country,
+        {row["source_song_id"]: row["roster_artist_id"] for row in found if adds(row)},
+    )
+    for row in found:
+        if row["source_song_id"] in copies:
+            row["discogs_class"] = HELD_TEXT
     chosen = {row["source_song_id"]: row for row in found if adds(row)}
     close_accepted = sum(row["discogs_class"] == "close" for row in chosen.values())
     discogs_counts = Counter(row["discogs_class"] for row in found)
@@ -1051,6 +1124,7 @@ def would_add(
             **result["left_out"],
             **{name: discogs_counts[name] for name in DISCOGS_CLASSES if name not in ADDED},
             ARTIST_OTHER_COUNTRY: discogs_counts[ARTIST_OTHER_COUNTRY],
+            HELD_TEXT: discogs_counts[HELD_TEXT],
         },
         "by_year": dict(sorted(years.items())),
         "no_year": no_year,

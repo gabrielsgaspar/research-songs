@@ -33,7 +33,7 @@ def write_dump(data: Path, source: str, songs: list[tuple[str, str, str]]) -> No
             "source_artist_id": ANNA,
             "credit_position": 1,
             "song_name": title,
-            "lyrics": "an invented line of text for the tests",
+            "lyrics": f"an invented line of text for the tests, text {sha}",
             "lyrics_sha256": sha,
         }
         for song_id, title, sha in songs

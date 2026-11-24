@@ -149,21 +149,30 @@ Some rosters hold artists of other countries. `uv run songs lyrics roster-check`
 
 The rule looks at each roster artist with a Discogs id, also an id found by name. The artist gets the decision `other_country` only when three conditions hold: the start of the Discogs profile states another country, the same text has no word of a home country, and fewer than 20% of the releases of the artist are in a home release country while another country has the most releases. Every other artist gets `keep`. No person checks a row. An import of a dump does not add a song of an artist with `other_country` in the newest table; the run record counts the song as `artist_other_country`. The rule for eligible songs leaves out the songs that the country already holds of such an artist, with the reason `artist_country`. The tracked list `resources/lyrics/artist_countries.csv` wins over the table for an artist that it names. [The data layout](../docs/standards/data_layout.md) gives the rule in full and the columns of the table. The country words are in `resources/lyrics/country_words.csv`.
 
+### Copies of a held text
+
+The same lyrics from a second source differ in punctuation, spacing or case, so their hash is not the hash of the held text. An import compares the texts on a key instead: the text in lower case with only its letters and digits, of any script (`songs.common.lyric_hash`). An import does not add a song that is a text copy of a song that the country holds, or of a song that the same import adds. A song is a text copy of another song when one of two conditions holds:
+
+- The two kept texts are the same, for any two artists of the country.
+- The two songs have the same roster artist, and the first 300 kept characters are the same.
+
+A kept text of fewer than 30 characters has no key and is never a copy. Of two copies in one import, the import adds the song with the lower `source_song_id`. The run record counts each song that the import holds back as `held_text`. The survey estimate uses the same rule, so it does not count these songs. The rule reads the text of each held song of the country and of each song that the import would add, not the text of the whole dump. On 2026-11-24 this added about 35 seconds to an estimate of the `lrclib` dump, and the held songs of a country with 1.5 million songs take about 35 seconds more.
+
 ### Limits of a campaign
 
 An audit on 2026-11-24 read the 978,744 songs that campaigns added to 74 countries. It found these limits. Read them before you report the result of a campaign.
 
 - `rows_added` is not the number of new lyrics. About 72% of the added songs were a new text with no doubt. About 19% had the same text as an older song of the same artist in the same country, when only letters and digits are compared.
-- An import holds back a text only when its hash is the same as the hash of a held text. The hash changes with punctuation and with small differences between two sources. The same lyrics from a second source pass this check.
-- The title checks cannot see an older song that has no title. In the audit, 53% of the older songs had no title, and 95% of the older copies were such songs.
-- A title with a suffix after a dash, such as "- Remastered" or "- Live", counts as a new title. About 2% of the added songs repeat the text of another added song of the same artist.
+- Until 2026-11-24, an import held back a text only when its hash was the same as the hash of a held text. The hash changes with punctuation and with small differences between two sources, so the same lyrics from a second source passed this check. Since then, an import also holds back a text copy (see "Copies of a held text"). The copies that earlier imports added stay in their folders.
+- The title checks cannot see an older song that has no title. In the audit, 53% of the older songs had no title, and 95% of the older copies were such songs. The text copy check needs no title.
+- A title with a suffix after a dash, such as "- Remastered" or "- Live", counts as a new title. In the audit, about 2% of the added songs repeated the text of another added song of the same artist. The text copy check now holds back such a song when its text is a copy.
 - About 2% of the added songs have a text that another country also holds. Most are one artist on the rosters of two countries.
 - About 78% of the added songs belong to an artist whose Discogs id was found by name. In a sample of 30 such artists, 27 were right for their country.
 - The dumps `lrclib` and `genius` hold the lyrics of a song under each recording of it. An instrumental recording of a standard can get the lyrics of the song.
 - A remaster or a live version can give a song a year that is too late, because the year comes from the matched Discogs track.
 - A dump campaign adds little to a country with a small roster or with few Discogs ids. On 2026-11-24 the survey estimate for the 30 best countries with no campaign was about 16,600 songs in total. Such a country needs a new source first.
 
-After a campaign, compare the added songs with the older songs of the same artist on a text with letters and digits only. Report that count next to `rows_added`.
+After a campaign, report the `held_text` count of each run record next to `rows_added`.
 
 ## Collect a lyric site
 
