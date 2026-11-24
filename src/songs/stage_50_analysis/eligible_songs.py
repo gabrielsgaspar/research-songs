@@ -32,9 +32,11 @@ filter. The rules, in the order that they are checked:
 8. `re_release`: the re-release check of the old pipeline says that the row is a
    re-release (`re_release` is true). A row that no check saw is not left out.
 9. `text_copy`: the table of text copies (`clean/quality/text_copies/<YYYYMMDD>/` in
-   the data folder, the newest complete folder) lists the song: a campaign song whose
-   text another song of its country already has. With no such folder, no song is
-   left out for this reason.
+   the data folder, the newest complete folder) lists the song: a song of any route
+   whose text another song of its country already has. A listed song that rules 6
+   to 8 already leave out reports that reason, so this count holds only the songs
+   that the old duplicate checks did not find. With no such folder, no song is left
+   out for this reason.
 10. `entered_by_hand`: a person collected the song (route `manual_review`), and its
    country has no group in the exceptions file.
 11. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.

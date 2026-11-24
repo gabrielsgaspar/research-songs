@@ -1,4 +1,4 @@
-"""Mark the campaign songs whose lyric text is a copy of another song of the same country.
+"""Mark the songs whose lyric text is a copy of another song of the same country.
 
     in   lyrics/<ISO3>/songs/<run id>/            songs.parquet of the newest complete
                                                   folder of each country
@@ -10,16 +10,29 @@ holds (the keys are those of `songs.common.lyric_hash`):
 1. `same_text`: A and B have the same `text_key`, for any two artists.
 2. `same_artist_start`: A and B have the same `artist_id` and the same `start_key`.
 
-A text with no key is never a copy. Only a campaign song (route `dump_name`) can
-be marked. An older song keeps the duplicate decisions of the old pipeline
-(`canonical_song_id`, `duplicate_decision`) and is never marked here.
+A text with no key is never a copy. A song of any route can be marked: a campaign
+song (route `dump_name`) or an older song. The duplicate decisions of the old
+pipeline (`canonical_song_id`, `duplicate_decision`, `re_release`) found only some
+of the older copies, so the rule also reads the older songs.
 
-The songs of one key are a group, and one song represents the group: an older song
-when the group has one, else the campaign song with the smallest `run_id`, then the
-smallest `song_id` (`ORDER`). Every other campaign song of the group gets one row,
-with that song as `kept_song_id`. The reason is `same_text` when the song is not the
-first of its `same_text` group, else `same_artist_start`. The first song in `ORDER`
-of a set of linked groups is never marked, so each text keeps one song.
+The songs of one key are a group, and one song represents the group, in this order
+(`ORDER`):
+
+1. An older song before a campaign song. So a campaign song never takes the place
+   of an older song, and the order of the older songs does not change which
+   campaign songs are marked, or their reasons.
+2. Of the older songs, a song that the old pipeline did not flag (`OLD_FLAG`)
+   before a flagged song. The rule for eligible songs leaves a flagged song out, so
+   a flagged song that represents a group would leave out the whole text.
+3. Of the older songs, the song with the earliest year, and a song with no year
+   last. An analysis by country and year cannot use a song with no year, and the
+   year of a re-release or of a cover is later than the year of the first release.
+4. The smallest `run_id`, then the smallest `song_id`, so that the order is stable.
+
+Every other song of the group gets one row, with that song as `kept_song_id`. The
+reason is `same_text` when the song is not the first of its `same_text` group, else
+`same_artist_start`. The first song in `ORDER` of a set of linked groups is never
+marked, so each text keeps one song.
 
 The rule reads each text one time, on two threads, one country at a time. The data
 folders are write-once, so the rule marks the copies and deletes nothing; the rule
@@ -35,17 +48,24 @@ import pandas as pd
 
 from songs.common import lyric_hash, manifests, paths, schemas
 from songs.common.schemas import SAME_ARTIST_START, SAME_TEXT
+from songs.stage_50_analysis import eligible_songs
 
 ROUTE = "dump_name"
+# The rules for eligible songs by which a duplicate check of the old pipeline left a song out.
+OLD_FLAG = " OR ".join(
+    f"coalesce({eligible_songs.RULES[name]}, false)"
+    for name in ("suppressed_duplicate", "not_canonical", "re_release")
+)
 # The order of the songs of a group; `campaign` is true for the route `ROUTE`.
-ORDER = "campaign, run_id, song_id"
+ORDER = "campaign, old_flag, old_year NULLS LAST, run_id, song_id"
 
 
 def country_copies(folder: Path, iso3: str) -> tuple[list[tuple], dict[str, int]]:
     """Return the rows of the table for one songs folder, and its counts.
 
     A row is (country, song id, kept song id, reason). The counts are the songs read
-    (`songs_in`), the campaign songs, the songs whose text has no key, and the rows by reason.
+    (`songs_in`), the campaign songs, the songs whose text has no key, the rows by
+    reason, and the rows of campaign songs (`campaign_copies`).
     """
     with duckdb.connect() as connection, tempfile.TemporaryDirectory() as spill:
         connection.execute(f"SET temp_directory = '{Path(spill).as_posix()}'")
@@ -57,7 +77,9 @@ def country_copies(folder: Path, iso3: str) -> tuple[list[tuple], dict[str, int]
         )
         connection.execute(
             "CREATE TEMP TABLE keyed AS SELECT song_id, artist_id, run_id, "
-            f"coalesce(route = '{ROUTE}', false) AS campaign, {lyric_hash.text_keys_sql()} "
+            f"coalesce(route = '{ROUTE}', false) AS campaign, "
+            f"NOT campaign AND ({OLD_FLAG}) AS old_flag, "
+            f"CASE WHEN NOT campaign THEN year END AS old_year, {lyric_hash.text_keys_sql()} "
             "FROM songs"
         )
         songs_in, campaign, no_key = connection.execute(
@@ -68,7 +90,8 @@ def country_copies(folder: Path, iso3: str) -> tuple[list[tuple], dict[str, int]
             f"""
             SELECT '{paths.check_iso3(iso3)}', song_id,
                 CASE WHEN text_first <> song_id THEN text_first ELSE start_first END,
-                CASE WHEN text_first <> song_id THEN '{SAME_TEXT}' ELSE '{SAME_ARTIST_START}' END
+                CASE WHEN text_first <> song_id THEN '{SAME_TEXT}' ELSE '{SAME_ARTIST_START}' END,
+                campaign
             FROM (
                 SELECT song_id, campaign,
                     first_value(song_id) OVER (PARTITION BY text_key ORDER BY {ORDER})
@@ -77,7 +100,7 @@ def country_copies(folder: Path, iso3: str) -> tuple[list[tuple], dict[str, int]
                         AS start_first
                 FROM keyed WHERE text_key IS NOT NULL
             )
-            WHERE campaign AND (text_first <> song_id OR start_first <> song_id)
+            WHERE text_first <> song_id OR start_first <> song_id
             ORDER BY song_id
             """
         ).fetchall()
@@ -87,8 +110,9 @@ def country_copies(folder: Path, iso3: str) -> tuple[list[tuple], dict[str, int]
         "songs_no_key": no_key,
         SAME_TEXT: sum(row[3] == SAME_TEXT for row in rows),
         SAME_ARTIST_START: sum(row[3] == SAME_ARTIST_START for row in rows),
+        "campaign_copies": sum(row[4] for row in rows),
     }
-    return rows, counts
+    return [row[:4] for row in rows], counts
 
 
 def check_copies(data: Path, *, write: bool = False, today: date | None = None) -> dict:
@@ -97,13 +121,20 @@ def check_copies(data: Path, *, write: bool = False, today: date | None = None) 
     With `write`, write the folder of the day with the table and its manifest, and
     return it as `folder`. Raise FileExistsError when the folder of the day exists.
     `counts` holds the songs read (`songs_in`), the campaign songs, the songs with no
-    key, the rows out (`copies`) and the rows by reason. `by_country` gives, for each
-    country with a copy, the copies, the campaign songs and all songs.
+    key, the rows out (`copies`), the rows by reason and the rows of campaign songs.
+    `by_country` gives, for each country with a copy, the copies and all songs.
     """
     out = paths.clean_text_copies_dir(data, today or date.today())
     if write and out.exists():
         raise FileExistsError(f"{out} exists; a version folder is never written over")
-    names = ("songs_in", "campaign_songs", "songs_no_key", SAME_TEXT, SAME_ARTIST_START)
+    names = (
+        "songs_in",
+        "campaign_songs",
+        "songs_no_key",
+        SAME_TEXT,
+        SAME_ARTIST_START,
+        "campaign_copies",
+    )
     counts = dict.fromkeys(("countries", *names, "copies"), 0)
     rows, inputs, by_country = [], [], {}
     for parent in sorted((data / "lyrics").glob("*")):
@@ -120,7 +151,7 @@ def check_copies(data: Path, *, write: bool = False, today: date | None = None) 
             counts[name] += one[name]
         counts["copies"] += len(found)
         if found:
-            by_country[parent.name] = (len(found), one["campaign_songs"], one["songs_in"])
+            by_country[parent.name] = (len(found), one["songs_in"])
         rows += found
         inputs.append(paths.data_relative(data, folder))
     result = {"counts": counts, "by_country": by_country, "folder": None}
