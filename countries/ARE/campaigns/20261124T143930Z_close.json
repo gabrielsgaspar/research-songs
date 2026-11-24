@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T143930Z",
+  "closed_utc": "2026-11-24T15:15:31Z",
+  "iso3": "ARE",
+  "next_time": "Audit ARE roster for Indian film-music artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "by-name sample: at least 6 of 8 artists are Indian Bollywood composers/lyricists (Anand Milind, Jatin Lalit, Nandu Bhende, A. M. Rajah, Tabun Sutradhar, Nitin Raikwar), not Emirati",
+  "schema_version": 1,
+  "songs_after": 3243
+}

@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T151314Z",
+  "closed_utc": "2026-11-24T15:15:41Z",
+  "iso3": "ARM",
+  "next_time": "Audit ARM roster for no-home-release artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 8/27 (29.6%) exceeds 15%",
+  "schema_version": 1,
+  "songs_after": 353
+}

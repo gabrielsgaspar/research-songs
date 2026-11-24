@@ -1,0 +1,38 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 3,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/songnu/20261121/",
+  "campaign_id": "20261124T143930Z",
+  "code_commit": "5fbb42fad051ea3acac33f5d8c07089b314625f1",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-24T14:40:45Z",
+  "iso3": "ARE",
+  "known_gaps": [
+    "close: 9 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 3 songs to add. 1 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 3,
+  "run_id": "20261124T144043Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 3,
+  "songs_attempted": 79050,
+  "songs_rejected": {
+    "already_linked": 24,
+    "artist_other_country": 6,
+    "close": 9,
+    "held": 708,
+    "no_track": 754,
+    "not_roster": 77121,
+    "out_of_scope": 8,
+    "same_title": 417
+  },
+  "source": "songnu",
+  "started_utc": "2026-11-24T14:40:43Z",
+  "state": "complete"
+}
