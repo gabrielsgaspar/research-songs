@@ -1030,6 +1030,8 @@ def score_prepare(
             f"{code}: "
             + ", ".join(f"{key} {value}" for key, value in counts.items() if isinstance(value, int))
         )
+    for folder in plan["reused_written"]:
+        typer.echo(f"wrote {folder} with the reused scores")
     estimate = plan["estimate"]
     if not plan["requests"]:
         typer.echo("nothing to score; no run was written")
@@ -1038,6 +1040,28 @@ def score_prepare(
         f"run {plan['run_id']}: {plan['requests']} requests, about {estimate['usd']} USD "
         f"({estimate['input_tokens']} input and {estimate['output_tokens']} output tokens)"
     )
+
+
+@score_app.command("status")
+def score_status(
+    countries: Annotated[
+        list[str] | None, typer.Argument(help="Country codes. All countries when absent.")
+    ] = None,
+    write: Annotated[
+        bool, typer.Option("--write", help="Write docs/status/scoring.md for all countries.")
+    ] = False,
+) -> None:
+    """Show how many eligible songs of each country have a current score. Sends nothing."""
+    from songs.common.paths import data_root
+    from songs.stage_30_topics import scoring_run
+
+    if write and countries:
+        typer.echo("error: --write takes all countries; give no country codes", err=True)
+        raise typer.Exit(1)
+    if write:
+        typer.echo(f"wrote {scoring_run.write_status(data_root())}")
+        return
+    typer.echo(scoring_run.render_status(scoring_run.status(data_root(), countries)))
 
 
 @score_app.command("submit")

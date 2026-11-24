@@ -227,3 +227,85 @@ def test_submit_on_the_command_line_needs_the_run_id_typed(data, tmp_path, monke
     result = CliRunner().invoke(cli.app, command, input="\n")
     assert result.exit_code == 1
     assert not (scoring_run.run_dir(data, plan["run_id"]) / scoring_run.STARTED_FILE).exists()
+
+
+def test_prepare_copies_the_score_of_a_song_with_the_same_text_and_decade(tmp_path):
+    data = tmp_path / "data"
+    songs = [
+        song("s5", lyrics_sha256=SHA["d"]),
+        song("s7", lyrics_sha256=SHA["d"], year=1995),
+        song("s8", lyrics_sha256=SHA["d"], year=1975),
+    ]
+    write_country(data, "TGO", songs, None)
+    write_scores(data, [("s5", SHA["d"], PROMPT.sha256)])
+    plan = prepared(data, tmp_path)
+    counts = plan["countries"]["TGO"]
+    assert counts["scored"] == 1 and counts["reused"] == 1 and counts["requests"] == 1
+    folder = paths.latest_country_scores_dir(data, "TGO")
+    assert plan["reused_written"] == [paths.data_relative(data, folder)]
+    provenance = schemas.read_table(schemas.SCORE_PROVENANCE, folder)
+    assert provenance.order("song_id").project("song_id, status").fetchall() == [
+        ("s5", "complete"),
+        ("s7", "reused"),
+    ]
+    topics = schemas.read_table(schemas.SCORE_TOPICS, folder).filter("song_id = 's7'")
+    assert topics.project(f'"{TOPIC_IDS[0]}"').fetchall() == [(7,)]
+    assert manifests.read_manifest(folder).counts["scores_reused"] == 1
+    again = prepared(data, tmp_path, run_id="20260202T000000Z")
+    assert again["countries"]["TGO"]["scored"] == 2 and again["countries"]["TGO"]["reused"] == 0
+    assert again["countries"]["TGO"]["in_open_run"] == 1 and again["reused_written"] == []
+
+
+def test_status_counts_the_eligible_songs_by_the_state_of_their_score(tmp_path):
+    data = tmp_path / "data"
+    songs = [
+        song("s1", lyrics_sha256=SHA["a"]),
+        song("s2", lyrics_sha256=SHA["b"]),
+        song("s3", lyrics_sha256=SHA["c"]),
+        song("s4", lyrics_sha256=SHA["d"]),
+        song("s5", lyrics_sha256=SHA["e"], year=1800),
+    ]
+    write_country(data, "TGO", songs, None)
+    write_scores(
+        data,
+        [
+            ("s2", SHA["b"], PROMPT.sha256),
+            ("s3", SHA["c"], "f" * 64),
+            ("s4", SHA["e"], PROMPT.sha256),
+        ],
+    )
+    prepared(data, tmp_path)
+    counts = scoring_run.status(data, ["tgo"], rule_files=rule_files(tmp_path))
+    assert counts == {
+        "TGO": {
+            "songs": 5,
+            "eligible": 4,
+            "scored": 1,
+            "other_prompt": 1,
+            "text_changed": 1,
+            "not_scored": 1,
+            "in_open_run": 3,
+        }
+    }
+    page = scoring_run.render_status(counts)
+    assert "| TGO | 5 | 4 | 1 | 25.0% | 1 | 1 | 1 | 3 |" in page
+    assert "| All | 5 | 4 | 1 | 25.0% |" in page
+    assert "No country has songs." in scoring_run.render_status({})
+    assert scoring_run.status(data, ["ben"], rule_files=rule_files(tmp_path)) == {}
+
+
+def test_status_counts_zero_for_a_country_with_no_eligible_songs(tmp_path):
+    data = tmp_path / "data"
+    write_country(data, "TGO", [song("s1", year=1800)], None)
+    counts = scoring_run.status(data, rule_files=rule_files(tmp_path))
+    assert counts["TGO"] == dict.fromkeys(scoring_run.STATUS_COUNTS, 0) | {"songs": 1}
+    assert "| TGO | 1 | 0 | 0 | no eligible songs |" in scoring_run.render_status(counts)
+
+
+def test_status_on_the_command_line_writes_the_page_only_for_all_countries():
+    from typer.testing import CliRunner
+
+    from songs import cli
+
+    result = CliRunner().invoke(cli.app, ["score", "status", "TGO", "--write"])
+    assert result.exit_code == 1 and "all countries" in result.output

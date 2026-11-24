@@ -12,6 +12,14 @@ A scoring run has three steps. Each one is a command of `songs score`.
              country: every score of the newest scores folder, with the new scores
              added or put in place of the old score of the same song.
 
+The request of a song holds only its country, decade and lyric text. So `prepare` sends
+no request for a song when another song of the country with the same text and decade
+has a score from this prompt and model. It copies that score with the status `reused`
+and writes a new scores folder for the country. This costs nothing.
+
+`status` counts, for each country, the eligible songs by the state of their score.
+`write_status` writes those counts to `docs/status/scoring.md`.
+
 The working files of a run are in `staging/scoring/<run id>/` of the data folder:
 the batch file (with lyric text), the request of each song, the plan, and the batch
 ids. That folder is not a version folder and never goes to the bucket. A song in a
@@ -33,9 +41,10 @@ import duckdb
 import pandas as pd
 
 from songs.common import manifests, paths, run_records, schemas
+from songs.common.paths import resolve_project_root
 from songs.stage_30_topics.scoring_prompt import FIELD_ORDER, ScoringPrompt, load_scoring_prompt
 from songs.stage_30_topics.topic_ids import TOPIC_IDS
-from songs.stage_50_analysis import eligible_songs
+from songs.stage_50_analysis import eligible_songs, release
 
 API_KEY_ENV = "OPENAI_API_KEY"
 MAX_REQUESTS = 50_000
@@ -54,6 +63,17 @@ PLAN_FILE = "plan.json"
 STARTED_FILE = "submit_started.json"
 BATCH_FILE = "batch.json"
 COLLECTED_FILE = "collected.json"
+STATUS_PAGE = Path("docs") / "status" / "scoring.md"
+STATUS_COMMAND = "uv run songs score status --write"
+STATUS_COUNTS = (
+    "songs",
+    "eligible",
+    "scored",
+    "other_prompt",
+    "text_changed",
+    "not_scored",
+    "in_open_run",
+)
 
 
 class BatchClient(Protocol):
@@ -179,17 +199,47 @@ def _scored(connection: duckdb.DuckDBPyConnection, folder: Path | None, prompt: 
     if folder is None:
         return set()
     provenance = schemas.read_table(schemas.SCORE_PROVENANCE, folder, connection)
-    return set(
-        provenance.filter(
-            f"prompt_sha256 = '{prompt.sha256}' AND model = '{prompt.settings['model']}'"
-        )
-        .project("song_id, lyrics_sha256")
-        .fetchall()
-    )
+    return set(provenance.filter(_current(prompt)).project("song_id, lyrics_sha256").fetchall())
 
 
 def _decade(year: Any) -> str | None:
     return None if pd.isna(year) else f"{int(year) // 10 * 10}s"
+
+
+def _current(prompt: ScoringPrompt) -> str:
+    return f"prompt_sha256 = '{prompt.sha256}' AND model = '{prompt.settings['model']}'"
+
+
+def _donors(
+    connection: duckdb.DuckDBPyConnection,
+    folder: Path | None,
+    songs: duckdb.DuckDBPyRelation,
+    prompt: ScoringPrompt,
+) -> dict[tuple[str, str | None], dict[str, Any]]:
+    """The score of each (lyrics hash, decade) that a song of `songs` has from this prompt.
+
+    The decade is that of the scored song in `songs` now; a scored song that is not in
+    `songs`, or whose text changed, gives no score.
+    """
+    if folder is None:
+        return {}
+    provenance = schemas.read_table(schemas.SCORE_PROVENANCE, folder, connection)
+    topics = schemas.read_table(schemas.SCORE_TOPICS, folder, connection)
+    quoted = ", ".join(f'"{topic}"' for topic in TOPIC_IDS)
+    joined = (
+        provenance.filter(_current(prompt))
+        .project("song_id, lyrics_sha256, text_kind, scored_utc")
+        .join(topics.project(f"song_id, {quoted}"), "song_id")
+        .join(songs.project("song_id, lyrics_sha256 AS song_sha, year"), "song_id")
+        .filter("lyrics_sha256 = song_sha")
+        .project(f"song_id, lyrics_sha256, year, text_kind, scored_utc, {quoted}")
+        .order("song_id")
+    )
+    names = joined.columns[3:]
+    donors: dict[tuple[str, str | None], dict[str, Any]] = {}
+    for _, lyrics_sha256, year, *values in joined.fetchall():
+        donors.setdefault((lyrics_sha256, _decade(year)), dict(zip(names, values, strict=True)))
+    return donors
 
 
 def _custom_id(iso3: str, lyrics_sha256: str, decade: str | None) -> str:
@@ -242,6 +292,7 @@ def prepare(
     }
     requests: list[bytes] = []
     assignments: list[dict[str, Any]] = []
+    reused: dict[str, list[dict[str, Any]]] = {}
     for code in dict.fromkeys(paths.check_iso3(code.upper()) for code in countries):
         songs_folder = paths.latest_country_songs_dir(data, code)
         if songs_folder is None:
@@ -253,9 +304,10 @@ def prepare(
             "song_id, lyrics, lyrics_sha256, year"
         )
         scored = _scored(connection, scores_folder, prompt)
+        donors = _donors(connection, scores_folder, songs, prompt)
         groups: dict[str, dict[str, Any]] = {}
         total = songs.aggregate("count(*)").fetchall()[0][0]
-        counts = Counter(songs=total, eligible=0, scored=0, in_open_run=0)
+        counts = Counter(songs=total, eligible=0, scored=0, in_open_run=0, reused=0)
         for song_id, lyrics, lyrics_sha256, year in eligible.order("song_id").fetchall():
             counts["eligible"] += 1
             if (song_id, lyrics_sha256) in scored:
@@ -265,6 +317,19 @@ def prepare(
                 counts["in_open_run"] += 1
                 continue
             decade = _decade(year)
+            donor = donors.get((lyrics_sha256, decade))
+            if donor is not None:
+                counts["reused"] += 1
+                reused.setdefault(code, []).append(
+                    {"country_iso3": code, "song_id": song_id, "lyrics_sha256": lyrics_sha256}
+                    | donor
+                    | {
+                        "prompt_sha256": prompt.sha256,
+                        "model": prompt.settings["model"],
+                        "status": "reused",
+                    }
+                )
+                continue
             custom_id = _custom_id(code, lyrics_sha256, decade)
             group = groups.setdefault(
                 custom_id, {"lyrics": lyrics, "lyrics_sha256": lyrics_sha256, "decade": decade}
@@ -310,6 +375,20 @@ def prepare(
         with (folder / ASSIGNMENTS_FILE).open("x", encoding="utf-8", newline="\n") as handle:
             handle.writelines(json.dumps(item) + "\n" for item in assignments)
         _write_json(folder / PLAN_FILE, plan)
+    notes = (
+        f"Scores that `songs score prepare` (run {run_id}) copied from another song of the "
+        "country with the same lyric text and decade, from the same prompt and model. No "
+        "request was sent. The scores of the earlier scores folder stay."
+    )
+    plan["reused_written"] = [
+        paths.data_relative(
+            data,
+            _write_country(
+                data, code, rows, plan["countries"][code], {"scores_reused": len(rows)}, notes
+            ),
+        )
+        for code, rows in sorted(reused.items())
+    ]
     return plan
 
 
@@ -391,8 +470,8 @@ def _write_country(
     code: str,
     rows: list[dict[str, Any]],
     plan_country: dict[str, Any],
-    prepared: str,
     counts: dict[str, int],
+    notes: str,
 ) -> Path:
     """Write the newest scores of a country, with `rows` in place of older scores.
 
@@ -430,11 +509,7 @@ def _write_country(
         run_id=run_id,
         inputs=inputs,
         counts=counts,
-        notes=(
-            f"Scoring run {prepared} through the Batch API. The scores of the earlier "
-            "scores folder stay, except where this run scored the same song again. "
-            "The working files of the run are in staging/scoring/ of the data folder."
-        ),
+        notes=notes,
     )
     return out
 
@@ -491,10 +566,15 @@ def collect(data: Path, run_id: str, client: BatchClient | None = None) -> dict[
                     "scored_utc": scored_utc,
                 }
             )
+    notes = (
+        f"Scoring run {run_id} through the Batch API. The scores of the earlier "
+        "scores folder stay, except where this run scored the same song again. "
+        "The working files of the run are in staging/scoring/ of the data folder."
+    )
     written = [
         paths.data_relative(
             data,
-            _write_country(data, code, rows, plan["countries"][code], run_id, dict(counts[code])),
+            _write_country(data, code, rows, plan["countries"][code], dict(counts[code]), notes),
         )
         for code, rows in sorted(by_country.items())
     ]
@@ -506,3 +586,104 @@ def collect(data: Path, run_id: str, client: BatchClient | None = None) -> dict[
     }
     _write_json(folder / COLLECTED_FILE, summary)
     return summary
+
+
+def status(
+    data: Path,
+    countries: list[str] | None = None,
+    *,
+    rule_files: dict[str, Path] | None = None,
+    root: Path | None = None,
+) -> dict[str, dict[str, int]]:
+    """Count, for each country, its songs and its eligible songs by the state of their score.
+
+    `scored`: a score from this prompt and model for the current lyric text.
+    `other_prompt`: a score for the current text from another prompt or model.
+    `text_changed`: a score of other text only. `not_scored`: no score. These four sum
+    to `eligible`. `in_open_run`: the eligible songs with no current score that a run
+    holds that is not collected. With no `countries`, take every country with songs.
+    """
+    prompt = load_scoring_prompt(root)
+    connection = duckdb.connect()
+    exceptions, lists = eligible_songs.load_rule(connection, data, **(rule_files or {}))
+    reserved = _reserved(data)
+    wanted = {paths.check_iso3(code.upper()) for code in countries or []}
+    result = {}
+    for code, songs_folder, scores_folder in release.country_folders(data):
+        if wanted and code not in wanted:
+            continue
+        songs = schemas.read_table(schemas.COUNTRY_SONGS, songs_folder, connection)
+        eligible = (
+            eligible_songs.classify(songs, exceptions, lists)
+            .filter("ineligible_reason IS NULL")
+            .project("song_id, lyrics_sha256 AS song_sha")
+        )
+        provenance = (
+            schemas.empty_table(schemas.SCORE_PROVENANCE, connection)
+            if scores_folder is None
+            else schemas.read_table(schemas.SCORE_PROVENANCE, scores_folder, connection)
+        )
+        joined = eligible.join(
+            provenance.project(f"song_id, lyrics_sha256, ({_current(prompt)}) AS current"),
+            "song_id",
+            how="left",
+        )
+        same = "lyrics_sha256 = song_sha"
+        row = joined.aggregate(
+            f"count(*), count_if({same} AND current), count_if({same} AND NOT current), "
+            f"count_if(lyrics_sha256 <> song_sha), count_if(lyrics_sha256 IS NULL)"
+        ).fetchall()[0]
+        waiting = joined.filter(f"NOT coalesce({same} AND current, false)")
+        in_open_run = sum(
+            (code, song_id, song_sha) in reserved
+            for song_id, song_sha in waiting.project("song_id, song_sha").fetchall()
+        )
+        total = songs.aggregate("count(*)").fetchall()[0][0]
+        values = (total, *(value or 0 for value in row), in_open_run)
+        result[code] = dict(zip(STATUS_COUNTS, values, strict=True))
+    return result
+
+
+def _share(scored: int, eligible: int) -> str:
+    return f"{100 * scored / eligible:.1f}%" if eligible else "no eligible songs"
+
+
+def render_status(counts: dict[str, dict[str, int]], root: Path | None = None) -> str:
+    """Return the scoring status page: one row per country and one row for all countries."""
+    prompt = load_scoring_prompt(root)
+    lines = [
+        "# Topic scores by country",
+        "",
+        f"Generated from the data folder by `{STATUS_COMMAND}`. Do not edit by hand.",
+        "",
+        f"The current prompt has the hash `{prompt.sha256[:12]}` and the model is "
+        f"`{prompt.settings['model']}`. Only eligible songs count. A song is scored when it "
+        "has a score from this prompt and model for its current lyric text. Other prompt: "
+        "the score of the text is from another prompt or model. Text changed: the score is "
+        "of other text. In open run: the song is in a scoring run that is not collected.",
+        "",
+    ]
+    if not counts:
+        return "\n".join([*lines, "No country has songs.", ""])
+    lines += [
+        "| Country | Songs | Eligible | Scored | Share scored | Other prompt | Text changed "
+        "| Not scored | In open run |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    total = {name: sum(row[name] for row in counts.values()) for name in STATUS_COUNTS}
+    for code, row in [*sorted(counts.items()), ("All", total)]:
+        lines.append(
+            f"| {code} | {row['songs']} | {row['eligible']} | {row['scored']} "
+            f"| {_share(row['scored'], row['eligible'])} | {row['other_prompt']} "
+            f"| {row['text_changed']} | {row['not_scored']} | {row['in_open_run']} |"
+        )
+    return "\n".join([*lines, ""])
+
+
+def write_status(data: Path, root: Path | None = None) -> Path:
+    """Write the status page of every country to `docs/status/scoring.md` and return its path."""
+    path = resolve_project_root(root) / STATUS_PAGE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(render_status(status(data, root=root), root))
+    return path

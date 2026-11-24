@@ -436,7 +436,7 @@ Folder: `lyrics/<ISO3>/scores/<run id>/`. Key: `song_id`.
 | `prompt_sha256` | string | yes | SHA-256 of the prompt that scored the song |
 | `model` | string | yes | Model that scored the song |
 | `text_kind` | string | yes | What the model says the text is |
-| `status` | string | yes | Result of the scoring request |
+| `status` | string | yes | Result of the scoring request: `complete`, or `reused` when `songs score prepare` copied the score of a song with the same text and decade |
 | `scored_utc` | string | no | When the song was scored |
 
 <!-- generated:score_tables:end -->
@@ -454,7 +454,8 @@ Folder: `lyrics/<ISO3>/scores/<run id>/`. Key: `song_id`.
 - A score with no song in that folder stays. The manifest counts it as `scores_no_song`.
 - `lyrics_sha256` is the value stored in the old provenance. The old scorer stored the SHA-256 of the lyric text that it scored. The command keeps that value.
 - When the song is in the songs folder and the two hashes differ, the lyric text changed after the score. The command keeps the score and keeps the stored hash. The manifest counts the row as `scores_text_changed`.
-- `prompt_sha256`, `model` and `text_kind` come from the provenance row. `status` is the old `measurement_status`. When a row has no value for one of these, or no `lyrics_sha256`, the command stops and writes no folder.
+- `prompt_sha256` is the old `instrument_sha256`: the identity of the prompt and model that `songs.stage_30_topics.scoring_prompt.PROMPT_SHA256` pins for the topics-only prompt. The old `prompt_sha256` is the SHA-256 of the prompt of one song, so the command does not keep it. The manifest counts a row whose `instrument_sha256` is not the pinned value as `scores_other_prompt`; for example, the old prompt that scored topics and values together.
+- `model` and `text_kind` come from the provenance row. `status` is the old `measurement_status`. When a row has no value for one of these, no `instrument_sha256` or no `lyrics_sha256`, the command stops and writes no folder.
 - `scored_utc` is empty. The old files have no time of the score.
 - A topic cell that is empty stays empty. The old files leave every topic empty when the text is not song lyrics.
 - The command reads neither `values.parquet` nor `value_flags.parquet`. This project keeps topic scores only.
@@ -463,9 +464,11 @@ Folder: `lyrics/<ISO3>/scores/<run id>/`. Key: `song_id`.
 
 ### How a scoring run fills the tables
 
-A scoring run sends songs to the model and the prompt of `prompts/scoring/` through the Batch API (`src/songs/stage_30_topics/scoring_run.py`). It has three commands.
+A scoring run sends songs to the model and the prompt of `prompts/scoring/` through the Batch API (`src/songs/stage_30_topics/scoring_run.py`). It has three commands, and a fourth command shows the state of the scores.
 
 - `songs score prepare <ISO3> ... --max-requests N` reads the newest songs folder and the newest scores folder of each country. It takes the songs that `eligible_songs.classify` lets in and that have no score from this prompt and model for their current `lyrics_sha256`. Songs of one country with the same `lyrics_sha256` and decade share one request. A song in a run that is not collected yet is not taken again. The command writes the batch file and prints the counts and a cost estimate in US dollars. It sends nothing.
+- The request of a song holds only its country, decade and lyric text. So `prepare` sends no request for a song when another song of the country with the same `lyrics_sha256` and decade has a score from this prompt and model. The decade is that of the scored song in the newest songs folder now. `prepare` copies that score with `status` `reused` and the `scored_utc` of the copied score. It writes a new folder `lyrics/<ISO3>/scores/<run id>/` for each country with a copied score: every score of the newest scores folder and the copied scores. The manifest counts `scores`, `scores_carried` and `scores_reused`. The plan counts the copied songs as `reused`. A score is never copied to a song of another country or decade, because its request would be different.
+- `songs score status [<ISO3> ...]` counts the songs and the eligible songs of each country by the state of their score: `scored` (a score from this prompt and model for the current text), `other_prompt` (a score of the current text from another prompt or model), `text_changed` (a score of other text only) and `not_scored`. These four sum to the eligible songs. `in_open_run` counts the eligible songs with no current score that a run holds that is not collected. With `--write`, the command writes the counts of all countries to `docs/status/scoring.md`. It sends nothing and writes no data.
 - `songs score submit <run id> --max-usd X` uploads the batch file and starts the batch. It stops when the estimate is above `--max-usd`, when the prompt changed after `prepare`, and when the run was submitted before. It asks the person to type the run id. The key is the environment variable `OPENAI_API_KEY`.
 - `songs score collect <run id>` reads the answers when the batch has ended. It checks each answer against the answer format: the model, the field order, and a score from 0 to 100 for each topic, or `unknown` for each topic when the text is not song lyrics. It writes a new folder `lyrics/<ISO3>/scores/<run id>/` for each country with a valid answer. The folder holds every score of the newest scores folder, with the new scores in place of older scores of the same `song_id`. `status` is `complete` and `scored_utc` is the time of the collection.
 - The manifest counts `scores` (rows written), `scores_carried` (rows from the earlier folder), `requests`, `answers`, the songs by `text_kind` (`songs_song_lyrics`, `songs_non_song`, `songs_uncertain`), and the requests with no valid answer by reason: `no_answer`, `request_error`, `http_error`, `not_completed`, `bad_answer`. A song with no valid answer gets no score, and the next `prepare` takes it again. The inputs are the songs folder that `prepare` read and the earlier scores folder.

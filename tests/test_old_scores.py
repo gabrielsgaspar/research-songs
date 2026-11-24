@@ -12,6 +12,7 @@ from songs.cli import app
 from songs.common import manifests, paths, schemas
 from songs.common.paths import DATA_ROOT_ENV
 from songs.stage_30_topics import old_scores as scores
+from songs.stage_30_topics.scoring_prompt import PROMPT_SHA256
 from songs.stage_30_topics.topic_ids import TOPIC_IDS
 
 LYRIC = "invented line scored-once"
@@ -71,6 +72,7 @@ def provenance_types(**extra: str) -> dict[str, str]:
         "song_id": "VARCHAR",
         "lyrics_sha256": "VARCHAR",
         "prompt_sha256": "VARCHAR",
+        "instrument_sha256": "VARCHAR",
         "model": "VARCHAR",
         "text_kind": "VARCHAR",
         "measurement_status": "VARCHAR",
@@ -87,6 +89,7 @@ def provenance_row(song_id: str, lyrics_hash: str, **over) -> dict:
         "song_id": song_id,
         "lyrics_sha256": lyrics_hash,
         "prompt_sha256": digest(100 + int(lyrics_hash[-2:], 16)),
+        "instrument_sha256": PROMPT_SHA256,
         "model": "invented-model",
         "text_kind": "song_lyrics",
         "measurement_status": "complete",
@@ -166,17 +169,17 @@ def test_the_command_keeps_the_stored_hash_and_writes_a_manifest(tmp_path, monke
     write_frame(
         folder / "topic_provenance.parquet",
         [
-            provenance_row("s1", digest(1), prompt_sha256=digest(11)),
-            provenance_row("s2", digest(2), prompt_sha256=digest(12)),
-            provenance_row("s3", digest(3), prompt_sha256=digest(13), country="XXX"),
-            provenance_row("s4", digest(4), prompt_sha256=digest(14), text_kind="non_song"),
+            provenance_row("s1", digest(1)),
+            provenance_row("s2", digest(2)),
+            provenance_row("s3", digest(3), country="XXX"),
+            provenance_row("s4", digest(4), instrument_sha256=digest(14), text_kind="non_song"),
         ],
         provenance_types(),
     )
     # An older provenance and the value files must not be read.
     write_frame(
         folder / "provenance.parquet",
-        [provenance_row("s1", digest(1), model="old-model", prompt_sha256=digest(99))],
+        [provenance_row("s1", digest(1), model="old-model", instrument_sha256=digest(99))],
         provenance_types(),
     )
     (folder / "values.parquet").write_bytes(b"not a parquet file\n")
@@ -212,6 +215,7 @@ def test_the_command_keeps_the_stored_hash_and_writes_a_manifest(tmp_path, monke
         "scores_text_changed": 1,
         "scores_null_topics": 1,
         "scores_country_differs": 1,
+        "scores_other_prompt": 1,
         "scores_song_lyrics": 3,
         "scores_non_song": 1,
         "scores_uncertain": 0,
@@ -235,12 +239,8 @@ def test_the_command_keeps_the_stored_hash_and_writes_a_manifest(tmp_path, monke
     ]
     assert provenance[1]["lyrics_sha256"] != digest(9)
     assert {row["model"] for row in provenance} == {"invented-model"}
-    assert [row["prompt_sha256"] for row in provenance] == [
-        digest(11),
-        digest(12),
-        digest(13),
-        digest(14),
-    ]
+    # The old per-song prompt hash is not kept; the prompt identity is.
+    assert [row["prompt_sha256"] for row in provenance] == [PROMPT_SHA256] * 3 + [digest(14)]
     assert [row["status"] for row in provenance] == ["complete"] * 4
     assert [row["scored_utc"] for row in provenance] == [None] * 4
     assert provenance[3]["text_kind"] == "non_song"
@@ -309,11 +309,11 @@ def test_the_import_stops_when_the_old_files_cannot_prove_a_row(tmp_path, monkey
     write_frame(folder / "topics.parquet", [topic_row("s1", 1)], topic_types())
     write_frame(
         folder / "topic_provenance.parquet",
-        [provenance_row("s1", digest(1), prompt_sha256=None)],
+        [provenance_row("s1", digest(1), instrument_sha256=None)],
         provenance_types(),
     )
     write_songs(data, SONGS_RUN, [("s1", LYRIC, digest(1))])
-    with pytest.raises(ValueError, match="no prompt_sha256: 1 rows"):
+    with pytest.raises(ValueError, match="no instrument_sha256: 1 rows"):
         scores.import_scores(old, data, "TGO", run_id=SCORE_RUN)
     assert not (data / "lyrics" / "TGO" / "scores").exists()
 

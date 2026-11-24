@@ -304,7 +304,13 @@ SCORE_PROVENANCE = Table(
         Column("prompt_sha256", "string", True, "SHA-256 of the prompt that scored the song"),
         Column("model", "string", True, "Model that scored the song"),
         Column("text_kind", "string", True, "What the model says the text is"),
-        Column("status", "string", True, "Result of the scoring request"),
+        Column(
+            "status",
+            "string",
+            True,
+            "Result of the scoring request: `complete`, or `reused` when `songs score prepare` "
+            "copied the score of a song with the same text and decade",
+        ),
         Column("scored_utc", "string", False, "When the song was scored"),
     ),
 )
