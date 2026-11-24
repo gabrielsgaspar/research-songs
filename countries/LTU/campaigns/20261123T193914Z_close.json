@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261123T193914Z",
+  "closed_utc": "2026-11-24T09:56:57Z",
+  "iso3": "LTU",
+  "next_time": "Do not collect dainutekstai again with the same client: it gives about 200 song pages and then empty song pages for 14 hours or more. Use another source for LTU, or ask the site owner for access. The raw folder raw/dainutekstai/20261123/ holds 200 songs and was not imported. Find local or archive sources for the years before 1980.",
+  "outcome": "stopped",
+  "reason": "The site dainutekstai gave 200 song pages on 2026-11-23 and then HTTP 200 with an empty body for each song page, also 14 hours later. Artist pages still load. No dump was built.",
+  "schema_version": 1,
+  "songs_after": 5006
+}

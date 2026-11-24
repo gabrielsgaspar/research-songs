@@ -125,7 +125,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [LIE](../../countries/LIE/) | 2 | 2026-11-21 | old_layout | old_pipeline | 84 |
 | [LKA](../../countries/LKA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 431 |
 | [LSO](../../countries/LSO/) | 2 | 2026-11-21 | old_layout | old_pipeline | 45 |
-| [LTU](../../countries/LTU/) | 7 | 2026-11-23 | dump_name, live, old_layout | dainutekstai, dainuzodziai, genius, lrclib, old_pipeline | 5006 |
+| [LTU](../../countries/LTU/) | 8 | 2026-11-24 | dump_name, live, old_layout | dainutekstai, dainuzodziai, genius, lrclib, old_pipeline | 5006 |
 | [LUX](../../countries/LUX/) | 2 | 2026-11-21 | old_layout | old_pipeline | 267 |
 | [LVA](../../countries/LVA/) | 4 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline | 4589 |
 | [MAC](../../countries/MAC/) | 2 | 2026-11-21 | old_layout | old_pipeline | 282 |
