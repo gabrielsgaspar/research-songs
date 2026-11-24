@@ -6,6 +6,7 @@ A scoring run has three steps. Each one is a command of `songs score`.
              folder. Take the eligible songs that have no score from this prompt and
              model for their current lyric text, and write one batch file. Songs with
              the same lyric text and decade share one request. Nothing is sent.
+             `decades` limits the run to the songs of those decades.
     submit   Upload the batch file and start the batch, below a cost limit in US
              dollars. Only a person runs this step: it costs money.
     collect  Read the answers and write lyrics/<ISO3>/scores/<run id>/ for each
@@ -29,6 +30,7 @@ run that is not collected yet is not prepared again.
 import hashlib
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -267,17 +269,23 @@ def prepare(
     max_requests: int,
     *,
     run_id: str | None = None,
+    decades: list[str] | None = None,
     rule_files: dict[str, Path] | None = None,
     root: Path | None = None,
 ) -> dict[str, Any]:
     """Write the batch file of a new run and return its plan. Nothing is sent.
 
     `max_requests` stops the run at that many requests; the songs that are left wait
-    for the next run. `rule_files` overrides the files of the eligibility rule
+    for the next run. `decades` (such as `["1980s"]`) takes only the songs of those
+    decades; the other songs with no score wait and count as `other_decade`.
+    `rule_files` overrides the files of the eligibility rule
     (the keyword arguments of `eligible_songs.load_rule`).
     """
     if not 1 <= max_requests <= MAX_REQUESTS:
         raise ValueError(f"max_requests must be from 1 to {MAX_REQUESTS}")
+    wanted = set(decades or ())
+    if bad := sorted(d for d in wanted if not re.fullmatch(r"\d{3}0s", d)):
+        raise ValueError(f"a decade is written like 1980s, not {', '.join(bad)}")
     prompt = load_scoring_prompt(root)
     run_id = paths.check_run_id(run_id) if run_id else run_records.new_run_id()
     folder = run_dir(data, run_id)
@@ -288,6 +296,7 @@ def prepare(
         "run_id": run_id,
         "prompt_sha256": prompt.sha256,
         "model": prompt.settings["model"],
+        "decades": sorted(wanted),
         "countries": {},
     }
     requests: list[bytes] = []
@@ -307,7 +316,7 @@ def prepare(
         donors = _donors(connection, scores_folder, songs, prompt)
         groups: dict[str, dict[str, Any]] = {}
         total = songs.aggregate("count(*)").fetchall()[0][0]
-        counts = Counter(songs=total, eligible=0, scored=0, in_open_run=0, reused=0)
+        counts = Counter(songs=total, eligible=0, scored=0, in_open_run=0, other_decade=0, reused=0)
         for song_id, lyrics, lyrics_sha256, year in eligible.order("song_id").fetchall():
             counts["eligible"] += 1
             if (song_id, lyrics_sha256) in scored:
@@ -317,6 +326,9 @@ def prepare(
                 counts["in_open_run"] += 1
                 continue
             decade = _decade(year)
+            if wanted and decade not in wanted:
+                counts["other_decade"] += 1
+                continue
             donor = donors.get((lyrics_sha256, decade))
             if donor is not None:
                 counts["reused"] += 1

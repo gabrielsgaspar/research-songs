@@ -139,6 +139,16 @@ def test_a_song_in_an_open_run_and_a_song_over_the_limit_wait(data, tmp_path):
         prepared(data, tmp_path, max_requests=0)
 
 
+def test_prepare_takes_only_the_songs_of_the_decades_asked(data, tmp_path):
+    plan = prepared(data, tmp_path, decades=["1970s"])
+    counts = plan["countries"]["TGO"]
+    assert counts["requests"] == 1 and counts["songs_to_score"] == 1
+    assert counts["other_decade"] == 3 and counts["scored"] == 1
+    assert plan["decades"] == ["1970s"]
+    with pytest.raises(ValueError, match="1980s"):
+        prepared(data, tmp_path, decades=["1980"])
+
+
 def test_submit_keeps_to_the_cost_limit_and_runs_one_time(data, tmp_path):
     plan = prepared(data, tmp_path)
     fake = FakeBatches()
