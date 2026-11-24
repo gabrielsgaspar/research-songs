@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T150437Z",
+  "closed_utc": "2026-11-24T15:15:39Z",
+  "iso3": "HND",
+  "next_time": "Audit HND roster for no-home-release artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 16/36 (44.4%) exceeds 15%",
+  "schema_version": 1,
+  "songs_after": 283
+}

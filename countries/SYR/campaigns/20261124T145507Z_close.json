@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T145507Z",
+  "closed_utc": "2026-11-24T15:15:36Z",
+  "iso3": "SYR",
+  "next_time": "Audit SYR roster for no-home-release artists before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 12/54 (22.2%) exceeds 15%",
+  "schema_version": 1,
+  "songs_after": 4209
+}

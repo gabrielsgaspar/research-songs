@@ -1,0 +1,33 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/lacoccinelle/20261120/",
+  "campaign_id": "20261124T144842Z",
+  "code_commit": "5fbb42fad051ea3acac33f5d8c07089b314625f1",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-24T14:50:25Z",
+  "iso3": "BEN",
+  "known_gaps": [],
+  "limits_hit": {},
+  "notes": "The survey estimates 1 songs to add. 1 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 1,
+  "run_id": "20261124T145023Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 1,
+  "songs_attempted": 110401,
+  "songs_rejected": {
+    "held": 1,
+    "no_title_key": 5,
+    "not_roster": 110354,
+    "out_of_scope": 36,
+    "same_title": 4
+  },
+  "source": "lacoccinelle",
+  "started_utc": "2026-11-24T14:50:23Z",
+  "state": "complete"
+}
