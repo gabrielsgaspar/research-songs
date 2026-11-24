@@ -33,6 +33,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 | Hyperinflations | Hanke and Krus, World Hyperinflations, table of episodes | May 2013 |
 | Currency crises | Culiuc and Park, Large Depreciations, IMF Working Paper 25/221 | November 2025 |
 | World region | World Bank regions, with a short list of project overrides | not stated |
+| Independence year | Old songs pipeline, lyrics_country_outputs.py: POST_1950_INDEPENDENCE_YEARS and FORMER_USSR_OR_YUGOSLAVIA_COUNTRIES, typed by hand | old repository, commit d1cb5449 of 2026-11-14 |
 | Artist and release catalog | Discogs monthly data dumps | 2026-06-01 |
 | Artist aliases and rosters | MusicBrainz JSON data dumps | 2026-06-24 |
 
@@ -292,6 +293,15 @@ It answers one question: where does a variable come from? Each concept has at mo
 - Link: <https://datahelpdesk.worldbank.org/knowledgebase/articles/906519>
 - Checked: no
 - Notes: The overrides must move to a tracked file with the code that applies them.
+
+## Independence year
+
+### `independence_years_old_pipeline` (canonical)
+
+- Source: Old songs pipeline, lyrics_country_outputs.py: POST_1950_INDEPENDENCE_YEARS and FORMER_USSR_OR_YUGOSLAVIA_COUNTRIES, typed by hand
+- Version: old repository, commit d1cb5449 of 2026-11-14
+- Checked: no
+- Notes: Tracked as resources/independence_years.csv. Only the sample tier (analysis_tier) reads it, through songs.stage_50_analysis.sample_tiers. The years were not checked against a published list.
 
 ## Land area
 
