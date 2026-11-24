@@ -47,7 +47,7 @@ def credit(song_id: str, artist: str, title: str, sha: str, position: int = 1, *
         "source_artist_id": over.get("artist_id", artist),
         "credit_position": position,
         "song_name": title,
-        "lyrics": over.get("lyrics", "an invented line of text for the tests"),
+        "lyrics": over.get("lyrics", f"an invented line of text for the tests, song {song_id}"),
         "lyrics_sha256": sha,
     }
 
@@ -862,3 +862,77 @@ def test_the_home_countries_of_discogs_include_the_states_that_no_longer_exist()
     assert {"Ukraine", "USSR"} <= home["UKR"] and "USSR" in home["SUN"]
     assert {"Serbia", "Yugoslavia", "Serbia and Montenegro"} <= home["SRB"]
     assert "Europe" not in set().union(*home.values())
+
+
+def test_held_text_finds_copies_of_held_songs_and_of_earlier_songs(tmp_path):
+    long_start = "an invented verse that repeats " * 12
+    dump = paths.clean_dump_dir(tmp_path, "example", "20260102")
+    texts = {
+        "t1": "An invented text that the country holds under another artist",
+        "t2": long_start + "and an invented end",
+        "t3": long_start + "and a second end",
+        "t4": "a new invented text of this dump, first copy",
+        "t5": "A NEW invented text of this dump -- first copy!",
+        "t6": "a short text",
+        "t7": "a short text",
+        "t8": "another invented text, which only a copy holds before it",
+    }
+    rows = [credit(key, "Anna Jons", "Title", key, lyrics=text) for key, text in texts.items()]
+    write(schemas.DUMP_SONGS, dump, rows)
+    country = paths.country_songs_dir(tmp_path, "ISL", RUN)
+    write(
+        schemas.COUNTRY_SONGS,
+        country,
+        [
+            held("s1", "a2", "Bára", "", "x1") | {"lyrics": texts["t1"].lower() + "."},
+            held("s2", "a1", "Anna Jons", "", "x2") | {"lyrics": long_start + "and an old end"},
+        ],
+    )
+    artists = dict.fromkeys(texts, "a1") | {"t3": "a2", "t8": "a2"}
+
+    copies = dump_match.held_text(dump, country, artists)
+
+    # t1: same text, other artist. t2: same artist, same start. t3: same start, other
+    # artist, so new. t5: same text as the earlier t4. t6 and t7: too short for a key.
+    assert copies == {"t1", "t2", "t5"}
+    assert dump_match.held_text(dump, country, {}) == set()
+
+
+def test_the_import_and_the_survey_hold_back_a_text_copy(tmp_path):
+    data, countries = tmp_path / "data", tmp_path / "countries"
+    dump, country = make_folders(data, "kasilyrics")
+    (country / schemas.COUNTRY_SONGS.file).unlink()
+    write(
+        schemas.COUNTRY_SONGS,
+        country,
+        [
+            held("s1", "a1", "Anna Jons", "Old Song", "h1"),
+            held("s2", "a1", "Anna Jons", "Sol sol", "other"),
+            held("s3", "a2", "Bára", "", "other")
+            | {"lyrics": "An invented line of text -- for the tests; SONG D3!"},
+        ],
+    )
+    manifests.write_manifest(
+        data, dump, "clean_dump", source="kasilyrics", inputs=["raw/x/20260101/"]
+    )
+    manifests.write_manifest(
+        data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
+    )
+    write_discogs(tmp_path / "discogs")
+
+    (found,) = survey(data, "ISL", ["kasilyrics"], tmp_path / "discogs")
+    assert (found["would_add"], found["rejected"][dump_match.HELD_TEXT]) == (1, 1)
+    assert found["would_add"] + sum(found["rejected"].values()) == found["songs_in"]
+    result = import_dump(
+        data, "kasilyrics", "ISL", tmp_path / "discogs", discogs_label="test", countries=countries
+    )
+    assert result["songs_added"] == 1 and result["rejected"] == found["rejected"]
+    added = duckdb.sql(
+        f"SELECT source_song_id FROM '{(result['path'] / 'songs.parquet').as_posix()}' "
+        "WHERE route = 'dump_name'"
+    ).fetchall()
+    assert added == [("d7",)]
+    assert manifests.read_manifest(result["path"]).counts["dump_songs_held_text"] == 1
+    (record,) = run_records.read_run_records("ISL", countries)
+    assert record.songs_rejected["held_text"] == 1
+    assert record.songs_accepted + sum(record.songs_rejected.values()) == record.songs_attempted
