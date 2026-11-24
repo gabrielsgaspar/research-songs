@@ -32,7 +32,7 @@ It answers one question: where does a variable come from? Each concept has at mo
 | Sovereign defaults | Bank of Canada and Bank of England, Sovereign Default Database | 2024 |
 | Hyperinflations | Hanke and Krus, World Hyperinflations, table of episodes | May 2013 |
 | Currency crises | Culiuc and Park, Large Depreciations, IMF Working Paper 25/221 | November 2025 |
-| World region | World Bank regions, with a short list of project overrides | not stated |
+| World region | World Bank regions from the World Development Indicators country list (api.worldbank.org/v2/country), with a short list of project overrides | country list retrieved 2026-06-27 (296 records) |
 | Independence year | Old songs pipeline, lyrics_country_outputs.py: POST_1950_INDEPENDENCE_YEARS and FORMER_USSR_OR_YUGOSLAVIA_COUNTRIES, typed by hand | old repository, commit d1cb5449 of 2026-11-14 |
 | Artist and release catalog | Discogs monthly data dumps | 2026-06-01 |
 | Artist aliases and rosters | MusicBrainz JSON data dumps | 2026-06-24 |
@@ -287,12 +287,13 @@ It answers one question: where does a variable come from? Each concept has at mo
 
 ### `region_world_bank` (canonical)
 
-- Source: World Bank regions, with a short list of project overrides
-- Version: not stated
+- Source: World Bank regions from the World Development Indicators country list (api.worldbank.org/v2/country), with a short list of project overrides
+- Version: country list retrieved 2026-06-27 (296 records)
 - Columns: `region_name`
 - Link: <https://datahelpdesk.worldbank.org/knowledgebase/articles/906519>
-- Checked: no
-- Notes: The overrides must move to a tracked file with the code that applies them.
+- Raw files: `raw/others/20260627/world_bank_wdi/20260627/`
+- Checked: yes
+- Notes: A region is the geographic group in which the World Bank places a country. There are 7 regions: East Asia & Pacific, Europe & Central Asia, Latin America & Caribbean, Middle East & North Africa, North America, South Asia and Sub-Saharan Africa. The World Bank now names one region 'Middle East, North Africa, Afghanistan & Pakistan'; the panel uses the shorter name 'Middle East & North Africa' (REGION_SHORT_NAMES). The 79 aggregate records (region id NA, for example World or Euro area) are left out. 11 economies and historical states that the list does not have get the region of their place on the map (REGION_OVERRIDES in songs.stage_10_clean.world_bank_countries: AIA, CSK, DDR, ESH, GGY, GLP, JEY, MTQ, SUN, TWN, YUG). The region does not change over time: a country has the same region in every year of the panel. The overrides must move to a tracked file with the code that applies them.
 
 ## Independence year
 

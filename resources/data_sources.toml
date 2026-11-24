@@ -320,12 +320,12 @@ id = "region_world_bank"
 concept = "World region"
 status = "canonical"
 columns = ["region_name"]
-source = "World Bank regions, with a short list of project overrides"
-version = "not stated"
+source = "World Bank regions from the World Development Indicators country list (api.worldbank.org/v2/country), with a short list of project overrides"
+version = "country list retrieved 2026-06-27 (296 records)"
 url = "https://datahelpdesk.worldbank.org/knowledgebase/articles/906519"
-raw_path = ""
-checked = false
-notes = "The overrides must move to a tracked file with the code that applies them."
+raw_path = "raw/others/20260627/world_bank_wdi/20260627/"
+checked = true
+notes = "A region is the geographic group in which the World Bank places a country. There are 7 regions: East Asia & Pacific, Europe & Central Asia, Latin America & Caribbean, Middle East & North Africa, North America, South Asia and Sub-Saharan Africa. The World Bank now names one region 'Middle East, North Africa, Afghanistan & Pakistan'; the panel uses the shorter name 'Middle East & North Africa' (REGION_SHORT_NAMES). The 79 aggregate records (region id NA, for example World or Euro area) are left out. 11 economies and historical states that the list does not have get the region of their place on the map (REGION_OVERRIDES in songs.stage_10_clean.world_bank_countries: AIA, CSK, DDR, ESH, GGY, GLP, JEY, MTQ, SUN, TWN, YUG). The region does not change over time: a country has the same region in every year of the panel. The overrides must move to a tracked file with the code that applies them."
 
 [[source]]
 id = "independence_years_old_pipeline"
