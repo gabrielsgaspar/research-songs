@@ -1,0 +1,41 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 847,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/genius/20261120/",
+  "campaign_id": "20261124T081943Z",
+  "code_commit": "b92d96e994af1529b1f3ce03244cab67a455c4ed",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-24T08:21:38Z",
+  "iso3": "NLD",
+  "known_gaps": [
+    "close: 446 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 3452 songs to add. 2870 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 3452,
+  "run_id": "20261124T082105Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 3452,
+  "songs_attempted": 5053001,
+  "songs_rejected": {
+    "already_linked": 619,
+    "artist_other_country": 33,
+    "close": 446,
+    "held": 14378,
+    "held_loose_title": 358,
+    "no_title_key": 705,
+    "no_track": 9435,
+    "not_roster": 5007876,
+    "out_of_scope": 7428,
+    "same_title": 8248,
+    "track_taken": 23
+  },
+  "source": "genius",
+  "started_utc": "2026-11-24T08:21:05Z",
+  "state": "complete"
+}

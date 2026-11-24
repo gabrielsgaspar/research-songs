@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T093051Z",
+  "closed_utc": "2026-11-24T09:36:46Z",
+  "iso3": "DEU",
+  "next_time": "lrclib added 40795, genius 11171, lieder_net 23; songtexte and deutscheslied have no dump. Close pile 4091. Build songtexte and clear close matches before the next campaign.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 257147
+}
