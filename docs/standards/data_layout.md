@@ -348,7 +348,7 @@ Some rosters hold artists of other countries. `songs lyrics roster-check --write
 
 The decision is `other_country` only when three conditions hold. Every other artist gets `keep`.
 
-1. The first 160 characters of the Discogs profile state another country. A statement is a country word that describes a role noun within a few words ("Syrian traditional singer"), or a country word that follows "from" within 40 characters with no sentence break ("from Dublin, Ireland"). A word followed by "-born" or " born" is no statement.
+1. The first 160 characters of the Discogs profile state another country. A statement is a country word that describes a role noun within a few words ("Syrian traditional singer"), or a country word that follows "from" within 40 characters with no sentence break ("from Dublin, Ireland"). A word followed by "-born" or " born" is no statement. A country word before a role noun is no statement when "the" comes before it ("founded by the German composer"), because such a phrase describes another person. A country word that is in the name of the artist is no statement and no home word.
 2. No word of a home country is anywhere in that text. A home country is the country itself, and each country whose Discogs release names are all release names of this country in `resources/lyrics/discogs_countries.csv`. For example, the USSR is a home of Ukraine. The Federal Republic of Germany is a home of the German Democratic Republic.
 3. The artist has a release with a country, fewer than 20% of those releases are in a home release country, and the release country with the most releases is not a home release country.
 
