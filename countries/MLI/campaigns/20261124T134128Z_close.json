@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T134128Z",
+  "closed_utc": "2026-11-24T14:00:13Z",
+  "iso3": "MLI",
+  "next_time": "lrclib/genius dump pass done. Home 16/291 (5.5%). Local dumps missing. Clear close matches before the next campaign.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 1174
+}
