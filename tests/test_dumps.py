@@ -295,6 +295,7 @@ def test_site_snapshot_maps_columns_and_drops_rows(tmp_path):
     assert by_id[url_id][0]["artist_name"] == "Url Band"
     assert result["rows_in"] == 10
     assert result["rows_out"] == 4
+    assert result["songs_out"] == 3
     assert result["dropped"] == {
         "duplicate_song": 1,
         "not_lyrics": 1,
@@ -304,7 +305,7 @@ def test_site_snapshot_maps_columns_and_drops_rows(tmp_path):
         "no_artist": 1,
     }
     assert result["credits_not_performer"] == 1
-    assert sum(result["dropped"].values()) == result["rows_in"] - 3
+    assert sum(result["dropped"].values()) == result["rows_in"] - result["songs_out"]
     assert {(row["source_artist_id"], row["artist_name"], row["name_type"]) for row in names} >= {
         ("k1", "Band One", "primary"),
         ("k1", "Band One Alt", "alias"),
@@ -318,6 +319,7 @@ def test_site_snapshot_maps_columns_and_drops_rows(tmp_path):
     assert manifest.source == "example"
     assert "site_snapshot" in manifest.notes
     assert manifest.counts["rows_out"] == 4
+    assert manifest.counts["songs_out"] + manifest.counts["rows_dropped"] == 10
     with pytest.raises(dumps.DumpError, match="already exists"):
         build(data, "example", folder)
 

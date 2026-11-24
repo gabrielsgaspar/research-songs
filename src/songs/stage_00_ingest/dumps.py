@@ -376,6 +376,7 @@ def _skipped(source: str, reason: str, **extra: object) -> dict:
         "incomplete": False,
         "rows_in": 0,
         "rows_out": 0,
+        "songs_out": 0,
         "artists_out": 0,
         "dropped": {},
         "not_lyrics_kinds": {},
@@ -467,6 +468,7 @@ def _build(
     counts = {
         "rows_in": rows_in,
         "rows_out": rows_out,
+        "songs_out": kept_songs,
         "rows_dropped": rows_in - kept_songs,
         "artists_out": artists_out,
     }
@@ -495,6 +497,7 @@ def _build(
         "incomplete": incomplete,
         "rows_in": rows_in,
         "rows_out": rows_out,
+        "songs_out": kept_songs,
         "artists_out": artists_out,
         "dropped": dropped,
         "not_lyrics_kinds": not_lyrics_kinds,
