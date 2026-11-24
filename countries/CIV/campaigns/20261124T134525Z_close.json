@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T134525Z",
+  "closed_utc": "2026-11-24T14:00:14Z",
+  "iso3": "CIV",
+  "next_time": "Audit CIV roster for no-home-release artists (Dobet Gnahoré, Didi B, Teeyah top the list) before any re-run or publish.",
+  "outcome": "stopped",
+  "reason": "home-check 62/207 (30%) exceeds 15%; roster artists lack Ivory Coast Discogs releases",
+  "schema_version": 1,
+  "songs_after": 2425
+}
