@@ -6,6 +6,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 import pytest
+from test_release import SONGS_RUN, old_quarantine, song, write_country
 from typer.testing import CliRunner
 
 from songs.cli import app
@@ -21,6 +22,7 @@ from songs.stage_10_clean import (
     world_bank_countries,
 )
 from songs.stage_50_analysis import countries_panel as panel
+from songs.stage_50_analysis import eligible_songs, sample_tiers
 
 FIXTURES = Path(__file__).parent / "fixtures" / "panel"
 REGISTRY = pd.DataFrame(
@@ -311,70 +313,125 @@ def test_an_old_code_takes_its_iso3_code_and_other_codes_are_reported():
         panel.join_panel(tables, "x")
 
 
-REGISTRY_FILE = "raw/country_registry/20261109/countries.parquet"
-NO_ORIGIN = dict.fromkeys(manifests.ORIGIN_KEYS)
+def country_root(tmp_path: Path, codes: list[str]) -> Path:
+    """Write a project root with a folder in `countries/` for each code."""
+    root = tmp_path / "repo"
+    for code in codes:
+        (root / "countries" / code / "runs").mkdir(parents=True)
+    (root / "countries" / "README.md").write_text("invented", encoding="utf-8")
+    return root
 
 
-def write_registry(data: Path) -> None:
-    folder = paths.raw_dir(data, "country_registry", "20261109")
-    folder.mkdir(parents=True)
-    duckdb.sql(
-        "SELECT * FROM (VALUES ('BRA', 'Brazil'), ('ROM', 'Romania'), ('ROU', 'Romania')) "
-        "AS t(country, country_name)"
-    ).write_parquet((folder / "countries.parquet").as_posix())
-    manifests.write_manifest(data, folder, "raw", source="country_registry", origin=NO_ORIGIN)
+def test_the_registry_is_the_country_folders_with_world_bank_names(tmp_path):
+    root = country_root(tmp_path, ["BRA", "ROM", "TWN"])
+    registry = panel.registry_from_countries(root, FIXTURES / "world_bank_countries.json")
+    assert list(registry.columns) == ["country_iso3", "country_name", "in_wvs", "in_evs"]
+    assert registry["country_iso3"].tolist() == ["BRA", "TWN"]  # ROM is an old code
+    assert registry["country_name"].iloc[0] == "Brazil"
+    assert registry["country_name"].isna().tolist() == [False, True]  # TWN is not on the list
+    assert registry[["in_wvs", "in_evs"]].isna().all().all()
+    assert panel.registry_from_countries(root, None)["country_name"].isna().all()
 
 
-def test_an_input_of_the_old_pipeline_is_its_newest_complete_raw_folder(tmp_path):
-    assert panel.default_inputs(tmp_path)["registry"] is None
-    with pytest.raises(FileNotFoundError, match="raw/country_registry/"):
-        panel.read_tables(panel.default_inputs(tmp_path), allow_missing=True)
-    write_registry(tmp_path)
-    paths.raw_dir(tmp_path, "country_registry", "20261201").mkdir()  # no manifest: incomplete
-    assert panel.default_inputs(tmp_path)["registry"] == tmp_path / REGISTRY_FILE
+def write_songs(data: Path) -> None:
+    """Write BRA with 100 eligible songs in each decade from the 1950s to the 2010s, and ROU."""
+    core = [
+        song(f"c{n}", country_iso3="BRA", artist_id=f"a{n % 3}", year=1950 + n // 100 * 10)
+        for n in range(700)
+    ]
+    core += [
+        song("c_no_year", country_iso3="BRA", year=None),
+        song("c_out", country_iso3="BRA", quality_status="quarantine"),
+    ]
+    write_country(data, "BRA", core, None)
+    write_country(data, "ROU", [song("r1", country_iso3="ROU")], None)
+    eligible_songs.import_old_song_quarantine(old_quarantine(data, ""), data, date(2026, 1, 1))
+
+
+def test_the_song_tables_count_the_eligible_songs_and_give_the_tier(tmp_path):
+    assert panel.song_tables(tmp_path) == ({}, {"countries_with_songs": 0})
+    write_songs(tmp_path)
+    tables, counts = panel.song_tables(tmp_path)
+    assert counts["countries_with_songs"] == 2
+    assert (counts["songs"], counts["eligible_songs"], counts["eligible_songs_no_year"]) == (
+        703,
+        702,
+        1,
+    )
+    assert counts["left_out_quality_quarantine"] == 1
+    assert (counts["sample_tier_core"], counts["sample_tier_total"]) == (1, 1)
+    songs = tables["songs"].set_index(["country_iso3", "year"])["num_songs"]
+    assert len(songs) == 2 * 127  # every year of a country with songs, 0 in a year with none
+    assert songs["BRA", 1950] == 100 and songs["BRA", 1955] == 0
+    assert songs["ROU", 1990] == 1 and songs["ROU", 1991] == 0
+    artists = tables["artists"].set_index(["country_iso3", "year"])
+    assert artists.loc[("BRA", 1950), "num_artists"] == 3
+    assert set(artists["artist_count_method"]) == {panel.ARTIST_COUNT_METHOD}
+    sample = tables["sample"]
+    tiers = dict(zip(sample["country_iso3"], sample["analysis_tier"], strict=True))
+    assert tiers == {"BRA": sample_tiers.CORE, "ROU": sample_tiers.TOTAL}
 
 
 def test_build_stops_on_absent_inputs_and_never_writes_over_a_panel(tmp_path):
-    write_registry(tmp_path)
+    write_songs(tmp_path)
     with pytest.raises(FileNotFoundError, match="democracy"):
         panel.build(tmp_path)
     result = panel.build(tmp_path, allow_missing=True, today=date(2026, 1, 2))
     assert result["path"] == tmp_path / "clean" / "countries" / "20260102" / "countries.parquet"
-    assert result["rows"] == 2 * 127  # the old code ROM gets no rows of its own
-    assert {"democracy", "gdp", "registry.in_wvs"} <= set(result["absent_inputs"])
+    assert result["rows"] == result["counts"]["registry_countries"] * 127
+    assert {"democracy", "gdp", *panel.NO_SOURCE} <= set(result["absent_inputs"])
+    assert "songs" not in result["absent_inputs"]
     written = duckdb.read_parquet(result["path"].as_posix())
     assert tuple(written.columns) == panel.COUNTRY_COLUMNS
+    bra = "country_iso3 = 'BRA' AND year = 1950"
+    assert rows(written, bra, "num_songs, num_artists, analysis_tier") == [(100, 3, "Core")]
+    # A country of the registry with no songs folder has empty counts and no tier.
+    arg = "country_iso3 = 'ARG' AND year = 1950"
+    assert rows(written, arg, "num_songs, analysis_tier") == [(None, None)]
     # The tracked hyperinflation episodes need no raw file.
     assert rows(written, "country_iso3 = 'BRA' AND hyperinflation_onset = 1", "year") == [(1989,)]
     with pytest.raises(FileExistsError):
         panel.build(tmp_path, allow_missing=True, today=date(2026, 1, 2))
 
 
+def test_with_no_songs_the_song_columns_are_empty(tmp_path):
+    tables, absent, _ = panel.read_tables(
+        panel.default_inputs(tmp_path), tmp_path, allow_missing=True
+    )
+    assert "songs" in absent and "sample" not in tables
+    result = panel.join_panel(tables, "x")
+    assert result.aggregate("count(num_songs), count(analysis_tier)").fetchall() == [(0, 0)]
+
+
 def test_build_writes_a_manifest_that_names_the_inputs_it_read(tmp_path):
-    write_registry(tmp_path)
+    write_songs(tmp_path)
     result = panel.build(tmp_path, allow_missing=True, today=date(2026, 1, 2))
     folder = paths.latest_clean_countries_dir(tmp_path)
     assert folder == result["path"].parent
     assert result["manifest"] == folder / paths.MANIFEST_NAME
     manifest = manifests.read_manifest(folder)
     assert (manifest.kind, manifest.path) == ("clean_countries", "clean/countries/20260102/")
-    assert manifest.inputs == [REGISTRY_FILE]  # the only input that is present
-    assert [(file["path"], file["rows"]) for file in manifest.files] == [
-        ("countries.parquet", 2 * 127)
+    assert manifest.inputs == [  # the only inputs that are present
+        "clean/quality/song_quarantine/20260101/",
+        f"lyrics/BRA/songs/{SONGS_RUN}/",
+        f"lyrics/ROU/songs/{SONGS_RUN}/",
     ]
-    assert manifest.counts == {"rows": 2 * 127, "countries": 2}
+    assert [(file["path"], file["rows"]) for file in manifest.files] == [
+        ("countries.parquet", result["rows"])
+    ]
+    countries = result["counts"]["registry_countries"]
+    assert manifest.counts == {"rows": result["rows"], "countries": countries, **result["counts"]}
+    assert manifest.counts["eligible_songs"] == 702
     assert "democracy" in manifest.notes and "resources/" in manifest.notes
     assert (manifest.country_iso3, manifest.source, manifest.run_id, manifest.origin) == (None,) * 4
 
 
 def test_the_inputs_of_a_build_are_the_files_that_it_read(tmp_path):
-    write_registry(tmp_path)
+    write_songs(tmp_path)
     inputs = panel.default_inputs(tmp_path)
     no_raw_folder = sorted(name for name, path in inputs.items() if path is None)
-    files = panel.files_read(
-        tmp_path, inputs, [*no_raw_folder, "currency_monthly", "registry.in_wvs"]
-    )
-    assert files == sorted(set(files)) and REGISTRY_FILE in files
+    files = panel.files_read(tmp_path, inputs, [*no_raw_folder, "currency_monthly"])
+    assert files == sorted(set(files)) and f"lyrics/BRA/songs/{SONGS_RUN}/" in files
     assert not any(file.startswith("/") or ":" in file for file in files)
     # Fertility is a folder: the build reads each of its files.
     folder = inputs["fertility"].relative_to(tmp_path).as_posix()
@@ -388,7 +445,7 @@ def test_the_inputs_of_a_build_are_the_files_that_it_read(tmp_path):
 
 def test_the_command_reports_what_it_wrote(monkeypatch, tmp_path):
     monkeypatch.setenv("SONGS_DATA_ROOT", str(tmp_path))
-    write_registry(tmp_path)
+    write_songs(tmp_path)
     result = CliRunner().invoke(app, ["panel", "countries", "--allow-missing"])
     assert result.exit_code == 0, result.output
     assert "wrote" in result.output and "absent inputs" in result.output
@@ -397,9 +454,8 @@ def test_the_command_reports_what_it_wrote(monkeypatch, tmp_path):
 
 @pytest.mark.needs_data
 def test_the_real_inputs_join_to_a_full_grid():
-    inputs = panel.default_inputs(data_root())
-    if inputs["registry"] is None:
-        pytest.skip("the data folder has no complete raw/country_registry/ folder")
-    tables, _ = panel.read_tables(inputs, allow_missing=True)
+    data = data_root()
+    tables, _, counts = panel.read_tables(panel.default_inputs(data), data, allow_missing=True)
     result = panel.join_panel(tables, "x")
     assert len(result) == len(tables["registry"]) * 127
+    assert counts["countries_with_songs"] > 0

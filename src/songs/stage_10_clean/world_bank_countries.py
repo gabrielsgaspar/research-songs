@@ -57,13 +57,23 @@ def load_income_groups(path: Path) -> pd.DataFrame:
     return pd.concat([groups, pd.DataFrame(extra, columns=groups.columns)], ignore_index=True)
 
 
+def _records(path: Path) -> list[dict]:
+    """Return the country records of the stored World Bank country list, without aggregates."""
+    pages = json.loads(path.read_text(encoding="utf-8"))["pages"]
+    records = (record for page in pages for record in page["records"])
+    return [record for record in records if record["region"]["id"] != "NA"]
+
+
+def load_names(path: Path) -> pd.DataFrame:
+    """Return `country_iso3`, `country_name` from the stored World Bank country list."""
+    names = {record["id"].upper(): record["name"].strip() for record in _records(path)}
+    return pd.DataFrame(sorted(names.items()), columns=["country_iso3", "country_name"])
+
+
 def load_regions(path: Path) -> pd.DataFrame:
     """Return `country_iso3`, `region_name` from the stored World Bank country list."""
-    pages = json.loads(path.read_text(encoding="utf-8"))["pages"]
     regions = {}
-    for record in (record for page in pages for record in page["records"]):
-        if record["region"]["id"] == "NA":  # an aggregate, not a country
-            continue
+    for record in _records(path):
         name = record["region"]["value"].strip()
         regions[record["id"].upper()] = REGION_SHORT_NAMES.get(name, name)
     regions.update(REGION_OVERRIDES)

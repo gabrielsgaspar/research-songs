@@ -63,6 +63,10 @@ names. `load_artist_lists` reads them, and the table of artist countries, which
 `songs.stage_10_clean.artist_country` writes from Discogs evidence.
 `load_text_copies` reads the table of text copies, which
 `songs.stage_10_clean.text_copies` writes.
+
+`country_folders` and `read_country_tables` read the songs of every country, and
+`year_counts` and `reason_counts` count the songs that `classify` lets in and
+leaves out. The analysis release and the country-year panel both count with them.
 """
 
 import csv
@@ -82,6 +86,8 @@ from songs.common.paths import (
     latest_clean_artist_country_dir,
     latest_clean_song_quarantine_dir,
     latest_clean_text_copies_dir,
+    latest_country_scores_dir,
+    latest_country_songs_dir,
     resolve_project_root,
 )
 from songs.common.years import MAX_SONG_YEAR, MIN_SONG_YEAR
@@ -130,6 +136,10 @@ COLUMNS = (
     "canonical_song_id",
     "re_release",
     "year",
+)
+# The columns of a song that an analysis reads; no lyric text.
+SONG_COLUMNS = tuple(
+    dict.fromkeys(("country_iso3", "artist_id", "source", "lyrics_sha256", *COLUMNS))
 )
 
 
@@ -339,6 +349,83 @@ def classify(
         f"* EXCLUDE ({flags}), {reason} AS ineligible_reason, "
         f"({reason}) IS NULL AND {manual} AND {named} AS by_exception"
     )
+
+
+def country_folders(data: Path) -> list[tuple[str, Path, Path | None]]:
+    """Return each country that has a complete songs folder.
+
+    Each item is the country code, the newest complete songs folder, and the newest
+    complete scores folder or None. Raise FileNotFoundError for a country that has
+    scores and no complete songs folder, so that no score is left out without a count.
+    """
+    found = []
+    for folder in sorted((data / "lyrics").glob("*")):
+        try:
+            code = check_iso3(folder.name)
+        except ValueError:
+            continue
+        songs = latest_country_songs_dir(data, code)
+        scores = latest_country_scores_dir(data, code)
+        if songs is not None:
+            found.append((code, songs, scores))
+        elif scores is not None:
+            raise FileNotFoundError(f"{code} has scores and no complete songs folder")
+    return found
+
+
+def read_country_tables(
+    connection: duckdb.DuckDBPyConnection,
+    name: str,
+    table: schemas.Table,
+    folders: list[tuple[str, Path]],
+    columns: str = "*",
+) -> None:
+    """Create the table `name` from `table` in each country folder, with `columns`.
+
+    Raise ValueError when a row names another country than its folder.
+    """
+    parts = []
+    for code, folder in folders:
+        relation = schemas.read_table(table, folder, connection)
+        if relation.filter(f"country_iso3 <> '{code}'").aggregate("count(*)").fetchall()[0][0]:
+            raise ValueError(f"{folder / table.file} holds rows of another country")
+        parts.append(relation.project(columns))
+    first, *rest = parts or [schemas.empty_table(table, connection).project(columns)]
+    first.create(name)
+    for part in rest:
+        part.insert_into(name)
+
+
+def year_counts(eligible: duckdb.DuckDBPyRelation) -> duckdb.DuckDBPyRelation:
+    """Return the eligible songs and their distinct artists by country and year.
+
+    A song with no year is not counted; `reason_counts` reports how many there are.
+    """
+    return eligible.filter("year IS NOT NULL").aggregate(
+        "country_iso3, year, count(*) AS num_songs, count(DISTINCT artist_id) AS num_artists",
+        "country_iso3, year",
+    )
+
+
+def reason_counts(classified: duckdb.DuckDBPyRelation) -> dict[str, int]:
+    """Count the songs, the eligible songs, the eligible songs with no year, and each reason.
+
+    Raise ValueError when the eligible songs and the songs left out do not add up.
+    """
+    (songs, eligible, no_year), *_ = classified.aggregate(
+        "count(*), count_if(ineligible_reason IS NULL), "
+        "count_if(ineligible_reason IS NULL AND year IS NULL)"
+    ).fetchall()
+    left_out = dict(
+        classified.filter("ineligible_reason IS NOT NULL")
+        .aggregate("ineligible_reason, count(*)", "ineligible_reason")
+        .fetchall()
+    )
+    counts = {"songs": songs, "eligible_songs": eligible, "eligible_songs_no_year": no_year}
+    counts |= {f"left_out_{reason}": left_out.get(reason, 0) for reason in REASONS}
+    if eligible + sum(left_out.values()) != songs:
+        raise ValueError("the eligible songs and the songs left out do not add up to the songs")
+    return counts
 
 
 def import_old_song_quarantine(old_list: Path, data: Path, today: date | None = None) -> dict:

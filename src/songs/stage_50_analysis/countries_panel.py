@@ -2,16 +2,21 @@
 
 `build` reads every input, joins them, and writes `countries.parquet` and its manifest
 to a new dated folder, `clean/countries/<YYYYMMDD>/`. It never writes over a panel that
-exists. The manifest names every input file that the build read
-(`docs/standards/data_layout.md`).
+exists. The manifest names every input file that the build read and counts the songs
+in, out and left out (`docs/standards/data_layout.md`).
 
-Sources that are not lyrics are read from their raw files, at the paths in
-`resources/data_sources.toml`. Five inputs are files of the old pipeline, kept as
-received in `raw/<source>/<YYYYMMDD>/`: the country registry, the analysis sample,
-the song counts, the artist counts and the populism series. The build reads the
-newest complete folder of each source.
+The registry is every country with a folder in `countries/`, named as in the World
+Bank country list. The song and artist counts and the analysis tier come from the
+eligible songs: `eligible_songs.classify` over the newest complete songs folder of
+each country, with the same rule and counts as the analysis release. `sample_tiers`
+gives the tier. Sources that are not lyrics are read from their raw files, at the
+paths in `resources/data_sources.toml`. The populism series is a file of the old
+pipeline, kept as received in `raw/populism_fst/<YYYYMMDD>/`; the build reads the
+newest complete folder. The survey columns and the Discogs columns have no source,
+so they are empty and the build reports them absent (`NO_SOURCE`).
 """
 
+import re
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -19,7 +24,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from songs.common import manifests, paths
+from songs.common import manifests, paths, schemas
 from songs.common.data_sources import canonical
 from songs.common.years import MAX_SONG_YEAR, MIN_SONG_YEAR
 from songs.stage_10_clean import (
@@ -31,6 +36,7 @@ from songs.stage_10_clean import (
     population,
     world_bank_countries,
 )
+from songs.stage_50_analysis import eligible_songs, sample_tiers
 
 FAMILIES = ("banking_crisis", "currency_crisis", "hyperinflation", "sovereign_default")
 CRISIS_MEASURES = {
@@ -108,13 +114,15 @@ OLD_CODES = {
 }
 
 # Files of the old pipeline: input name -> (source in `raw/`, file name in its version folder).
-OLD_PIPELINE_FILES = {
-    "registry": ("country_registry", "countries.parquet"),
-    "sample": ("analysis_sample", "analysis_sample.parquet"),
-    "songs": ("country_year_song_counts", "country_year_song_counts.parquet"),
-    "artists": ("country_year_artist_counts", "country_year_artist_counts.parquet"),
-    "populism": ("populism_fst", "populism.parquet"),
-}
+OLD_PIPELINE_FILES = {"populism": ("populism_fst", "populism.parquet")}
+# Columns that no input fills yet: they are empty, and the build reports them absent.
+NO_SOURCE = [
+    "artists.discogs_artists_available",
+    "artists.discogs_dump_date",
+    "registry.in_evs",
+    "registry.in_wvs",
+]
+ARTIST_COUNT_METHOD = "distinct artist_id of the eligible songs"
 # Raw files: (input name, concept in the data source file, file name in its raw folder).
 RAW_FILES = {
     "gdp": (gdp.CONCEPT, gdp.FILE_NAME),
@@ -132,16 +140,7 @@ RAW_FILES = {
 # The currency table is read only when both of its files are present.
 CURRENCY_INPUTS = {"currency_episodes", "currency_monthly"}
 # How each clean file names the columns of its table: panel name -> expression on the file.
-CLEAN_SELECT = {
-    "sample": {
-        "analysis_tier": "tier",
-        "analysis_included": "included",
-        "analysis_exclusion_reason": "exclusion_reason",
-    },
-    "songs": {},
-    "artists": {"num_artists": "scraped_artists", "artist_count_method": "count_method"},
-    "populism": {"country_iso3": "iso3", "populism_start": "pop_start"},
-}
+CLEAN_SELECT = {"populism": {"country_iso3": "iso3", "populism_start": "pop_start"}}
 
 
 def default_inputs(data: Path) -> dict[str, Path | None]:
@@ -167,39 +166,115 @@ def _read_clean(name: str, path: Path) -> pd.DataFrame:
     return duckdb.sql(f"SELECT {select} FROM read_parquet('{path.as_posix()}')").df()
 
 
-def _read_registry(path: Path) -> tuple[pd.DataFrame, list[str]]:
-    """Read the registry. Return it with the names of the survey columns that it lacks."""
-    registry = duckdb.sql(
-        "SELECT * RENAME (country AS country_iso3) "
-        f"FROM read_parquet('{path.as_posix()}') ORDER BY country"
+def registry_from_countries(root: Path, names: Path | None) -> pd.DataFrame:
+    """Return one row per country folder in `countries/` of `root`, less the old codes.
+
+    The name comes from the World Bank country list at `names`. A country that the
+    list lacks, or every country when `names` is None, has an empty name. The survey
+    columns are empty (`NO_SOURCE`).
+    """
+    codes = sorted(
+        folder.name
+        for folder in (root / "countries").iterdir()
+        if folder.is_dir()
+        and re.fullmatch("[A-Z]{3}", folder.name)
+        and folder.name not in OLD_CODES
+    )
+    registry = pd.DataFrame({"country_iso3": codes})
+    if names is not None:
+        registry = registry.merge(world_bank_countries.load_names(names), how="left")
+    return registry.reindex(columns=_columns("registry"))
+
+
+def song_inputs(data: Path) -> list[Path]:
+    """Return the folders that the count of the eligible songs reads; none with no songs."""
+    folders = [songs for _, songs, _ in eligible_songs.country_folders(data)]
+    if not folders:
+        return []
+    found = (
+        paths.latest_clean_song_quarantine_dir(data),
+        paths.latest_clean_artist_country_dir(data),
+        paths.latest_clean_text_copies_dir(data),
+    )
+    return folders + [folder for folder in found if folder is not None]
+
+
+def song_tables(data: Path) -> tuple[dict[str, pd.DataFrame], dict[str, int]]:
+    """Return the song, artist and sample tables from the eligible songs, and their counts.
+
+    A country with a songs folder has 0 songs in a year with no eligible song. The
+    tier comes from the eligible songs by decade (`sample_tiers.assign`). The counts
+    give the songs read, the songs that enter, the songs left out for each reason
+    and the countries of each tier. With no complete songs folder, there are no tables.
+    """
+    countries = eligible_songs.country_folders(data)
+    if not countries:
+        return {}, {"countries_with_songs": 0}
+    connection = duckdb.connect()
+    eligible_songs.read_country_tables(
+        connection,
+        "songs",
+        schemas.COUNTRY_SONGS,
+        [(code, folder) for code, folder, _ in countries],
+        ", ".join(eligible_songs.SONG_COLUMNS),
+    )
+    exceptions, lists = eligible_songs.load_rule(connection, data)
+    eligible_songs.classify(connection.table("songs"), exceptions, lists).create("classified")
+    eligible = connection.table("classified").filter("ineligible_reason IS NULL")
+    eligible_songs.year_counts(eligible).create("year_counts")
+    yearly = connection.sql(
+        f"""
+        SELECT country_iso3, CAST(year AS INTEGER) AS year,
+            coalesce(num_songs, 0) AS num_songs, coalesce(num_artists, 0) AS num_artists
+        FROM (SELECT DISTINCT country_iso3 FROM songs)
+        CROSS JOIN range({MIN_SONG_YEAR}, {MAX_SONG_YEAR + 1}) AS years(year)
+        LEFT JOIN year_counts USING (country_iso3, year)
+        """
     ).df()
-    registry["country_iso3"] = registry["country_iso3"].str.strip().str.upper()
-    registry = registry[registry["country_iso3"].str.fullmatch(r"[A-Z]{3}")]
-    registry = registry[~registry["country_iso3"].isin(OLD_CODES)]
-    if registry["country_iso3"].duplicated().any():
-        raise ValueError("the registry has duplicate country codes")
-    absent = [column for column in ("in_wvs", "in_evs") if column not in registry.columns]
-    return registry.assign(**dict.fromkeys(absent)), [f"registry.{column}" for column in absent]
+    decades = connection.sql(
+        "SELECT country_iso3, year // 10 * 10 AS decade, "
+        "count_if(ineligible_reason IS NULL) AS num_songs FROM classified GROUP BY ALL"
+    ).df()
+    tiers = sample_tiers.assign(decades)
+    tables = {
+        "songs": yearly[["country_iso3", "year", "num_songs"]],
+        "artists": yearly[["country_iso3", "year", "num_artists"]].assign(
+            discogs_artists_available=None,
+            discogs_dump_date=None,
+            artist_count_method=ARTIST_COUNT_METHOD,
+        ),
+        "sample": tiers,
+    }
+    counts = {"countries_with_songs": len(countries)}
+    counts |= eligible_songs.reason_counts(connection.table("classified"))
+    counts |= {f"sample_{name}": number for name, number in sample_tiers.row_counts(tiers).items()}
+    return tables, counts
 
 
 def read_tables(
-    inputs: dict[str, Path | None], *, allow_missing: bool = False
-) -> tuple[dict[str, pd.DataFrame], list[str]]:
-    """Read every input. Return the tables and the names of the inputs that are absent.
+    inputs: dict[str, Path | None],
+    data: Path,
+    *,
+    allow_missing: bool = False,
+    root: Path | None = None,
+) -> tuple[dict[str, pd.DataFrame], list[str], dict[str, int]]:
+    """Read every input. Return the tables, the names of the absent inputs, and the counts.
 
-    An absent input stops the build, unless `allow_missing` is set. Then its columns
-    are empty in the panel, and the caller must report the names.
+    The registry comes from `countries/` of `root` (default: the project root), and the
+    songs from `data`. An absent input stops the build, unless `allow_missing` is set.
+    Then its columns are empty in the panel, and the caller must report the names.
+    The columns in `NO_SOURCE` are always absent.
     """
     absent = sorted(name for name, path in inputs.items() if path is None or not path.exists())
-    if "registry" in absent:
-        where = inputs["registry"] or f"raw/{OLD_PIPELINE_FILES['registry'][0]}/<YYYYMMDD>/"
-        raise FileNotFoundError(f"the country registry is absent: {where}")
-    registry, no_survey = _read_registry(inputs["registry"])
-    absent += no_survey
-    if absent and not allow_missing:
+    registry = registry_from_countries(
+        paths.resolve_project_root(root), None if "regions" in absent else inputs["regions"]
+    )
+    song, counts = song_tables(data)
+    absent = sorted([*absent, *([] if song else ["songs"]), *NO_SOURCE])
+    if not allow_missing:
         raise FileNotFoundError(f"inputs of the country panel are absent: {absent}")
     countries = set(registry["country_iso3"])
-    lookup = crises.name_lookup(registry)
+    lookup = crises.name_lookup(registry.dropna(subset=["country_name"]))
     readers: dict[str, Callable[[], pd.DataFrame]] = {
         "regions": lambda: world_bank_countries.load_regions(inputs["regions"]),
         "income_groups": lambda: world_bank_countries.load_income_groups(inputs["income_groups"]),
@@ -210,7 +285,7 @@ def read_tables(
         "democracy": lambda: democracy.load_democracy(inputs["democracy"]),
         **{name: lambda name=name: _read_clean(name, inputs[name]) for name in CLEAN_SELECT},
     }
-    tables = {"registry": registry}
+    tables = {"registry": registry, **song}
     tables |= {name: read() for name, read in readers.items() if name not in absent}
     parts = [crises.load_hyperinflation(countries)]  # the episodes are a tracked file
     if "banking" not in absent:
@@ -222,7 +297,11 @@ def read_tables(
             crises.load_currency(inputs["currency_episodes"], inputs["currency_monthly"], countries)
         )
     tables["crises"] = crises.combine(parts)
-    return tables, absent
+    counts |= {
+        "registry_countries": len(registry),
+        "registry_no_name": int(registry["country_name"].isna().sum()),
+    }
+    return tables, absent, counts
 
 
 def join_panel(tables: dict[str, pd.DataFrame], gdp_source_name: str) -> duckdb.DuckDBPyRelation:
@@ -312,6 +391,7 @@ def files_read(data: Path, inputs: dict[str, Path | None], absent: list[str]) ->
 
     An absent input is not read. The currency table needs both of its files, so when
     one is absent the other is not read. The fertility input is a folder of files.
+    The count of the eligible songs reads the folders of `song_inputs`.
     """
     skipped = set(absent)
     if skipped & CURRENCY_INPUTS:
@@ -321,6 +401,7 @@ def files_read(data: Path, inputs: dict[str, Path | None], absent: list[str]) ->
         if name in skipped:
             continue
         files += [path / file for file in fertility.FILE_COLUMNS] if name == "fertility" else [path]
+    files += song_inputs(data)
     return sorted({paths.data_relative(data, file) for file in files})
 
 
@@ -337,7 +418,7 @@ def build(data: Path, *, allow_missing: bool = False, today: date | None = None)
             f"A folder without {paths.MANIFEST_NAME} is a build that did not end."
         )
     inputs = default_inputs(data)
-    tables, absent = read_tables(inputs, allow_missing=allow_missing)
+    tables, absent, counts = read_tables(inputs, data, allow_missing=allow_missing)
     panel = join_panel(tables, canonical(gdp.CONCEPT).source)
     folder.mkdir(parents=True)
     out = folder / manifests.COUNTRIES_FILE
@@ -353,7 +434,7 @@ def build(data: Path, *, allow_missing: bool = False, today: date | None = None)
         folder,
         "clean_countries",
         inputs=files_read(data, inputs, absent),
-        counts={"rows": len(panel), "countries": len(tables["registry"])},
+        counts={"rows": len(panel), "countries": len(tables["registry"]), **counts},
         notes=notes,
     )
     return {
@@ -361,5 +442,6 @@ def build(data: Path, *, allow_missing: bool = False, today: date | None = None)
         "manifest": folder / paths.MANIFEST_NAME,
         "rows": len(panel),
         "absent_inputs": absent,
+        "counts": counts,
         "codes_outside_registry": codes_outside_registry(tables),
     }
