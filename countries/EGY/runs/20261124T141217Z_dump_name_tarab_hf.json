@@ -1,0 +1,39 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/tarab_hf/20261119/",
+  "campaign_id": "20261124T141017Z",
+  "code_commit": "5fbb42fad051ea3acac33f5d8c07089b314625f1",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-24T14:12:22Z",
+  "iso3": "EGY",
+  "known_gaps": [
+    "close: 24 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 1 songs to add.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 1,
+  "run_id": "20261124T141217Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 1,
+  "songs_attempted": 34240,
+  "songs_rejected": {
+    "already_linked": 168,
+    "close": 24,
+    "held": 1320,
+    "held_loose_title": 185,
+    "no_track": 2015,
+    "not_roster": 28405,
+    "same_title": 2115,
+    "short_lyrics": 1,
+    "track_taken": 6
+  },
+  "source": "tarab_hf",
+  "started_utc": "2026-11-24T14:12:17Z",
+  "state": "complete"
+}
