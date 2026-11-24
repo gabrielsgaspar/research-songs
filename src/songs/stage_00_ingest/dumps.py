@@ -235,6 +235,37 @@ FAMILIES: tuple[Family, ...] = (
         fetched=("updated_at",),
         credits="page",
     ),
+    Family(
+        "lidicity",
+        frozenset({"lyrics_text", "provider_title", "site_artist_label"}),
+        song_key=("provider_song_id",),
+        song_name=("provider_title",),
+        lyrics=("lyrics_text",),
+        page_artist=("site_artist_label",),
+        credits="page",
+    ),
+    Family(
+        "lyricsmy",
+        frozenset({"lyrics_text", "provider_title", "artist_names_json"}),
+        song_key=("provider_song_id",),
+        song_name=("provider_title", "page_title", "index_title"),
+        lyrics=("lyrics_text",),
+        page_artist=(),
+        credits="json",
+        json_ids="artist_ids_json",
+        json_labels="artist_names_json",
+        parsed=True,
+    ),
+    Family(
+        "deungdutjai",
+        frozenset({"song_id", "artist_text", "lyrics_text"}),
+        song_key=("song_id",),
+        song_url=("url",),
+        song_name=("title",),
+        lyrics=("lyrics_text",),
+        page_artist=("artist_text",),
+        credits="page",
+    ),
 )
 FAMILY_BY_NAME = {family.name: family for family in FAMILIES}
 

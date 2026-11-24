@@ -572,6 +572,135 @@ def test_kugeci_reads_labels_and_the_song_index(tmp_path):
     assert result["dropped"]["no_artist"] == 1
 
 
+def test_lidicity_uses_the_printed_label(tmp_path):
+    folder = tmp_path / "in"
+    write_parquet(
+        folder / "lidicity_lyrics.parquet",
+        [
+            {
+                "provider": "lidicity",
+                "provider_song_id": "l1",
+                "song_url": "https://songs.example/l1",
+                "http_status": 200,
+                "raw_path": "raw/lidicity/20261106/l1.html",
+                "provider_title": "Lidi Song",
+                "site_artist_label": "Lidi Band",
+                "lyrics_text": "invented line l1",
+                "has_lyrics": True,
+            },
+            {
+                "provider": "lidicity",
+                "provider_song_id": "l2",
+                "song_url": "https://songs.example/l2",
+                "http_status": 404,
+                "raw_path": None,
+                "provider_title": "Missing",
+                "site_artist_label": "Lidi Band",
+                "lyrics_text": None,
+                "has_lyrics": False,
+            },
+        ],
+    )
+    data = tmp_path / "data"
+    result = build(data, "lidicity", folder)
+    songs = table(schemas.DUMP_SONGS, _out(data, "lidicity"), "source_song_id")
+    assert result["family"] == "lidicity"
+    assert [row["source_song_id"] for row in songs] == ["l1"]
+    assert songs[0]["song_name"] == "Lidi Song"
+    assert songs[0]["artist_name"] == "Lidi Band"
+    assert songs[0]["song_url"] == "https://songs.example/l1"
+    assert songs[0]["raw_ref"] == "raw/lidicity/20261106/l1.html"
+    assert result["dropped"] == {"error_page": 1}
+
+
+def test_lyricsmy_reads_the_artist_lists_and_the_title_fallback(tmp_path):
+    folder = tmp_path / "in"
+    common = {"provider": "lyricsmy", "has_lyrics": True, "http_status": 200}
+    write_parquet(
+        folder / "lyricsmy_lyrics.parquet",
+        [
+            common
+            | {
+                "provider_song_id": "m1",
+                "provider_title": None,
+                "index_title": "Index Title",
+                "page_title": "Page Title",
+                "song_url": "https://songs.example/m1",
+                "artist_ids_json": '["a1", "a2"]',
+                "artist_names_json": '["First Singer", "Second Singer"]',
+                "lyrics_text": "invented line m1",
+                "parse_state": "parsed",
+            },
+            common
+            | {
+                "provider_song_id": "m2",
+                "provider_title": "Unparsed",
+                "index_title": None,
+                "page_title": None,
+                "song_url": "https://songs.example/m2",
+                "artist_ids_json": '["a1"]',
+                "artist_names_json": '["First Singer"]',
+                "lyrics_text": "invented line m2",
+                "parse_state": "failed",
+            },
+        ],
+    )
+    data = tmp_path / "data"
+    result = build(data, "lyricsmy", folder)
+    songs = table(schemas.DUMP_SONGS, _out(data, "lyricsmy"), "credit_position")
+    assert result["family"] == "lyricsmy"
+    assert [row["artist_name"] for row in songs] == ["First Singer", "Second Singer"]
+    assert [row["source_artist_id"] for row in songs] == ["a1", "a2"]
+    assert {row["song_name"] for row in songs} == {"Page Title"}
+    assert {row["song_url"] for row in songs} == {"https://songs.example/m1"}
+    assert result["dropped"] == {"not_parsed": 1}
+
+
+def test_deungdutjai_uses_the_printed_artist_and_the_url(tmp_path):
+    folder = tmp_path / "in"
+    write_parquet(
+        folder / "deungdutjai_lyrics.parquet",
+        [
+            {
+                "provider": "deungdutjai",
+                "song_id": "d1",
+                "url": "https://songs.example/d1",
+                "title": "Deung Song",
+                "artist_text": "Deung Singer",
+                "artist_ids": "s1",
+                "lyrics_text": "invented line d1",
+                "has_lyrics": True,
+                "parse_state": "partial",
+            },
+            {
+                "provider": "deungdutjai",
+                "song_id": "d2",
+                "url": "https://songs.example/d2",
+                "title": None,
+                "artist_text": "Deung Singer",
+                "artist_ids": "s1",
+                "lyrics_text": "invented line d2",
+                "has_lyrics": True,
+                "parse_state": "partial",
+            },
+        ],
+    )
+    data = tmp_path / "data"
+    result = build(data, "deungdutjai", folder)
+    songs = table(schemas.DUMP_SONGS, _out(data, "deungdutjai"), "source_song_id")
+    assert result["family"] == "deungdutjai"
+    assert [row["source_song_id"] for row in songs] == ["d1"]
+    assert songs[0]["song_name"] == "Deung Song"
+    assert songs[0]["artist_name"] == "Deung Singer"
+    assert songs[0]["song_url"] == "https://songs.example/d1"
+    assert result["dropped"] == {"no_song_name": 1}
+
+
+def test_the_new_families_leave_appleofmyeye_in_kugeci():
+    appleofmyeye = {"lyrics_text", "provider_title", "site_artist_labels_json", "site_artist_label"}
+    assert dumps.detect_family(appleofmyeye) == "kugeci"
+
+
 def test_aama_uses_the_probed_columns_not_the_old_names(tmp_path):
     folder = tmp_path / "in"
     write_parquet(
