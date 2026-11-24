@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261124T083953Z",
+  "closed_utc": "2026-11-24T08:43:29Z",
+  "iso3": "ESP",
+  "next_time": "lrclib added 23794, musica 7497, genius 3891; letras and buenamusica have no dump. Close pile 2572. Build letras/buenamusica and clear close matches before the next campaign.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 129501
+}

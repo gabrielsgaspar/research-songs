@@ -1,0 +1,36 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 5,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/lieder_net/20261119/",
+  "campaign_id": "20261124T093051Z",
+  "code_commit": "b92d96e994af1529b1f3ce03244cab67a455c4ed",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-24T09:36:19Z",
+  "iso3": "DEU",
+  "known_gaps": [
+    "close: 3 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 23 songs to add. 15 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 23,
+  "run_id": "20261124T093607Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 23,
+  "songs_attempted": 7072,
+  "songs_rejected": {
+    "close": 3,
+    "held": 1,
+    "no_track": 428,
+    "not_roster": 6572,
+    "out_of_scope": 40,
+    "same_title": 5
+  },
+  "source": "lieder_net",
+  "started_utc": "2026-11-24T09:36:07Z",
+  "state": "complete"
+}

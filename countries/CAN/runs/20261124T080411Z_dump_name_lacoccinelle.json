@@ -1,0 +1,41 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 82,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/lacoccinelle/20261120/",
+  "campaign_id": "20261124T080132Z",
+  "code_commit": "b92d96e994af1529b1f3ce03244cab67a455c4ed",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-24T08:04:29Z",
+  "iso3": "CAN",
+  "known_gaps": [
+    "close: 6 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 162 songs to add. 122 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 162,
+  "run_id": "20261124T080411Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 162,
+  "songs_attempted": 110401,
+  "songs_rejected": {
+    "already_linked": 35,
+    "artist_other_country": 5,
+    "close": 6,
+    "held": 81,
+    "held_loose_title": 257,
+    "no_title_key": 5,
+    "no_track": 230,
+    "not_roster": 105775,
+    "out_of_scope": 725,
+    "same_title": 3111,
+    "short_lyrics": 9
+  },
+  "source": "lacoccinelle",
+  "started_utc": "2026-11-24T08:04:11Z",
+  "state": "complete"
+}
