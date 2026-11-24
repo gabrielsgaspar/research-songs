@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261123T235131Z",
+  "closed_utc": "2026-11-23T23:58:31Z",
+  "iso3": "AUT",
+  "next_time": "lrclib added 4067 and genius 1153; volksmusikdatenbank and songtexte have no dump. Wall time 751 s. Close pile 644. By-name sample flagged Akov (UK-origin, Vienna resident). Build German-language dumps before the next campaign.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 23522
+}

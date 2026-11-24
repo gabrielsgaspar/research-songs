@@ -14,11 +14,11 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [ARG](../../countries/ARG/) | 6 | 2026-11-23 | dump_name, old_layout | genius, lrclib, musica, old_pipeline, todotango | 66457 |
 | [ARM](../../countries/ARM/) | 2 | 2026-11-21 | old_layout | old_pipeline | 326 |
 | [ATG](../../countries/ATG/) | 2 | 2026-11-21 | old_layout | old_pipeline | 12 |
-| [AUS](../../countries/AUS/) | 2 | 2026-11-21 | old_layout | old_pipeline | 87184 |
-| [AUT](../../countries/AUT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 18302 |
+| [AUS](../../countries/AUS/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 97548 |
+| [AUT](../../countries/AUT/) | 4 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline | 23522 |
 | [AZE](../../countries/AZE/) | 2 | 2026-11-21 | old_layout | old_pipeline | 642 |
 | [BDI](../../countries/BDI/) | 2 | 2026-11-21 | old_layout | old_pipeline | 367 |
-| [BEL](../../countries/BEL/) | 2 | 2026-11-21 | old_layout | old_pipeline | 30115 |
+| [BEL](../../countries/BEL/) | 7 | 2026-11-24 | dump_name, old_layout | genius, lacoccinelle, lrclib, old_pipeline, paroles2chansons, parolesnet | 38300 |
 | [BEN](../../countries/BEN/) | 2 | 2026-11-21 | old_layout | old_pipeline | 971 |
 | [BES](../../countries/BES/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [BFA](../../countries/BFA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 86 |
@@ -39,13 +39,13 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [CAF](../../countries/CAF/) | 2 | 2026-11-21 | old_layout | old_pipeline | 17 |
 | [CAN](../../countries/CAN/) | 2 | 2026-11-21 | old_layout | old_pipeline | 131954 |
 | [CHE](../../countries/CHE/) | 2 | 2026-11-21 | old_layout | old_pipeline | 16665 |
-| [CHL](../../countries/CHL/) | 2 | 2026-11-21 | old_layout | old_pipeline | 14551 |
+| [CHL](../../countries/CHL/) | 5 | 2026-11-24 | dump_name, old_layout | genius, lrclib, musica, old_pipeline | 20000 |
 | [CHN](../../countries/CHN/) | 2 | 2026-11-21 | old_layout | old_pipeline | 26521 |
 | [CIV](../../countries/CIV/) | 2 | 2026-11-21 | old_layout | old_pipeline | 2218 |
 | [CMR](../../countries/CMR/) | 2 | 2026-11-21 | old_layout | old_pipeline | 1383 |
 | [COD](../../countries/COD/) | 2 | 2026-11-21 | old_layout | old_pipeline | 3294 |
 | [COG](../../countries/COG/) | 2 | 2026-11-21 | old_layout | old_pipeline | 364 |
-| [COL](../../countries/COL/) | 2 | 2026-11-21 | old_layout | old_pipeline | 17254 |
+| [COL](../../countries/COL/) | 5 | 2026-11-24 | dump_name, old_layout | genius, lrclib, musica, old_pipeline | 24865 |
 | [COM](../../countries/COM/) | 2 | 2026-11-21 | old_layout | old_pipeline | 135 |
 | [CPV](../../countries/CPV/) | 2 | 2026-11-21 | old_layout | old_pipeline | 2374 |
 | [CRI](../../countries/CRI/) | 5 | 2026-11-23 | dump_name, old_layout | genius, lrclib, musica, old_pipeline | 2323 |
@@ -59,7 +59,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [DEU](../../countries/DEU/) | 2 | 2026-11-21 | old_layout | old_pipeline | 205158 |
 | [DJI](../../countries/DJI/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [DMA](../../countries/DMA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 56 |
-| [DNK](../../countries/DNK/) | 2 | 2026-11-21 | old_layout | old_pipeline | 19954 |
+| [DNK](../../countries/DNK/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 30678 |
 | [DOM](../../countries/DOM/) | 2 | 2026-11-21 | old_layout | old_pipeline | 5451 |
 | [DZA](../../countries/DZA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 5655 |
 | [ECU](../../countries/ECU/) | 5 | 2026-11-23 | dump_name, old_layout | genius, lrclib, musica, old_pipeline | 3855 |
@@ -94,7 +94,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [GUY](../../countries/GUY/) | 2 | 2026-11-21 | old_layout | old_pipeline | 70 |
 | [HKG](../../countries/HKG/) | 4 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline | 34404 |
 | [HND](../../countries/HND/) | 2 | 2026-11-21 | old_layout | old_pipeline | 247 |
-| [HRV](../../countries/HRV/) | 2 | 2026-11-21 | old_layout | old_pipeline | 18113 |
+| [HRV](../../countries/HRV/) | 8 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline, tekstomanija, tekstovi, tekstovipesama, tekstovipjesama | 23691 |
 | [HTI](../../countries/HTI/) | 5 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline, wikimizik | 1867 |
 | [HUN](../../countries/HUN/) | 4 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline | 24154 |
 | [IDN](../../countries/IDN/) | 4 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline | 24357 |
@@ -156,7 +156,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [NIC](../../countries/NIC/) | 2 | 2026-11-21 | old_layout | old_pipeline | 437 |
 | [NIU](../../countries/NIU/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [NLD](../../countries/NLD/) | 2 | 2026-11-21 | old_layout | old_pipeline | 57879 |
-| [NOR](../../countries/NOR/) | 2 | 2026-11-21 | old_layout | old_pipeline | 31119 |
+| [NOR](../../countries/NOR/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 40844 |
 | [NPL](../../countries/NPL/) | 2 | 2026-11-21 | old_layout | old_pipeline | 127 |
 | [NZL](../../countries/NZL/) | 4 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline | 13046 |
 | [OMN](../../countries/OMN/) | 2 | 2026-11-21 | old_layout | old_pipeline | 37 |
@@ -166,7 +166,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [PHL](../../countries/PHL/) | 4 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline | 14930 |
 | [PLW](../../countries/PLW/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [PNG](../../countries/PNG/) | 2 | 2026-11-21 | old_layout | old_pipeline | 8 |
-| [POL](../../countries/POL/) | 2 | 2026-11-21 | old_layout | old_pipeline | 42060 |
+| [POL](../../countries/POL/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 50207 |
 | [PRI](../../countries/PRI/) | 2 | 2026-11-21 | old_layout | old_pipeline | 26404 |
 | [PRK](../../countries/PRK/) | 2 | 2026-11-21 | old_layout | old_pipeline | 53 |
 | [PRT](../../countries/PRT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 22556 |
@@ -175,7 +175,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [QAT](../../countries/QAT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 502 |
 | [REU](../../countries/REU/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [ROU](../../countries/ROU/) | 2 | 2026-11-21 | old_layout | old_pipeline | 14017 |
-| [RUS](../../countries/RUS/) | 2 | 2026-11-21 | old_layout | old_pipeline | 60002 |
+| [RUS](../../countries/RUS/) | 6 | 2026-11-24 | dump_name, old_layout | genius, geniusru, lrclib, old_pipeline, tekstpesni | 72918 |
 | [RWA](../../countries/RWA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 2107 |
 | [SAU](../../countries/SAU/) | 2 | 2026-11-21 | old_layout | old_pipeline | 7151 |
 | [SDN](../../countries/SDN/) | 2 | 2026-11-21 | old_layout | old_pipeline | 1270 |
