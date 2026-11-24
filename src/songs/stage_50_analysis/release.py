@@ -240,10 +240,12 @@ def build(
     _read_inputs(connection, countries)
     connection.sql("CREATE TABLE covered (country_iso3 VARCHAR)")
     connection.executemany("INSERT INTO covered VALUES (?)", [(code,) for code, _, _ in countries])
-    lists = eligible_songs.load_hash_lists(
-        connection, suspect_file, quarantine_file
-    ) | eligible_songs.load_artist_lists(
-        connection, excluded_artists_file, artist_countries_file, data
+    lists = (
+        eligible_songs.load_hash_lists(connection, suspect_file, quarantine_file)
+        | eligible_songs.load_artist_lists(
+            connection, excluded_artists_file, artist_countries_file, data
+        )
+        | eligible_songs.load_text_copies(connection, data)
     )
     eligible_songs.classify(connection.table("songs"), exceptions, lists).create("classified")
     _release_songs(connection).create("release_songs")
@@ -270,9 +272,12 @@ def build(
     inputs = [paths.data_relative(data, panel_folder)]
     if quarantine_file.parent.is_relative_to(data):
         inputs.append(paths.data_relative(data, quarantine_file.parent))
-    artist_country = paths.latest_clean_artist_country_dir(data)
-    if artist_country is not None:
-        inputs.append(paths.data_relative(data, artist_country))
+    for table in (
+        paths.latest_clean_artist_country_dir(data),
+        paths.latest_clean_text_copies_dir(data),
+    ):
+        if table is not None:
+            inputs.append(paths.data_relative(data, table))
     for _, songs, scores in countries:
         inputs += [paths.data_relative(data, songs)]
         inputs += [paths.data_relative(data, scores)] if scores is not None else []

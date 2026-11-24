@@ -31,9 +31,13 @@ filter. The rules, in the order that they are checked:
    is not the `song_id` of the row): a duplicate or a re-release.
 8. `re_release`: the re-release check of the old pipeline says that the row is a
    re-release (`re_release` is true). A row that no check saw is not left out.
-9. `entered_by_hand`: a person collected the song (route `manual_review`), and its
+9. `text_copy`: the table of text copies (`clean/quality/text_copies/<YYYYMMDD>/` in
+   the data folder, the newest complete folder) lists the song: a campaign song whose
+   text another song of its country already has. With no such folder, no song is
+   left out for this reason.
+10. `entered_by_hand`: a person collected the song (route `manual_review`), and its
    country has no group in the exceptions file.
-10. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
+11. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
 
 A song with no year is eligible. An analysis by year cannot use it, and reports
 how many such songs it leaves out.
@@ -57,6 +61,8 @@ The list of artist countries holds the country of each artist that the old data
 put in the folder of another country. Both are tracked, with ids and codes and no
 names. `load_artist_lists` reads them, and the table of artist countries, which
 `songs.stage_10_clean.artist_country` writes from Discogs evidence.
+`load_text_copies` reads the table of text copies, which
+`songs.stage_10_clean.text_copies` writes.
 """
 
 import csv
@@ -75,6 +81,7 @@ from songs.common.paths import (
     data_root,
     latest_clean_artist_country_dir,
     latest_clean_song_quarantine_dir,
+    latest_clean_text_copies_dir,
     resolve_project_root,
 )
 from songs.common.years import MAX_SONG_YEAR, MIN_SONG_YEAR
@@ -98,14 +105,16 @@ MATCHES = {
     "excluded_artist": "q.artist_id = s.artist_id",
     "artist_country": "q.artist_id = s.artist_id "
     "AND (q.country_iso3 = s.country_iso3) = q.other_country",
+    "text_copy": "q.country_iso3 = s.country_iso3 AND q.song_id = s.song_id",
 }
 # Reason -> the condition on a song row that leaves it out. The order is the order of the check.
 RULES = {
     "quality_quarantine": "quality_status = 'quarantine'",
-    **{name: f"on_{name}" for name in MATCHES},
+    **{name: f"on_{name}" for name in MATCHES if name != "text_copy"},
     "suppressed_duplicate": "duplicate_decision = 'suppress_duplicate'",
     "not_canonical": "canonical_song_id IS NOT NULL AND canonical_song_id <> song_id",
     "re_release": "re_release",
+    "text_copy": "on_text_copy",
     "entered_by_hand": "{manual} AND NOT {named}",
     "year_out_of_range": f"year NOT BETWEEN {MIN_SONG_YEAR} AND {MAX_SONG_YEAR}",
 }
@@ -250,6 +259,21 @@ def load_artist_lists(
     return lists
 
 
+def load_text_copies(
+    connection: duckdb.DuckDBPyConnection, data: Path | None = None
+) -> dict[str, duckdb.DuckDBPyRelation]:
+    """Read the songs of the newest complete table of text copies in `data` into `connection`.
+
+    The default is the data folder of `data_root`. With no such table, the list is empty.
+    """
+    folder = latest_clean_text_copies_dir(data or data_root())
+    if folder is None:
+        empty = "SELECT NULL::VARCHAR AS country_iso3, NULL::VARCHAR AS song_id WHERE false"
+        return {"text_copy": connection.sql(empty)}
+    table = schemas.read_table(schemas.TEXT_COPIES, folder, connection)
+    return {"text_copy": table.project("country_iso3, song_id")}
+
+
 def _load(
     connection: duckdb.DuckDBPyConnection, *lists: tuple[str, Path, list[str]]
 ) -> dict[str, duckdb.DuckDBPyRelation]:
@@ -273,12 +297,15 @@ def load_rule(
     """Return the exceptions and the lists that `classify` takes, read into `connection`.
 
     Each file defaults to the tracked file in `resources/lyrics/`, and the list of songs
-    in quarantine to the newest complete quarantine folder of `data`. The table of
-    artist countries is the newest complete one of `data`, when `data` has one.
+    in quarantine to the newest complete quarantine folder of `data`. The tables of
+    artist countries and of text copies are the newest complete ones of `data`, when
+    `data` has them.
     """
-    lists = load_hash_lists(
-        connection, suspect, quarantine or quarantine_file(data)
-    ) | load_artist_lists(connection, excluded_artists, artist_countries, data)
+    lists = (
+        load_hash_lists(connection, suspect, quarantine or quarantine_file(data))
+        | load_artist_lists(connection, excluded_artists, artist_countries, data)
+        | load_text_copies(connection, data)
+    )
     return load_exceptions(exceptions), lists
 
 
@@ -292,8 +319,8 @@ def classify(
     `ineligible_reason` is the first rule that leaves the song out, or null when the
     song is eligible. `by_exception` is true for an eligible song that entered
     through a group of the exceptions file. The songs need `country_iso3` and the
-    columns in `COLUMNS`. `lists` joins the results of `load_hash_lists` and
-    `load_artist_lists` on the connection of the songs.
+    columns in `COLUMNS`. `lists` joins the results of `load_hash_lists`,
+    `load_artist_lists` and `load_text_copies` on the connection of the songs.
     """
     for name, condition in MATCHES.items():
         hits = songs.set_alias("s").join(lists[name].set_alias("q"), condition, how="semi")

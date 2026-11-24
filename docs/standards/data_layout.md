@@ -39,6 +39,7 @@ clean/catalog/<source>/<YYYYMMDD>/           parsed MusicBrainz and Discogs tabl
 clean/countries/<YYYYMMDD>/                  country-year table of economic and social variables: countries.parquet
 clean/quality/song_quarantine/<YYYYMMDD>/    songs that the old quality checks put in quarantine: song_quarantine.csv
 clean/quality/artist_country/<YYYYMMDD>/     roster artists that belong to another country: artist_country.parquet
+clean/quality/text_copies/<YYYYMMDD>/        campaign songs whose text another song of the country has: text_copies.parquet
 lyrics/<ISO3>/songs/<run id>/                full state of the country after that run: artists.parquet, songs.parquet, links.parquet
 lyrics/<ISO3>/scores/<run id>/               topic scores of one scoring run: topics.parquet, provenance.parquet
 analysis/<YYYYMMDD>/                         the release: country_year.parquet, songs.parquet
@@ -55,6 +56,7 @@ Each version folder has one function in `src/songs/common/paths.py`. No other mo
 | `clean/countries/<YYYYMMDD>/` | `clean_countries_dir(data, day)` | `latest_clean_countries_dir(data)` |
 | `clean/quality/song_quarantine/<YYYYMMDD>/` | `clean_song_quarantine_dir(data, day)` | `latest_clean_song_quarantine_dir(data)` |
 | `clean/quality/artist_country/<YYYYMMDD>/` | `clean_artist_country_dir(data, day)` | `latest_clean_artist_country_dir(data)` |
+| `clean/quality/text_copies/<YYYYMMDD>/` | `clean_text_copies_dir(data, day)` | `latest_clean_text_copies_dir(data)` |
 | `lyrics/<ISO3>/songs/<run id>/` | `country_songs_dir(data, iso3, run_id)` | `latest_country_songs_dir(data, iso3)` |
 | `lyrics/<ISO3>/scores/<run id>/` | `country_scores_dir(data, iso3, run_id)` | `latest_country_scores_dir(data, iso3)` |
 | `analysis/<YYYYMMDD>/` | `analysis_dir(data, day)` | `latest_analysis_dir(data)` |
@@ -151,6 +153,7 @@ Every version folder holds one `_MANIFEST.json`. All kinds of folder use one for
 | `clean_countries` | `clean/countries/<YYYYMMDD>/` | `inputs` | `countries.parquet` |
 | `clean_song_quarantine` | `clean/quality/song_quarantine/<YYYYMMDD>/` | `inputs` | `song_quarantine.csv` |
 | `clean_artist_country` | `clean/quality/artist_country/<YYYYMMDD>/` | `inputs` | `artist_country.parquet` |
+| `clean_text_copies` | `clean/quality/text_copies/<YYYYMMDD>/` | `inputs` | `text_copies.parquet` |
 | `country_songs` | `lyrics/<ISO3>/songs/<run id>/` | `country_iso3`, `run_id`, `inputs` | `artists.parquet`, `songs.parquet`, `links.parquet` |
 | `country_scores` | `lyrics/<ISO3>/scores/<run id>/` | `country_iso3`, `run_id`, `inputs` | `topics.parquet`, `provenance.parquet` |
 | `analysis` | `analysis/<YYYYMMDD>/` | `inputs` | `country_year.parquet`, `songs.parquet` |
@@ -358,6 +361,19 @@ The manifest names the Discogs catalog folder and the songs folder of each count
 
 Two places read the newest complete folder. The rule for eligible songs leaves out a song of an artist with `other_country` for the country of the song, with the reason `artist_country` (section "Analysis release"). `songs lyrics import-dump` does not add a song of such an artist; it counts the song as `artist_other_country` in the run record and in the manifest, and the manifest notes name the folder. With no such folder, both work without the table.
 
+## Text copies
+
+A campaign can add the same lyrics a second time, from a second source with other punctuation or spacing. `songs lyrics copy-check --write` writes `clean/quality/text_copies/<YYYYMMDD>/` (`src/songs/stage_10_clean/text_copies.py`). Without `--write`, the command only prints the counts. It reads the newest complete songs folder of every country, one country at a time. No person checks a row.
+
+The keys are those of `songs.common.lyric_hash`: the text in lower case with only its letters and digits, of any script. A kept text of fewer than 30 characters has no key. A song B is a text copy of a song A of the same country when one of two conditions holds:
+
+1. `same_text`: A and B have the same `text_key`, for any two artists.
+2. `same_artist_start`: A and B have the same `artist_id` and the same `start_key`, the key of the first 300 kept characters.
+
+Only a song with the route `dump_name` can be a copy. An older song keeps the duplicate decisions of the old pipeline (`canonical_song_id`, `duplicate_decision`), and this rule never marks it. The songs of one key are a group. One song represents the group, in this order: an older song when the group has one, then the campaign song with the smallest `run_id`, then the smallest `song_id`. Each other campaign song of the group gets one row, with that song as `kept_song_id`. The reason is `same_text` when the song is not the first of its `same_text` group, else `same_artist_start`. The first song of a set of linked groups is never a copy, so each text keeps one song.
+
+The folders of the data are write-once, so the table marks the copies and deletes nothing. The rule for eligible songs leaves out a song that the newest complete table lists, with the reason `text_copy` (section "Analysis release"). With no such folder, the rule leaves out no song for this reason. An import of a dump holds back a new copy before it enters (`held_text`, see `countries/README.md`). The manifest names the songs folder of each country that the rule read. It counts the songs read, the campaign songs, the songs whose text has no key, and the copies by reason.
+
 <!-- generated:quality_tables:start -->
 <!-- Do not edit by hand. To rebuild, run: python -m songs.common.schemas --write -->
 
@@ -376,6 +392,17 @@ Folder: `clean/quality/artist_country/<YYYYMMDD>/`. Key: `country_iso3`, `artist
 | `releases_home` | int64 | yes | Those releases in a home release country |
 | `top_release_country` | string | yes | Release country of Discogs with the most of those releases. Empty text when `releases` is 0 |
 | `decision` | string | yes | `other_country` when the artist belongs to another country, or `keep` |
+
+### `text_copies.parquet`: one row per campaign song that is a text copy of another song of its country
+
+Folder: `clean/quality/text_copies/<YYYYMMDD>/`. Key: `country_iso3`, `song_id`.
+
+| Column | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `country_iso3` | string | yes | Country of the song |
+| `song_id` | string | yes | The copy: a song with the route `dump_name` in `songs.parquet` of the country |
+| `kept_song_id` | string | yes | The song of the same country that represents the group: an older song when the group has one, else the campaign song with the smallest `run_id`, then the smallest `song_id` |
+| `reason` | string | yes | `same_text`: the same `text_key` as the kept song (`songs.common.lyric_hash`). `same_artist_start`: the same artist and the same `start_key` |
 
 <!-- generated:quality_tables:end -->
 
@@ -491,7 +518,7 @@ Folder: `analysis/<YYYYMMDD>/`. Key: `country_iso3`, `song_id`.
 ### How the release is built
 
 - **Inputs.** The newest complete songs folder and scores folder of each country (`latest_country_songs_dir`, `latest_country_scores_dir`), and the newest complete country-year table (`latest_clean_countries_dir`). A country with no complete songs folder is not in the release. The manifest names each input folder.
-- **Eligible songs.** One function decides which songs enter: `classify` in `src/songs/stage_50_analysis/eligible_songs.py` (decision 0007). It gives each song that it leaves out one reason, in this order: `quality_quarantine` (`quality_status` is `quarantine`), `suspect_text` (`lyrics_text_hash` and `source` are on `resources/lyrics/suspect_text_hashes.csv`), `quarantined_song` (`song_id`, `artist_id`, `source` and `lyrics_text_hash` are on the list of the newest `clean/quality/song_quarantine/<YYYYMMDD>/` folder), `excluded_artist` (`artist_id` is on `resources/lyrics/excluded_artists.csv`), `artist_country` (`resources/lyrics/artist_countries.csv` gives the artist another country than `country_iso3`, or the newest `clean/quality/artist_country/<YYYYMMDD>/` folder gives the artist `other_country` for `country_iso3`; the tracked list alone decides for an artist that it names), `suppressed_duplicate` (`duplicate_decision` is `suppress_duplicate`), `not_canonical` (`canonical_song_id` names another row), `re_release` (the re-release check says that the row is a re-release), `entered_by_hand` (route `manual_review`, and the country has no group in the exceptions file), and `year_out_of_range` (outside 1900 to 2026). A song with no year is eligible: it is in `songs.parquet` with an empty `year`, and it is not in `country_year.parquet`.
+- **Eligible songs.** One function decides which songs enter: `classify` in `src/songs/stage_50_analysis/eligible_songs.py` (decision 0007). It gives each song that it leaves out one reason, in this order: `quality_quarantine` (`quality_status` is `quarantine`), `suspect_text` (`lyrics_text_hash` and `source` are on `resources/lyrics/suspect_text_hashes.csv`), `quarantined_song` (`song_id`, `artist_id`, `source` and `lyrics_text_hash` are on the list of the newest `clean/quality/song_quarantine/<YYYYMMDD>/` folder), `excluded_artist` (`artist_id` is on `resources/lyrics/excluded_artists.csv`), `artist_country` (`resources/lyrics/artist_countries.csv` gives the artist another country than `country_iso3`, or the newest `clean/quality/artist_country/<YYYYMMDD>/` folder gives the artist `other_country` for `country_iso3`; the tracked list alone decides for an artist that it names), `suppressed_duplicate` (`duplicate_decision` is `suppress_duplicate`), `not_canonical` (`canonical_song_id` names another row), `re_release` (the re-release check says that the row is a re-release), `text_copy` (the newest `clean/quality/text_copies/<YYYYMMDD>/` folder lists `country_iso3` and `song_id`), `entered_by_hand` (route `manual_review`, and the country has no group in the exceptions file), and `year_out_of_range` (outside 1900 to 2026). A song with no year is eligible: it is in `songs.parquet` with an empty `year`, and it is not in `country_year.parquet`.
 - **Exceptions.** `resources/lyrics/eligibility_exceptions.csv` names the countries whose hand-collected songs enter, with the reason and the date of the decision. Such a song has `by_exception` true. `country_year.parquet` counts them in `num_songs_by_exception`, and the manifest counts them for each country (`songs_by_exception_<ISO3>`). The file has no rows while no country has a `manual_review` run. A test fails when a run record names that route and the file has no row for its country.
 - **Scores.** A score joins a song on `country_iso3`, `song_id` and `lyrics_sha256`. A score of other lyric text, or of a song that is not in the songs folder, does not join. The manifest counts both (`scores_other_lyrics`, `scores_no_song`), and the scores of songs that are left out (`scores_ineligible_song`). The build stops when these counts and `songs_scored` do not add up to the scores read, when a country has scores and no complete songs folder, and when a row names another country than its folder. A song with no score stays, with empty topic columns.
 - **Counts.** The manifest counts `songs` (rows read), `eligible_songs` (rows in `songs.parquet`), `left_out_<reason>` for each reason, `songs_by_exception`, `songs_scored`, `songs_in_country_year`, `country_year_left_out_no_year` (eligible songs that are not in `country_year.parquet` because they have no year), `songs_outside_panel` (eligible songs with a year whose country and year are not in the country-year table), `scores`, `countries` and `country_years`. The build stops when the eligible songs and the songs left out do not add up to the songs read, and when `songs_in_country_year`, `country_year_left_out_no_year` and `songs_outside_panel` do not add up to the eligible songs.

@@ -897,6 +897,40 @@ def lyrics_roster_check(
     typer.echo(f"wrote {result['folder']}" if write else "dry run: nothing written")
 
 
+@lyrics_app.command("copy-check")
+def lyrics_copy_check(
+    write: Annotated[
+        bool, typer.Option("--write", help="Write the table. Without it, the command only prints.")
+    ] = False,
+) -> None:
+    """Mark the campaign songs of every country whose text is a copy of another song.
+
+    The rule compares the letters and digits of each text. It takes about 3 minutes.
+    With --write, the command writes clean/quality/text_copies/<YYYYMMDD>/ in the data folder.
+    """
+    from songs.common.paths import data_root
+    from songs.common.schemas import SAME_ARTIST_START, SAME_TEXT
+    from songs.stage_10_clean import text_copies
+
+    try:
+        result = text_copies.check_copies(data_root(), write=write)
+    except FileExistsError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    counts = result["counts"]
+    typer.echo(f"countries: {counts['countries']}")
+    typer.echo(f"songs in: {counts['songs_in']}, campaign songs: {counts['campaign_songs']}")
+    typer.echo(f"left out, text with no key: {counts['songs_no_key']}")
+    typer.echo(f"copies (rows out): {counts['copies']}")
+    for reason in (SAME_TEXT, SAME_ARTIST_START):
+        typer.echo(f"  {reason}: {counts[reason]}")
+    typer.echo("country	copies	campaign songs	songs	share of campaign songs")
+    by_share = sorted(result["by_country"].items(), key=lambda item: -item[1][0] / item[1][1])
+    for code, (copies, campaign, songs) in by_share[:15]:
+        typer.echo(f"{code}	{copies}	{campaign}	{songs}	{100 * copies / campaign:.1f}%")
+    typer.echo(f"wrote {result['folder']}" if write else "dry run: nothing written")
+
+
 @campaign_app.command("run")
 def campaign_run_command(
     countries: CountriesArgument,
