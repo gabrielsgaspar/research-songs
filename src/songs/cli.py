@@ -856,6 +856,47 @@ def lyrics_gaps(
     )
 
 
+@lyrics_app.command("roster-check")
+def lyrics_roster_check(
+    write: Annotated[
+        bool, typer.Option("--write", help="Write the table. Without it, the command only prints.")
+    ] = False,
+) -> None:
+    """Mark the roster artists of every country that belong to another country.
+
+    The rule reads the Discogs profile and the release countries of each roster artist
+    with a Discogs id. It takes about 10 minutes. With --write, the command writes
+    clean/quality/artist_country/<YYYYMMDD>/ in the data folder.
+    """
+    from songs.common.paths import data_root
+    from songs.stage_10_clean import artist_country
+
+    try:
+        result = artist_country.check_rosters(data_root(), write=write)
+    except (FileNotFoundError, FileExistsError) as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    counts = result["counts"]
+    typer.echo(f"countries: {counts['countries']}")
+    typer.echo(f"roster artists in: {counts['artists_in']}")
+    typer.echo(f"with a Discogs id (rows out): {counts['artists_with_discogs_id']}")
+    typer.echo(f"left out, no Discogs id: {counts['left_out_no_discogs_id']}")
+    typer.echo(
+        f"other_country: {counts['other_country_artists']} artists, "
+        f"{counts['other_country_artists_with_songs']} of them with songs"
+    )
+    share = 100 * counts["other_country_songs"] / max(counts["songs_in"], 1)
+    typer.echo(
+        f"songs of those artists: {counts['other_country_songs']} of {counts['songs_in']} "
+        f"({share:.2f}%)"
+    )
+    typer.echo("country	songs of those artists	songs	share")
+    by_share = sorted(result["by_country"].items(), key=lambda item: -item[1][0] / item[1][1])
+    for code, (other, songs) in by_share[:15]:
+        typer.echo(f"{code}	{other}	{songs}	{100 * other / songs:.1f}%")
+    typer.echo(f"wrote {result['folder']}" if write else "dry run: nothing written")
+
+
 @campaign_app.command("run")
 def campaign_run_command(
     countries: CountriesArgument,

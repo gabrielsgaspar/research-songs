@@ -143,6 +143,12 @@ What the commands do:
 
 A roster artist with no Discogs id gets one when exactly one Discogs artist has the same name key. No other roster artist may hold that id or have that key. A release of the country must credit that Discogs artist, so an artist of another country with the same name gets no id. The file `resources/lyrics/discogs_countries.csv` lists the release countries of Discogs that count for each country; a state that no longer exists, such as the USSR, counts for each country that followed it. The songs of the artist still need a title match with a track of that artist. The links of these songs carry a match method that ends with `_artist_by_name`. The import writes the Discogs id of such an artist to the roster of its new folder (`discogs_artist_id` in `artists.parquet`), for each artist that gets a song or that has a link of an earlier import. The match method of the links still shows that the id was found by name.
 
+### Artists of another country
+
+Some rosters hold artists of other countries. `uv run songs lyrics roster-check` applies one automatic rule to every roster and prints the counts. It takes about 10 minutes and reads only. With `--write`, it writes the table `clean/quality/artist_country/<YYYYMMDD>/artist_country.parquet` in the data folder.
+
+The rule looks at each roster artist with a Discogs id, also an id found by name. The artist gets the decision `other_country` only when three conditions hold: the start of the Discogs profile states another country, the same text has no word of a home country, and fewer than 20% of the releases of the artist are in a home release country while another country has the most releases. Every other artist gets `keep`. No person checks a row. An import of a dump does not add a song of an artist with `other_country` in the newest table; the run record counts the song as `artist_other_country`. The rule for eligible songs leaves out the songs that the country already holds of such an artist, with the reason `artist_country`. The tracked list `resources/lyrics/artist_countries.csv` wins over the table for an artist that it names. [The data layout](../docs/standards/data_layout.md) gives the rule in full and the columns of the table. The country words are in `resources/lyrics/country_words.csv`.
+
 ## Collect a lyric site
 
 A site with no dump on this disk is collected first. One collector exists, for `dainutekstai` (LTU). Only a person starts it, because it sends requests to the site:

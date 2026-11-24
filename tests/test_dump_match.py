@@ -398,6 +398,48 @@ def test_import_dump_adds_exact_and_loose_matches_with_links_and_a_run_record(tm
     assert record.songs_rejected["close"] == 1
 
 
+def test_import_dump_leaves_out_the_songs_of_an_artist_of_another_country(tmp_path):
+    data, countries = tmp_path / "data", tmp_path / "countries"
+    dump, country = make_folders(data, "kasilyrics")
+    manifests.write_manifest(
+        data, dump, "clean_dump", source="kasilyrics", inputs=["raw/x/20260101/"]
+    )
+    manifests.write_manifest(
+        data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
+    )
+    write_discogs(tmp_path / "discogs")
+    table = paths.clean_artist_country_dir(data, "20260103")
+    evidence = {"stated_country": "", "home_word": False, "releases": 0, "releases_home": 0}
+    write(
+        schemas.ARTIST_COUNTRY,
+        table,
+        [
+            evidence
+            | {"country_iso3": code, "artist_id": "a1", "discogs_artist_id": "11"}
+            | {"top_release_country": "", "decision": decision}
+            for code, decision in (("ISL", schemas.OTHER_COUNTRY), ("NOR", schemas.KEEP))
+        ],
+    )
+    assert dump_match.other_country_artists(data, "ISL") == (None, frozenset())
+    manifests.write_manifest(data, table, "clean_artist_country", inputs=["lyrics/isl/"])
+    assert dump_match.other_country_artists(data, "ISL") == (table, frozenset({"a1"}))
+    assert dump_match.other_country_artists(data, "NOR") == (table, frozenset())
+
+    (found,) = survey(data, "ISL", ["kasilyrics"], tmp_path / "discogs")
+    assert (found["would_add"], found["rejected"]["artist_other_country"]) == (0, 2)
+    assert found["would_add"] + sum(found["rejected"].values()) == found["songs_in"]
+    result = import_dump(
+        data, "kasilyrics", "ISL", tmp_path / "discogs", discogs_label="test", countries=countries
+    )
+    assert (result["songs_added"], result["songs"]) == (0, 2)
+    manifest = manifests.read_manifest(result["path"])
+    assert manifest.counts["dump_songs_artist_other_country"] == 2
+    assert "Artist countries: clean/quality/artist_country/20260103/." in manifest.notes
+    (record,) = run_records.read_run_records("ISL", countries)
+    assert record.songs_rejected["artist_other_country"] == 2
+    assert record.songs_accepted + sum(record.songs_rejected.values()) == record.songs_attempted
+
+
 def import_with_review(root: Path, reviewed: dict) -> dict:
     data = root / "data"
     dump, country = make_folders(data, "kasilyrics")

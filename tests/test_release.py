@@ -142,6 +142,60 @@ def test_the_rule_needs_a_complete_quarantine_folder(tmp_path):
         eligible_songs.quarantine_file(tmp_path)
 
 
+def write_artist_countries(data: Path, day: str, rows: list[tuple[str, str, str]]) -> None:
+    """Write a table of artist countries from (country, artist id, decision) rows."""
+    folder = paths.clean_artist_country_dir(data, day)
+    folder.mkdir(parents=True)
+    full = [
+        {
+            "country_iso3": code,
+            "artist_id": artist_id,
+            "discogs_artist_id": "1",
+            "stated_country": "",
+            "home_word": False,
+            "releases": 0,
+            "releases_home": 0,
+            "top_release_country": "",
+            "decision": decision,
+        }
+        for code, artist_id, decision in rows
+    ]
+    schemas.write_table(schemas.ARTIST_COUNTRY, frame(schemas.ARTIST_COUNTRY, full), folder)
+    manifests.write_manifest(data, folder, "clean_artist_country", inputs=["z"])
+
+
+CHECKED = [
+    ("on_the_roster_that_the_table_names", {"artist_id": "a_checked"}, "artist_country"),
+    ("on_a_roster_with_no_row", {"artist_id": "a_checked", "country_iso3": "BEN"}, None),
+    ("kept_in_the_newest_table", {"artist_id": "a_kept"}, None),
+    # The tracked list names this artist, so the table does not decide.
+    ("list_says_home", {"artist_id": "a_moved", "country_iso3": "GHA"}, None),
+    ("list_says_other", {"artist_id": "a_moved"}, "artist_country"),
+]
+
+
+@pytest.mark.parametrize(("song_id", "over", "reason"), CHECKED, ids=[c[0] for c in CHECKED])
+def test_the_table_of_artist_countries_leaves_out_an_artist_of_another_country(
+    tmp_path, song_id, over, reason
+):
+    data = tmp_path / "data"
+    other, keep = schemas.OTHER_COUNTRY, schemas.KEEP
+    write_artist_countries(data, "20260101", [("TGO", "a_kept", other)])
+    write_artist_countries(
+        data,
+        "20260102",
+        [("TGO", "a_checked", other), ("TGO", "a_kept", keep), ("GHA", "a_moved", other)],
+    )
+    connection = duckdb.default_connection()
+    lists = eligible_songs.load_hash_lists(connection, *list_files(tmp_path))
+    lists |= eligible_songs.load_artist_lists(
+        connection, *artist_files(tmp_path, countries="a_moved,GHA\n"), data
+    )
+    songs = frame(schemas.COUNTRY_SONGS, [song(song_id, **over)])
+    result = eligible_songs.classify(songs, [], lists)
+    assert result.project("ineligible_reason").fetchall() == [(reason,)]
+
+
 CASES = [
     ("eligible", {}, None, False),
     ("suspect_text", {"lyrics_text_hash": SUSPECT, "source": "Invented"}, "suspect_text", False),
@@ -357,6 +411,7 @@ def built(tmp_path):
             song("quarantined"),
             song("t8", artist_id="a_out"),
             song("t9", artist_id="a_moved"),
+            song("t10", artist_id="a_checked"),
         ],
         [score("t1", 10), score("t2", 20), score("t3", 30), score("gone", 40), score("t4", 50)],
     )
@@ -371,6 +426,7 @@ def built(tmp_path):
     )
     old = old_quarantine(tmp_path, f"quarantined,TGO,a1,Invented,{ZEROS},quarantine,x,c,y,z\n")
     eligible_songs.import_old_song_quarantine(old, data, date(2026, 1, 2))
+    write_artist_countries(data, "20260103", [("TGO", "a_checked", schemas.OTHER_COUNTRY)])
     suspect, _ = invented_lists(tmp_path)
     excluded, countries = artist_files(tmp_path, "a_out,spoken_word\n", "a_moved,GHA\n")
     result = release.build(
@@ -391,12 +447,13 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
     assert manifest.inputs == [
         "clean/countries/20260101/",
         "clean/quality/song_quarantine/20260102/",
+        "clean/quality/artist_country/20260103/",
         f"lyrics/BEN/songs/{SONGS_RUN}/",
         f"lyrics/TGO/songs/{SONGS_RUN}/",
         f"lyrics/TGO/scores/{SCORES_RUN}/",
     ]
     assert manifest.counts == {
-        "songs": 12,
+        "songs": 13,
         "eligible_songs": 6,
         "songs_by_exception": 1,
         "songs_by_exception_BEN": 1,
@@ -412,7 +469,7 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         "left_out_suspect_text": 1,
         "left_out_quarantined_song": 1,
         "left_out_excluded_artist": 1,
-        "left_out_artist_country": 1,
+        "left_out_artist_country": 2,
         "left_out_suppressed_duplicate": 0,
         "left_out_not_canonical": 0,
         "left_out_re_release": 1,
