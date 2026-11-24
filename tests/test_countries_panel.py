@@ -311,13 +311,27 @@ def test_an_old_code_takes_its_iso3_code_and_other_codes_are_reported():
         panel.join_panel(tables, "x")
 
 
+REGISTRY_FILE = "raw/country_registry/20261109/countries.parquet"
+NO_ORIGIN = dict.fromkeys(manifests.ORIGIN_KEYS)
+
+
 def write_registry(data: Path) -> None:
-    (data / "extraction").mkdir(parents=True)
-    out = (data / "extraction" / "countries.parquet").as_posix()
+    folder = paths.raw_dir(data, "country_registry", "20261109")
+    folder.mkdir(parents=True)
     duckdb.sql(
         "SELECT * FROM (VALUES ('BRA', 'Brazil'), ('ROM', 'Romania'), ('ROU', 'Romania')) "
         "AS t(country, country_name)"
-    ).write_parquet(out)
+    ).write_parquet((folder / "countries.parquet").as_posix())
+    manifests.write_manifest(data, folder, "raw", source="country_registry", origin=NO_ORIGIN)
+
+
+def test_an_input_of_the_old_pipeline_is_its_newest_complete_raw_folder(tmp_path):
+    assert panel.default_inputs(tmp_path)["registry"] is None
+    with pytest.raises(FileNotFoundError, match="raw/country_registry/"):
+        panel.read_tables(panel.default_inputs(tmp_path), allow_missing=True)
+    write_registry(tmp_path)
+    paths.raw_dir(tmp_path, "country_registry", "20261201").mkdir()  # no manifest: incomplete
+    assert panel.default_inputs(tmp_path)["registry"] == tmp_path / REGISTRY_FILE
 
 
 def test_build_stops_on_absent_inputs_and_never_writes_over_a_panel(tmp_path):
@@ -344,7 +358,7 @@ def test_build_writes_a_manifest_that_names_the_inputs_it_read(tmp_path):
     assert result["manifest"] == folder / paths.MANIFEST_NAME
     manifest = manifests.read_manifest(folder)
     assert (manifest.kind, manifest.path) == ("clean_countries", "clean/countries/20260102/")
-    assert manifest.inputs == ["extraction/countries.parquet"]  # the only input that is present
+    assert manifest.inputs == [REGISTRY_FILE]  # the only input that is present
     assert [(file["path"], file["rows"]) for file in manifest.files] == [
         ("countries.parquet", 2 * 127)
     ]
@@ -354,12 +368,13 @@ def test_build_writes_a_manifest_that_names_the_inputs_it_read(tmp_path):
 
 
 def test_the_inputs_of_a_build_are_the_files_that_it_read(tmp_path):
+    write_registry(tmp_path)
     inputs = panel.default_inputs(tmp_path)
     no_raw_folder = sorted(name for name, path in inputs.items() if path is None)
     files = panel.files_read(
         tmp_path, inputs, [*no_raw_folder, "currency_monthly", "registry.in_wvs"]
     )
-    assert files == sorted(set(files)) and "extraction/countries.parquet" in files
+    assert files == sorted(set(files)) and REGISTRY_FILE in files
     assert not any(file.startswith("/") or ":" in file for file in files)
     # Fertility is a folder: the build reads each of its files.
     folder = inputs["fertility"].relative_to(tmp_path).as_posix()
@@ -383,6 +398,8 @@ def test_the_command_reports_what_it_wrote(monkeypatch, tmp_path):
 @pytest.mark.needs_data
 def test_the_real_inputs_join_to_a_full_grid():
     inputs = panel.default_inputs(data_root())
+    if inputs["registry"] is None:
+        pytest.skip("the data folder has no complete raw/country_registry/ folder")
     tables, _ = panel.read_tables(inputs, allow_missing=True)
     result = panel.join_panel(tables, "x")
     assert len(result) == len(tables["registry"]) * 127
