@@ -17,9 +17,14 @@ filter. The rules, in the order that they are checked:
 4. `excluded_artist`: the artist is on the list of excluded artists
    (`resources/lyrics/excluded_artists.csv`): a poet or a spoken-word artist, a
    second entry of an artist, or a wrong Discogs artist.
-5. `artist_country`: the list of artist countries
-   (`resources/lyrics/artist_countries.csv`) gives the artist another country than
-   the country of the song. An artist that the list does not name passes.
+5. `artist_country`: the artist belongs to another country than the country of the
+   song. Two sources say so. The list of artist countries
+   (`resources/lyrics/artist_countries.csv`) gives the country of an artist. The
+   table of artist countries (`clean/quality/artist_country/<YYYYMMDD>/` in the data
+   folder, the newest complete folder) gives the decision `other_country` for an
+   artist on the roster of the country of the song. The list wins: only the list
+   decides for an artist that it names. An artist that neither source names passes,
+   and with no such folder only the list decides.
 6. `suppressed_duplicate`: the duplicate check suppressed the song
    (`duplicate_decision` is `suppress_duplicate`).
 7. `not_canonical`: another row represents the song (`canonical_song_id` is set and
@@ -50,7 +55,8 @@ The two artist lists come from the master artist table of the old pipeline. The
 list of excluded artists holds the artists with `include` 0 and a short reason code.
 The list of artist countries holds the country of each artist that the old data
 put in the folder of another country. Both are tracked, with ids and codes and no
-names. `load_artist_lists` reads them.
+names. `load_artist_lists` reads them, and the table of artist countries, which
+`songs.stage_10_clean.artist_country` writes from Discogs evidence.
 """
 
 import csv
@@ -62,11 +68,12 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from songs.common import manifests
+from songs.common import manifests, schemas
 from songs.common.paths import (
     check_iso3,
     clean_song_quarantine_dir,
     data_root,
+    latest_clean_artist_country_dir,
     latest_clean_song_quarantine_dir,
     resolve_project_root,
 )
@@ -89,7 +96,8 @@ MATCHES = {
     "quarantined_song": "q.song_id = s.song_id AND q.artist_id = s.artist_id "
     "AND q.source = lower(s.source) AND q.lyrics_text_hash = s.lyrics_text_hash",
     "excluded_artist": "q.artist_id = s.artist_id",
-    "artist_country": "q.artist_id = s.artist_id AND q.country_iso3 <> s.country_iso3",
+    "artist_country": "q.artist_id = s.artist_id "
+    "AND (q.country_iso3 = s.country_iso3) = q.other_country",
 }
 # Reason -> the condition on a song row that leaves it out. The order is the order of the check.
 RULES = {
@@ -210,17 +218,36 @@ def load_artist_lists(
     connection: duckdb.DuckDBPyConnection,
     excluded: Path | None = None,
     countries: Path | None = None,
+    data: Path | None = None,
 ) -> dict[str, duckdb.DuckDBPyRelation]:
-    """Read the list of excluded artists and the list of artist countries into `connection`.
+    """Read the list of excluded artists and the artist countries into `connection`.
 
-    The defaults are the tracked files.
+    The defaults are the tracked files and the data folder of `data_root`. The
+    artist countries have the column `other_country`. It is false for a row of the
+    list: `country_iso3` is the country of the artist. It is true for a row of the
+    newest complete table of artist countries in `data` with the decision
+    `other_country`: the artist does not belong to `country_iso3`. An artist that
+    the list names has no row of the table.
     """
     root = resolve_project_root()
-    return _load(
+    lists = _load(
         connection,
         ("excluded_artist", excluded or root / EXCLUDED_ARTISTS_FILE, EXCLUDED_ARTIST_COLUMNS),
         ("artist_country", countries or root / ARTIST_COUNTRIES_FILE, ARTIST_COUNTRY_COLUMNS),
     )
+    tracked = lists["artist_country"]
+    lists["artist_country"] = tracked.project("*, false AS other_country")
+    folder = latest_clean_artist_country_dir(data or data_root())
+    if folder is not None:
+        checked = (
+            schemas.read_table(schemas.ARTIST_COUNTRY, folder, connection)
+            .filter(f"decision = '{schemas.OTHER_COUNTRY}'")
+            .project("artist_id, country_iso3, true AS other_country")
+            .set_alias("checked")
+            .join(tracked.set_alias("tracked"), "checked.artist_id = tracked.artist_id", how="anti")
+        )
+        lists["artist_country"] = lists["artist_country"].union(checked)
+    return lists
 
 
 def _load(
@@ -246,11 +273,12 @@ def load_rule(
     """Return the exceptions and the lists that `classify` takes, read into `connection`.
 
     Each file defaults to the tracked file in `resources/lyrics/`, and the list of songs
-    in quarantine to the newest complete quarantine folder of `data`.
+    in quarantine to the newest complete quarantine folder of `data`. The table of
+    artist countries is the newest complete one of `data`, when `data` has one.
     """
     lists = load_hash_lists(
         connection, suspect, quarantine or quarantine_file(data)
-    ) | load_artist_lists(connection, excluded_artists, artist_countries)
+    ) | load_artist_lists(connection, excluded_artists, artist_countries, data)
     return load_exceptions(exceptions), lists
 
 

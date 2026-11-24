@@ -98,6 +98,14 @@ KINDS: dict[str, Kind] = {
         ("inputs",),
         (SONG_QUARANTINE_FILE,),
     ),
+    "clean_artist_country": Kind(
+        schemas.ARTIST_COUNTRY_FOLDER,
+        paths.clean_artist_country_dir,
+        None,
+        "day",
+        ("inputs",),
+        _files("quality_tables"),
+    ),
     "country_songs": Kind(
         schemas.COUNTRY_FOLDER,
         paths.country_songs_dir,

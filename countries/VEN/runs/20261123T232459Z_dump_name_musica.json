@@ -1,0 +1,41 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 147,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/musica/20261120/",
+  "campaign_id": "20261123T232459Z",
+  "code_commit": "2fa52e5b95de9b47184fac9c2db211fded7b39a3",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-23T23:25:06Z",
+  "iso3": "VEN",
+  "known_gaps": [
+    "close: 92 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 2488 songs to add. 1702 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 2488,
+  "run_id": "20261123T232459Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 2488,
+  "songs_attempted": 1036356,
+  "songs_rejected": {
+    "already_linked": 37,
+    "close": 92,
+    "held": 2251,
+    "held_loose_title": 9,
+    "no_title_key": 27,
+    "no_track": 2142,
+    "not_roster": 1027610,
+    "out_of_scope": 913,
+    "same_title": 745,
+    "short_lyrics": 2,
+    "track_taken": 40
+  },
+  "source": "musica",
+  "started_utc": "2026-11-23T23:24:59Z",
+  "state": "complete"
+}

@@ -1,0 +1,530 @@
+country_iso3,word
+ABW,Aruba
+ABW,Aruban
+AFG,Afghan
+AFG,Afghanistan
+AGO,Angola
+AGO,Angolan
+AIA,Anguilla
+AIA,Anguillan
+ALB,Albania
+ALB,Albanian
+AND,Andorra
+AND,Andorran
+ARE,Emirati
+ARE,United Arab Emirates
+ARG,Argentina
+ARG,Argentine
+ARG,Argentinean
+ARG,Argentinian
+ARM,Armenia
+ARM,Armenian
+ASM,American Samoa
+ATG,Antigua
+ATG,Antiguan
+AUS,Australia
+AUS,Australian
+AUT,Austria
+AUT,Austrian
+AZE,Azerbaijan
+AZE,Azerbaijani
+AZE,Azeri
+BDI,Burundi
+BDI,Burundian
+BEL,Belgian
+BEL,Belgium
+BEL,Flemish
+BEL,Walloon
+BEN,Benin
+BEN,Beninese
+BES,Bonaire
+BFA,Burkina Faso
+BFA,Burkinabe
+BFA,Burkinabé
+BGD,Bangladesh
+BGD,Bangladeshi
+BGR,Bulgaria
+BGR,Bulgarian
+BHR,Bahrain
+BHR,Bahraini
+BHS,Bahamas
+BHS,Bahamian
+BIH,Bosnia
+BIH,Bosnian
+BIH,Herzegovina
+BLR,Belarus
+BLR,Belarusian
+BLR,Belarussian
+BLR,Belorussian
+BLR,Byelorussian
+BLZ,Belize
+BLZ,Belizean
+BMU,Bermuda
+BMU,Bermudian
+BOL,Bolivia
+BOL,Bolivian
+BRA,Brasil
+BRA,Brazil
+BRA,Brazilian
+BRB,Bajan
+BRB,Barbadian
+BRB,Barbados
+BRN,Brunei
+BRN,Bruneian
+BTN,Bhutan
+BTN,Bhutanese
+BWA,Botswana
+BWA,Botswanan
+CAF,Central African Republic
+CAN,Canada
+CAN,Canadian
+CAN,Quebec
+CAN,Quebecois
+CAN,Québécois
+CHE,Swiss
+CHE,Switzerland
+CHL,Chile
+CHL,Chilean
+CHN,China
+CHN,Chinese
+CIV,Cote d'Ivoire
+CIV,Côte d'Ivoire
+CIV,Ivorian
+CIV,Ivory Coast
+CMR,Cameroon
+CMR,Cameroonian
+CMR,Cameroun
+COD,DR Congo
+COD,Democratic Republic of the Congo
+COD,Zaire
+COD,Zairean
+COD,Zairian
+COG,Congo-Brazzaville
+COG,Republic of the Congo
+COK,Cook Islands
+COL,Colombia
+COL,Colombian
+COM,Comorian
+COM,Comoros
+CPV,Cabo Verde
+CPV,Cabo Verdean
+CPV,Cape Verde
+CPV,Cape Verdean
+CRI,Costa Rica
+CRI,Costa Rican
+CSK,Czechoslovak
+CSK,Czechoslovakia
+CSK,Czechoslovakian
+CUB,Cuba
+CUB,Cuban
+CUW,Curacao
+CUW,Curaçao
+CUW,Curaçaoan
+CYM,Cayman Islands
+CYM,Caymanian
+CYP,Cypriot
+CYP,Cyprus
+CYP,Greek Cypriot
+CYP,Turkish Cypriot
+CZE,Czech
+CZE,Czech Republic
+CZE,Czechia
+DDR,East German
+DDR,East Germany
+DDR,GDR
+DEU,German
+DEU,Germany
+DJI,Djibouti
+DJI,Djiboutian
+DMA,Dominica
+DNK,Danish
+DNK,Denmark
+DOM,Dominican
+DOM,Dominican Republic
+DZA,Algeria
+DZA,Algerian
+ECU,Ecuador
+ECU,Ecuadorean
+ECU,Ecuadorian
+EGY,Egypt
+EGY,Egyptian
+ERI,Eritrea
+ERI,Eritrean
+ESH,Sahrawi
+ESH,Western Sahara
+ESP,Catalan
+ESP,Spain
+ESP,Spanish
+EST,Estonia
+EST,Estonian
+ETH,Ethiopia
+ETH,Ethiopian
+FIN,Finland
+FIN,Finnish
+FJI,Fiji
+FJI,Fijian
+FLK,Falkland Islands
+FRA,France
+FRA,French
+FRO,Faroe Islands
+FRO,Faroese
+FSM,Micronesia
+FSM,Micronesian
+GAB,Gabon
+GAB,Gabonese
+GBR,British
+GBR,England
+GBR,English
+GBR,Great Britain
+GBR,Northern Ireland
+GBR,Northern Irish
+GBR,Scotland
+GBR,Scottish
+GBR,UK
+GBR,United Kingdom
+GBR,Wales
+GBR,Welsh
+GEO,Georgian
+GGY,Guernsey
+GHA,Ghana
+GHA,Ghanaian
+GIB,Gibraltar
+GIB,Gibraltarian
+GIN,Guinean
+GLP,Guadeloupe
+GLP,Guadeloupean
+GMB,Gambia
+GMB,Gambian
+GNB,Bissau-Guinean
+GNB,Guinea-Bissau
+GNQ,Equatoguinean
+GNQ,Equatorial Guinea
+GNQ,Equatorial Guinean
+GRC,Greece
+GRC,Greek
+GRD,Grenada
+GRD,Grenadian
+GRL,Greenland
+GRL,Greenlandic
+GTM,Guatemala
+GTM,Guatemalan
+GUF,French Guiana
+GUF,Guianese
+GUM,Chamorro
+GUM,Guam
+GUM,Guamanian
+GUY,Guyana
+GUY,Guyanese
+HKG,Hong Kong
+HKG,Hongkonger
+HND,Honduran
+HND,Honduras
+HRV,Croatia
+HRV,Croatian
+HTI,Haiti
+HTI,Haitian
+HUN,Hungarian
+HUN,Hungary
+IDN,Indonesia
+IDN,Indonesian
+IMN,Isle of Man
+IND,India
+IND,Indian
+IRL,Ireland
+IRL,Irish
+IRN,Iran
+IRN,Iranian
+IRN,Persian
+IRQ,Iraq
+IRQ,Iraqi
+ISL,Iceland
+ISL,Icelandic
+ISR,Israel
+ISR,Israeli
+ITA,Italian
+ITA,Italy
+JAM,Jamaica
+JAM,Jamaican
+JEY,Jersey
+JOR,Jordanian
+JPN,Japan
+JPN,Japanese
+KAZ,Kazakh
+KAZ,Kazakhstan
+KAZ,Kazakhstani
+KEN,Kenya
+KEN,Kenyan
+KGZ,Kyrgyz
+KGZ,Kyrgyzstan
+KHM,Cambodia
+KHM,Cambodian
+KHM,Khmer
+KIR,Kiribati
+KNA,Kittitian
+KNA,Saint Kitts
+KNA,St. Kitts
+KOR,Korean
+KOR,South Korea
+KOR,South Korean
+KWT,Kuwait
+KWT,Kuwaiti
+LAO,Laos
+LAO,Laotian
+LBN,Lebanese
+LBN,Lebanon
+LBR,Liberia
+LBR,Liberian
+LBY,Libya
+LBY,Libyan
+LCA,Saint Lucia
+LCA,Saint Lucian
+LCA,St. Lucia
+LCA,St. Lucian
+LIE,Liechtenstein
+LKA,Sri Lanka
+LKA,Sri Lankan
+LSO,Basotho
+LSO,Lesotho
+LTU,Lithuania
+LTU,Lithuanian
+LUX,Luxembourg
+LUX,Luxembourger
+LUX,Luxembourgish
+LVA,Latvia
+LVA,Latvian
+MAC,Macanese
+MAC,Macao
+MAC,Macau
+MAR,Moroccan
+MAR,Morocco
+MCO,Monaco
+MCO,Monegasque
+MDA,Moldavian
+MDA,Moldova
+MDA,Moldovan
+MDG,Madagascar
+MDG,Malagasy
+MDV,Maldives
+MDV,Maldivian
+MEX,Mexican
+MEX,Mexico
+MHL,Marshall Islands
+MKD,Macedonia
+MKD,Macedonian
+MLI,Mali
+MLI,Malian
+MLT,Malta
+MLT,Maltese
+MMR,Burma
+MMR,Burmese
+MMR,Myanmar
+MNE,Montenegrin
+MNE,Montenegro
+MNG,Mongolia
+MNG,Mongolian
+MNP,Northern Mariana Islands
+MOZ,Mozambican
+MOZ,Mozambique
+MRT,Mauritania
+MRT,Mauritanian
+MSR,Montserrat
+MSR,Montserratian
+MTQ,Martinican
+MTQ,Martiniquais
+MTQ,Martinique
+MUS,Mauritian
+MUS,Mauritius
+MWI,Malawi
+MWI,Malawian
+MYS,Malaysia
+MYS,Malaysian
+MYT,Mayotte
+NAM,Namibia
+NAM,Namibian
+NCL,New Caledonia
+NCL,New Caledonian
+NER,Nigerien
+NFK,Norfolk Island
+NGA,Nigeria
+NGA,Nigerian
+NIC,Nicaragua
+NIC,Nicaraguan
+NIU,Niue
+NIU,Niuean
+NLD,Dutch
+NLD,Holland
+NLD,Netherlands
+NOR,Norway
+NOR,Norwegian
+NPL,Nepal
+NPL,Nepalese
+NPL,Nepali
+NRU,Nauru
+NZL,New Zealand
+NZL,New Zealander
+OMN,Oman
+OMN,Omani
+PAK,Pakistan
+PAK,Pakistani
+PAN,Panama
+PAN,Panamanian
+PCN,Pitcairn Islands
+PER,Peru
+PER,Peruvian
+PHL,Filipina
+PHL,Filipino
+PHL,Philippine
+PHL,Philippines
+PLW,Palau
+PLW,Palauan
+PNG,Papua New Guinea
+PNG,Papua New Guinean
+POL,Poland
+POL,Polish
+PRI,Puerto Rican
+PRI,Puerto Rico
+PRK,North Korea
+PRK,North Korean
+PRT,Portugal
+PRT,Portuguese
+PRY,Paraguay
+PRY,Paraguayan
+PSE,Palestine
+PSE,Palestinian
+PYF,French Polynesia
+QAT,Qatar
+QAT,Qatari
+REU,Reunion
+REU,Réunion
+REU,Réunionese
+ROU,Romania
+ROU,Romanian
+RUS,Russia
+RUS,Russian
+RWA,Rwanda
+RWA,Rwandan
+SAU,Saudi
+SAU,Saudi Arabia
+SAU,Saudi Arabian
+SDN,Sudan
+SDN,Sudanese
+SEN,Senegal
+SEN,Senegalese
+SGP,Singapore
+SGP,Singaporean
+SHN,Saint Helena
+SLB,Solomon Islands
+SLE,Sierra Leone
+SLE,Sierra Leonean
+SLV,El Salvador
+SLV,Salvadoran
+SLV,Salvadorian
+SMR,Sammarinese
+SMR,San Marino
+SOM,Somali
+SOM,Somalia
+SOM,Somalian
+SPM,Saint Pierre and Miquelon
+SRB,Serbia
+SRB,Serbian
+SSD,South Sudan
+SSD,South Sudanese
+STP,Santomean
+STP,Sao Tome
+STP,São Tomé
+SUN,Soviet
+SUN,Soviet Union
+SUN,USSR
+SUR,Surinam
+SUR,Suriname
+SUR,Surinamese
+SVK,Slovak
+SVK,Slovakia
+SVK,Slovakian
+SVN,Slovene
+SVN,Slovenia
+SVN,Slovenian
+SWE,Sweden
+SWE,Swedish
+SWZ,Eswatini
+SWZ,Swazi
+SWZ,Swaziland
+SXM,Sint Maarten
+SYC,Seychelles
+SYC,Seychellois
+SYR,Syria
+SYR,Syrian
+TCA,Turks and Caicos
+TCD,Chadian
+TGO,Togo
+TGO,Togolese
+THA,Thai
+THA,Thailand
+TJK,Tajik
+TJK,Tajikistan
+TKM,Turkmen
+TKM,Turkmenistan
+TLS,East Timor
+TLS,Timor-Leste
+TLS,Timorese
+TON,Tonga
+TON,Tongan
+TTO,Tobagonian
+TTO,Trinidad
+TTO,Trinidadian
+TUN,Tunisia
+TUN,Tunisian
+TUR,Turkey
+TUR,Turkish
+TWN,Taiwan
+TWN,Taiwanese
+TZA,Tanzania
+TZA,Tanzanian
+UGA,Uganda
+UGA,Ugandan
+UKR,Ukraine
+UKR,Ukrainian
+UKR,Ukranian
+URY,Uruguay
+URY,Uruguayan
+USA,American
+USA,Hawaiian
+USA,U.S.
+USA,U.S.A.
+USA,US
+USA,USA
+USA,United States
+UZB,Uzbek
+UZB,Uzbekistan
+VAT,Vatican
+VCT,Saint Vincent
+VCT,St. Vincent
+VCT,Vincentian
+VEN,Venezuela
+VEN,Venezuelan
+VGB,British Virgin Islands
+VIR,U.S. Virgin Islands
+VIR,US Virgin Islands
+VNM,Viet Nam
+VNM,Vietnam
+VNM,Vietnamese
+VNM,Viêt-Nam
+VUT,Vanuatu
+WLF,Wallis and Futuna
+WSM,Samoa
+WSM,Samoan
+XKX,Kosovan
+XKX,Kosovar
+XKX,Kosovo
+YEM,Yemen
+YEM,Yemeni
+YEM,Yemenite
+YUG,Yugoslav
+YUG,Yugoslavia
+YUG,Yugoslavian
+ZAF,South Africa
+ZAF,South African
+ZMB,Zambia
+ZMB,Zambian
+ZWE,Zimbabwe
+ZWE,Zimbabwean

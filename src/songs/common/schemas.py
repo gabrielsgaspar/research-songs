@@ -74,6 +74,7 @@ COUNTRY_FOLDER = "lyrics/<ISO3>/songs/<run id>/"
 SCORES_FOLDER = "lyrics/<ISO3>/scores/<run id>/"
 DUMP_FOLDER = "clean/dumps/<source>/<YYYYMMDD>/"
 ANALYSIS_FOLDER = "analysis/<YYYYMMDD>/"
+ARTIST_COUNTRY_FOLDER = "clean/quality/artist_country/<YYYYMMDD>/"
 
 RAW_MEMBERS = Table(
     file="members.parquet",
@@ -461,6 +462,54 @@ ANALYSIS_SONGS = Table(
     ),
 )
 
+# The decisions of `artist_country.parquet`.
+KEEP, OTHER_COUNTRY = "keep", "other_country"
+
+ARTIST_COUNTRY = Table(
+    file="artist_country.parquet",
+    folder=ARTIST_COUNTRY_FOLDER,
+    rows="one row per roster artist with a Discogs id",
+    key=("country_iso3", "artist_id"),
+    columns=(
+        Column("country_iso3", "string", True, "Country of the roster"),
+        Column("artist_id", "string", True, "Joins to `artists.parquet` of the country"),
+        Column(
+            "discogs_artist_id",
+            "string",
+            True,
+            "Discogs id of the roster, or the id that `dump_match.discogs_ids` found by name",
+        ),
+        Column(
+            "stated_country",
+            "string",
+            True,
+            "Country that the start of the Discogs profile states for the artist, as a code. "
+            "Empty text when it states none",
+        ),
+        Column(
+            "home_word",
+            "boolean",
+            True,
+            "True when the start of the profile holds a word of a home country",
+        ),
+        Column("releases", "int64", True, "Releases that credit the artist and have a country"),
+        Column("releases_home", "int64", True, "Those releases in a home release country"),
+        Column(
+            "top_release_country",
+            "string",
+            True,
+            "Release country of Discogs with the most of those releases. Empty text when "
+            "`releases` is 0",
+        ),
+        Column(
+            "decision",
+            "string",
+            True,
+            f"`{OTHER_COUNTRY}` when the artist belongs to another country, or `{KEEP}`",
+        ),
+    ),
+)
+
 # Name of a generated part of the standard -> the tables that it shows.
 GROUPS: dict[str, tuple[Table, ...]] = {
     "raw_tables": (RAW_MEMBERS,),
@@ -468,6 +517,7 @@ GROUPS: dict[str, tuple[Table, ...]] = {
     "score_tables": (SCORE_TOPICS, SCORE_PROVENANCE),
     "dump_tables": (DUMP_SONGS, DUMP_ARTIST_NAMES),
     "analysis_tables": (ANALYSIS_COUNTRY_YEAR, ANALYSIS_SONGS),
+    "quality_tables": (ARTIST_COUNTRY,),
 }
 TABLES: tuple[Table, ...] = tuple(table for tables in GROUPS.values() for table in tables)
 

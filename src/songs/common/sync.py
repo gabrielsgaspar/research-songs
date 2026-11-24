@@ -19,6 +19,7 @@ KINDS = (
     "clean/countries/",
     "clean/quality/song_quarantine/",
     "lyrics/*/songs/",
+    "clean/quality/artist_country/",
     "lyrics/*/scores/",
     "analysis/",
 )

@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261123T231336Z",
+  "closed_utc": "2026-11-23T23:15:25Z",
+  "iso3": "PER",
+  "next_time": "musica added 1904, lrclib 840, genius 131; letras has no dump. Strong older-decade adds (1960s +215, 1970s +279). Build letras dump and clear close matches (208) before the next campaign.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 10659
+}

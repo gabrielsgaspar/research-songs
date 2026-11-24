@@ -204,7 +204,8 @@ def build(
 
     The exceptions file, the list of suspect texts and the two artist lists default to
     the tracked files in `resources/lyrics/`, and the list of songs in quarantine to
-    the newest complete quarantine folder of `data`.
+    the newest complete quarantine folder of `data`. The rule also reads the newest
+    complete table of artist countries of `data`, when `data` has one.
 
     Raise FileNotFoundError when there is no complete country-year table or no
     complete songs folder, and FileExistsError when the folder of the day exists.
@@ -241,7 +242,9 @@ def build(
     connection.executemany("INSERT INTO covered VALUES (?)", [(code,) for code, _, _ in countries])
     lists = eligible_songs.load_hash_lists(
         connection, suspect_file, quarantine_file
-    ) | eligible_songs.load_artist_lists(connection, excluded_artists_file, artist_countries_file)
+    ) | eligible_songs.load_artist_lists(
+        connection, excluded_artists_file, artist_countries_file, data
+    )
     eligible_songs.classify(connection.table("songs"), exceptions, lists).create("classified")
     _release_songs(connection).create("release_songs")
     counts = _counts(connection)
@@ -267,6 +270,9 @@ def build(
     inputs = [paths.data_relative(data, panel_folder)]
     if quarantine_file.parent.is_relative_to(data):
         inputs.append(paths.data_relative(data, quarantine_file.parent))
+    artist_country = paths.latest_clean_artist_country_dir(data)
+    if artist_country is not None:
+        inputs.append(paths.data_relative(data, artist_country))
     for _, songs, scores in countries:
         inputs += [paths.data_relative(data, songs)]
         inputs += [paths.data_relative(data, scores)] if scores is not None else []
