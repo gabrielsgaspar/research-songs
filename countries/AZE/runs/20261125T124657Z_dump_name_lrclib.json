@@ -1,0 +1,43 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 7,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/lrclib/20261120/",
+  "campaign_id": "20261125T124558Z",
+  "code_commit": "9130600c12f47a2577511a4f5cb50d3c44cab9c0",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-25T12:47:52Z",
+  "iso3": "AZE",
+  "known_gaps": [
+    "close: 11 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 25 songs to add. 6 artists joined the roster by the Discogs home rule (country tag discogs_home_releases).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 25,
+  "run_id": "20261125T124657Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 25,
+  "songs_attempted": 29206785,
+  "songs_rejected": {
+    "already_linked": 31,
+    "close": 11,
+    "held": 617,
+    "held_loose_title": 135,
+    "held_text": 9,
+    "no_artist_key": 1121,
+    "no_title_key": 843,
+    "no_track": 1067,
+    "not_roster": 29202294,
+    "out_of_scope": 331,
+    "same_title": 278,
+    "short_lyrics": 1,
+    "track_taken": 22
+  },
+  "source": "lrclib",
+  "started_utc": "2026-11-25T12:46:57Z",
+  "state": "complete"
+}

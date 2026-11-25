@@ -1,0 +1,39 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/nhac_vn/20261119/",
+  "campaign_id": "20261125T125739Z",
+  "code_commit": "9130600c12f47a2577511a4f5cb50d3c44cab9c0",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-25T13:00:07Z",
+  "iso3": "VNM",
+  "known_gaps": [
+    "close: 1 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 1 songs to add.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 1,
+  "run_id": "20261125T130000Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 1,
+  "songs_attempted": 2973,
+  "songs_rejected": {
+    "already_linked": 10,
+    "close": 1,
+    "held": 196,
+    "held_loose_title": 30,
+    "no_track": 613,
+    "not_roster": 1961,
+    "out_of_scope": 43,
+    "same_title": 116,
+    "short_lyrics": 2
+  },
+  "source": "nhac_vn",
+  "started_utc": "2026-11-25T13:00:00Z",
+  "state": "complete"
+}
