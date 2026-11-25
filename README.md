@@ -52,7 +52,7 @@ flowchart LR
 | Repository rules, CI, templates | Working |
 | Shared library (configuration, paths, storage) | Working |
 | Data layout (paths, table schemas, manifests) | Working: [data layout](docs/standards/data_layout.md). The songs of all 226 countries were imported from the old pipeline (`songs lyrics import-old`). The undated inputs of the country-year table still have the old layout |
-| Version folders in the bucket | Working: `songs data upload`, `songs data download`, `songs data check` and `songs data pull`. `songs lyrics publish` and `songs lyrics audit` upload and check the songs folders of the countries. The objects from before the layout wait for a deletion list |
+| Version folders in the bucket | Working: `songs data upload`, `songs data download`, `songs data check` and `songs data pull`. `songs lyrics publish` and `songs lyrics audit` upload and check the songs folders of the countries. On 2026-11-24 the objects from before the layout were deleted by list, except 267.941 GiB that stay by choice ([known gaps](docs/standards/data_layout.md#known-gaps)) |
 | Country folders, run records and campaigns | Working: `songs lyrics history`, `songs lyrics plan`, `songs lyrics campaign`, and [coverage by country](docs/status/coverage.md) |
 | Lyric collection and matching | Working for lyric dumps: `songs lyrics survey`, `songs lyrics import-dump`, and the campaign ladder (`songs lyrics campaign run`) in [countries/README.md](countries/README.md). Collection from web sources is not in this repository |
 | Country-year panel | Working in part: `songs panel countries`. Democracy, populism, banking crises and the corpus counts wait for their inputs |
