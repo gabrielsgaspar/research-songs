@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261125T123425Z",
+  "closed_utc": "2026-11-25T13:09:30Z",
+  "iso3": "MAR",
+  "next_time": "Check the roster first. 173 of the 203 new songs are of Fairuz, an artist of Lebanon on this roster; the list of artist countries now gives this artist LBN, so the rule for eligible songs leaves the songs out. The same-name rule of pull request 111 trusts the roster: it took a Discogs artist with 28 of 1,595 releases in Morocco. The roster check marks 27 other artists of this roster for another country.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 6965
+}

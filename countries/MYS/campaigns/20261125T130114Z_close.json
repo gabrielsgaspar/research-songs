@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261125T130114Z",
+  "closed_utc": "2026-11-25T13:09:26Z",
+  "iso3": "MYS",
+  "next_time": "The local dumps are used with the rules of pull requests 108, 109 and 111. Find local or archive sources for the years before 1990, where the new rules add few songs.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 9280
+}

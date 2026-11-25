@@ -1,0 +1,41 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 13,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/textpesenok/20261125/",
+  "campaign_id": "20261125T124005Z",
+  "code_commit": "9130600c12f47a2577511a4f5cb50d3c44cab9c0",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-25T12:40:13Z",
+  "iso3": "BLR",
+  "known_gaps": [
+    "close: 4 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 124 songs to add. 124 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 124,
+  "run_id": "20261125T124005Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 124,
+  "songs_attempted": 203135,
+  "songs_rejected": {
+    "already_linked": 1,
+    "close": 4,
+    "held": 10,
+    "held_loose_title": 27,
+    "held_text": 21,
+    "no_title_key": 3,
+    "no_track": 132,
+    "not_roster": 202529,
+    "out_of_scope": 18,
+    "same_title": 263,
+    "track_taken": 3
+  },
+  "source": "textpesenok",
+  "started_utc": "2026-11-25T12:40:05Z",
+  "state": "complete"
+}
