@@ -1,0 +1,41 @@
+{
+  "batch_status": "completed",
+  "code_commit": "96a7d131e7d11897203955ea6b59ae952031100b",
+  "collected": {
+    "answers": 879,
+    "bad_answer": 0,
+    "cached_input_tokens": 0,
+    "http_error": 0,
+    "input_tokens": 3128454,
+    "no_answer": 0,
+    "not_completed": 0,
+    "output_tokens": 469979,
+    "reasoning_tokens": 283631,
+    "request_error": 0,
+    "requests": 879,
+    "songs_song_lyrics": 879
+  },
+  "collected_utc": "2026-11-25T18:15:22Z",
+  "decades": [],
+  "iso3": "ARE",
+  "model": "gpt-5.6-luna",
+  "prepared": {
+    "eligible": 2278,
+    "in_open_run": 0,
+    "left_for_next_run": 0,
+    "other_decade": 0,
+    "requests": 879,
+    "reused": 0,
+    "scored": 1399,
+    "scores_folder": "lyrics/ARE/scores/20261124T213944Z/",
+    "songs": 3243,
+    "songs_folder": "lyrics/ARE/songs/20261124T144043Z/",
+    "songs_to_score": 879
+  },
+  "prompt_sha256": "c51d257f2d6be1f2117aee6e9684117ae61c693c8752517d8d4e36bcb30e4793",
+  "run_estimate_usd": 10.1925,
+  "run_id": "20261125T163558Z",
+  "run_requests": 10000,
+  "scores_folder": "lyrics/ARE/scores/20261125T181523Z/",
+  "usage_usd": 0.5948
+}

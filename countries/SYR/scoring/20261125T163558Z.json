@@ -1,0 +1,43 @@
+{
+  "batch_status": "completed",
+  "code_commit": "96a7d131e7d11897203955ea6b59ae952031100b",
+  "collected": {
+    "answers": 1301,
+    "bad_answer": 0,
+    "cached_input_tokens": 0,
+    "http_error": 0,
+    "input_tokens": 4675808,
+    "no_answer": 0,
+    "not_completed": 0,
+    "output_tokens": 720133,
+    "reasoning_tokens": 444327,
+    "request_error": 0,
+    "requests": 1301,
+    "songs_non_song": 5,
+    "songs_song_lyrics": 1295,
+    "songs_uncertain": 1
+  },
+  "collected_utc": "2026-11-25T18:15:22Z",
+  "decades": [],
+  "iso3": "SYR",
+  "model": "gpt-5.6-luna",
+  "prepared": {
+    "eligible": 3041,
+    "in_open_run": 0,
+    "left_for_next_run": 0,
+    "other_decade": 0,
+    "requests": 1301,
+    "reused": 0,
+    "scored": 1740,
+    "scores_folder": "lyrics/SYR/scores/20261125T143709Z/",
+    "songs": 4209,
+    "songs_folder": "lyrics/SYR/songs/20261124T145653Z/",
+    "songs_to_score": 1301
+  },
+  "prompt_sha256": "c51d257f2d6be1f2117aee6e9684117ae61c693c8752517d8d4e36bcb30e4793",
+  "run_estimate_usd": 10.1925,
+  "run_id": "20261125T163558Z",
+  "run_requests": 10000,
+  "scores_folder": "lyrics/SYR/scores/20261125T181525Z/",
+  "usage_usd": 0.8997
+}

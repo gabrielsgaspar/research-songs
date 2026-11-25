@@ -1,0 +1,46 @@
+{
+  "batch_status": "completed",
+  "code_commit": "24c6eb354fbe092f428a3a2a1ae1c6448f5ee41b",
+  "collected": {
+    "answers": 299,
+    "bad_answer": 0,
+    "cached_input_tokens": 0,
+    "http_error": 0,
+    "input_tokens": 1088731,
+    "no_answer": 0,
+    "not_completed": 0,
+    "output_tokens": 146108,
+    "reasoning_tokens": 82722,
+    "request_error": 0,
+    "requests": 299,
+    "songs_non_song": 2,
+    "songs_song_lyrics": 297
+  },
+  "collected_utc": "2026-11-25T14:33:44Z",
+  "decades": [
+    "1950s",
+    "1960s",
+    "1970s"
+  ],
+  "iso3": "AUT",
+  "model": "gpt-5.6-luna",
+  "prepared": {
+    "eligible": 19327,
+    "in_open_run": 0,
+    "left_for_next_run": 0,
+    "other_decade": 3878,
+    "requests": 299,
+    "reused": 0,
+    "scored": 15150,
+    "scores_folder": "lyrics/AUT/scores/20261124T213952Z/",
+    "songs": 23522,
+    "songs_folder": "lyrics/AUT/songs/20261123T235725Z/",
+    "songs_to_score": 299
+  },
+  "prompt_sha256": "c51d257f2d6be1f2117aee6e9684117ae61c693c8752517d8d4e36bcb30e4793",
+  "run_estimate_usd": 9.445,
+  "run_id": "20261125T112608Z",
+  "run_requests": 9393,
+  "scores_folder": "lyrics/AUT/scores/20261125T143344Z/",
+  "usage_usd": 0.1965
+}
