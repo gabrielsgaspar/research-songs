@@ -252,8 +252,10 @@ def test_submit_on_the_command_line_needs_the_run_id_typed(data, tmp_path, monke
     monkeypatch.delenv(scoring_run.API_KEY_ENV, raising=False)
     command = ["score", "submit", plan["run_id"], "--max-usd", "100"]
     result = CliRunner().invoke(cli.app, command, input="\n")
-    assert result.exit_code == 1
+    assert result.exit_code == 1 and "Nothing was sent" in result.output
     assert not (scoring_run.run_dir(data, plan["run_id"]) / scoring_run.STARTED_FILE).exists()
+    result = CliRunner().invoke(cli.app, command, input=f" {plan['run_id']} \n")
+    assert scoring_run.API_KEY_ENV in str(result.exception)
 
 
 def test_prepare_copies_the_score_of_a_song_with_the_same_text_and_decade(tmp_path):
