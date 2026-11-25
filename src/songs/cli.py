@@ -1069,6 +1069,22 @@ def score_status(
     typer.echo(scoring_run.render_status(scoring_run.status(data_root(), countries)))
 
 
+@score_app.command("agreement")
+def score_agreement(
+    write: Annotated[
+        bool, typer.Option("--write", help="Write docs/status/prompt_agreement.md.")
+    ] = False,
+) -> None:
+    """Compare the current scores with the scores of other prompts on the same requests."""
+    from songs.common.paths import data_root
+    from songs.stage_30_topics import prompt_agreement
+
+    if write:
+        typer.echo(f"wrote {prompt_agreement.write_agreement(data_root())}")
+        return
+    typer.echo(prompt_agreement.render_agreement(prompt_agreement.agreement(data_root())))
+
+
 @score_app.command("submit")
 def score_submit(
     run_id: Annotated[str, typer.Argument(help="Run id that `songs score prepare` printed.")],
