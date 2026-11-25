@@ -232,7 +232,7 @@ Folder: `lyrics/<ISO3>/songs/<run id>/`. Key: `artist_id`.
 | `artist_id` | string | yes | Project id of the artist. For an artist with a Discogs id it is `uuid5(NAMESPACE_URL, "https://www.discogs.com/artist/<id>")`, the same value as in the old data. For an artist with no Discogs id it is `uuid5(NAMESPACE_URL, "https://research-songs.invalid/artist/<ISO3>/<artist_name>")` |
 | `artist_name` | string | yes | Name as the roster has it |
 | `discogs_artist_id` | string | no | Discogs id |
-| `country_tag` | string | no | Why the artist belongs to the country, as recorded (the old `country_basis`, or the "Nationality / country in our file" value of a review workbook) |
+| `country_tag` | string | no | Why the artist belongs to the country, as recorded (the old `country_basis`, the "Nationality / country in our file" value of a review workbook, or `discogs_home_releases` for an artist that a campaign added from Discogs) |
 | `attempted` | boolean | yes | True when a collection run tried this artist |
 | `last_attempt_utc` | string | no | Time of the last attempt |
 | `songs` | int32 | yes | Number of rows of this artist in `songs.parquet` of the same folder |
