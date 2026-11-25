@@ -3,9 +3,10 @@
 A scoring run has three steps. Each one is a command of `songs score`.
 
     prepare  For each country, read the newest songs folder and the newest scores
-             folder. Take the eligible songs that have no score from this prompt and
-             model for their current lyric text, and write one batch file. Songs with
-             the same lyric text and decade share one request. Nothing is sent.
+             folder. Take the eligible songs that have no score for their current
+             lyric text from this prompt and model or from `ACCEPTED_PROMPTS`, and
+             write one batch file. Songs with the same lyric text and decade share
+             one request. Nothing is sent.
              `decades` limits the run to the songs of those decades.
     submit   Upload the batch file and start the batch, below a cost limit in US
              dollars. Only a person runs this step: it costs money.
@@ -15,8 +16,8 @@ A scoring run has three steps. Each one is a command of `songs score`.
 
 The request of a song holds only its country, decade and lyric text. So `prepare` sends
 no request for a song when another song of the country with the same text and decade
-has a score from this prompt and model. It copies that score with the status `reused`
-and writes a new scores folder for the country. This costs nothing.
+has a score that counts as scored. It copies that score, with its own prompt hash and
+model and the status `reused`, and writes a new scores folder for the country. This costs nothing.
 
 `status` counts, for each country, the eligible songs by the state of their score.
 `write_status` writes those counts to `docs/status/scoring.md`.
@@ -58,6 +59,10 @@ BATCH_PRICE_FACTOR = 0.5
 DONE_STATES = ("completed", "expired", "cancelled", "failed")
 TEXT_KINDS = ("song_lyrics", "non_song", "uncertain")
 FAILURES = ("no_answer", "request_error", "http_error", "not_completed", "bad_answer")
+# Decision 0011: the old combined topics-and-values prompt.
+ACCEPTED_PROMPTS = {
+    "8a51ce6792177109997b9720f2e18fca1ccdcca553cf7cc46ec1f830d172dc51": "gpt-5.6-luna",
+}
 
 REQUESTS_FILE = "requests.jsonl"
 ASSIGNMENTS_FILE = "assignments.jsonl"
@@ -197,7 +202,7 @@ def _reserved(data: Path) -> set[tuple[str, str, str]]:
 
 
 def _scored(connection: duckdb.DuckDBPyConnection, folder: Path | None, prompt: ScoringPrompt):
-    """(song id, lyrics hash) of each score of `folder` from this prompt and model."""
+    """(song id, lyrics hash) of each score of `folder` that counts as scored."""
     if folder is None:
         return set()
     provenance = schemas.read_table(schemas.SCORE_PROVENANCE, folder, connection)
@@ -209,7 +214,15 @@ def _decade(year: Any) -> str | None:
 
 
 def _current(prompt: ScoringPrompt) -> str:
-    return f"prompt_sha256 = '{prompt.sha256}' AND model = '{prompt.settings['model']}'"
+    """A filter for the scores that count as scored: this prompt and model, or an accepted one."""
+    pairs = {prompt.sha256: prompt.settings["model"], **ACCEPTED_PROMPTS}
+    return (
+        "("
+        + " OR ".join(
+            f"(prompt_sha256 = '{sha}' AND model = '{model}')" for sha, model in pairs.items()
+        )
+        + ")"
+    )
 
 
 def _donors(
@@ -230,11 +243,13 @@ def _donors(
     quoted = ", ".join(f'"{topic}"' for topic in TOPIC_IDS)
     joined = (
         provenance.filter(_current(prompt))
-        .project("song_id, lyrics_sha256, text_kind, scored_utc")
+        .project("song_id, lyrics_sha256, text_kind, scored_utc, prompt_sha256, model")
         .join(topics.project(f"song_id, {quoted}"), "song_id")
         .join(songs.project("song_id, lyrics_sha256 AS song_sha, year"), "song_id")
         .filter("lyrics_sha256 = song_sha")
-        .project(f"song_id, lyrics_sha256, year, text_kind, scored_utc, {quoted}")
+        .project(
+            f"song_id, lyrics_sha256, year, text_kind, scored_utc, prompt_sha256, model, {quoted}"
+        )
         .order("song_id")
     )
     names = joined.columns[3:]
@@ -335,11 +350,7 @@ def prepare(
                 reused.setdefault(code, []).append(
                     {"country_iso3": code, "song_id": song_id, "lyrics_sha256": lyrics_sha256}
                     | donor
-                    | {
-                        "prompt_sha256": prompt.sha256,
-                        "model": prompt.settings["model"],
-                        "status": "reused",
-                    }
+                    | {"status": "reused"}
                 )
                 continue
             custom_id = _custom_id(code, lyrics_sha256, decade)
@@ -609,8 +620,9 @@ def status(
 ) -> dict[str, dict[str, int]]:
     """Count, for each country, its songs and its eligible songs by the state of their score.
 
-    `scored`: a score from this prompt and model for the current lyric text.
-    `other_prompt`: a score for the current text from another prompt or model.
+    `scored`: a score for the current lyric text from this prompt and model or from a
+    prompt of `ACCEPTED_PROMPTS`. `other_prompt`: a score for the current text from
+    another prompt or model.
     `text_changed`: a score of other text only. `not_scored`: no score. These four sum
     to `eligible`. `in_open_run`: the eligible songs with no current score that a run
     holds that is not collected. With no `countries`, take every country with songs.
@@ -670,8 +682,10 @@ def render_status(counts: dict[str, dict[str, int]], root: Path | None = None) -
         "",
         f"The current prompt has the hash `{prompt.sha256[:12]}` and the model is "
         f"`{prompt.settings['model']}`. Only eligible songs count. A song is scored when it "
-        "has a score from this prompt and model for its current lyric text. Other prompt: "
-        "the score of the text is from another prompt or model. Text changed: the score is "
+        "has a score for its current lyric text from this prompt and model, or from the "
+        f"combined topics-and-values prompt `{next(iter(ACCEPTED_PROMPTS))[:12]}` (decision "
+        "0011). Other prompt: the "
+        "score of the text is from another prompt or model. Text changed: the score is "
         "of other text. In open run: the song is in a scoring run that is not collected.",
         "",
     ]

@@ -319,3 +319,17 @@ def test_status_on_the_command_line_writes_the_page_only_for_all_countries():
 
     result = CliRunner().invoke(cli.app, ["score", "status", "TGO", "--write"])
     assert result.exit_code == 1 and "all countries" in result.output
+
+
+def test_a_score_of_an_accepted_prompt_counts_as_scored_and_is_copied_with_its_hash(tmp_path):
+    combined = next(iter(scoring_run.ACCEPTED_PROMPTS))
+    data = tmp_path / "data"
+    songs = [song("s5", lyrics_sha256=SHA["d"]), song("s7", lyrics_sha256=SHA["d"])]
+    write_country(data, "TGO", songs, None)
+    write_scores(data, [("s5", SHA["d"], combined)])
+    assert scoring_run.status(data, ["tgo"], rule_files=rule_files(tmp_path))["TGO"]["scored"] == 1
+    counts = prepared(data, tmp_path)["countries"]["TGO"]
+    assert counts["scored"] == 1 and counts["reused"] == 1 and counts["requests"] == 0
+    folder = paths.latest_country_scores_dir(data, "TGO")
+    provenance = schemas.read_table(schemas.SCORE_PROVENANCE, folder).filter("song_id = 's7'")
+    assert provenance.project("prompt_sha256, status").fetchall() == [(combined, "reused")]
