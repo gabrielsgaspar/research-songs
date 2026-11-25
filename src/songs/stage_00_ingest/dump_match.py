@@ -12,7 +12,9 @@ Each song of the dump counts once, in the first class that it fits:
 
 A song of the dump is one `source_song_id`; it can have more than one credited
 artist. The artists of a song are its credited names and the other names of
-those artists in `artist_names.parquet`. A song that is not held, and whose lyric
+those artists in `artist_names.parquet`. An artist id with two or more primary names
+of different keys holds unrelated artists (`_ALIAS_SQL`), so a song of such an id has
+only its credited name. A song that is not held, and whose lyric
 text has fewer than `MIN_LYRICS_CHARS` characters, is left out as `short_lyrics`:
 such a text is a placeholder, not a lyric. When no artist of a song gives
 same_title or roster_new, the lead part of each credited name is tried next
@@ -161,6 +163,15 @@ _CREDIT_SPLIT = re.compile(
     rf"\s*(?:\(?(?<!\w)(?:feat|ft|featuring)(?!\w)\.?|[,&]|(?<=\s)(?:{_JOINERS})(?=\s))\s*",
     re.IGNORECASE,
 )
+# The SQL of the names that a credit of an artist id carries, from `named`
+# (source_artist_id, name_type, key). An id with two primary keys holds unrelated artists.
+_ALIAS_SQL = """
+    SELECT DISTINCT source_artist_id, key FROM named
+    WHERE key <> '' AND source_artist_id NOT IN (
+        SELECT source_artist_id FROM named WHERE name_type = 'primary' AND key <> ''
+        GROUP BY source_artist_id HAVING count(DISTINCT key) > 1
+    )
+"""
 
 
 # Letters that Unicode does not split into a plain letter and an accent.
@@ -201,6 +212,10 @@ def lead_artist(name: str | None) -> str:
     """Return the lead performer of a credit such as "A feat. B" or "A & B", or "" for no split.
 
     A name with no featuring or joining word, or with nothing on one side of it, has no split.
+    The split also cuts band names ("As I Lay Dying" gives "As"). On 2026-11-24 about 42%
+    of the 30,493 dump rows that reached a roster artist only through a split were wrong
+    at the name step, and the Discogs title step removed them: 120 sampled of the 999
+    added songs were all right.
     """
     parts = _CREDIT_SPLIT.split(name or "", maxsplit=1)
     return parts[0].strip() if len(parts) == 2 and name_key(parts[0]) and name_key(parts[1]) else ""
@@ -221,7 +236,13 @@ def _table(connection: duckdb.DuckDBPyConnection, name: str, kind: str, values: 
 def _keys_text() -> str:
     """Return everything that decides the content of a key cache, as one text."""
     builders = (_in_key, name_key, lead_artist, dump_keys, _discogs_keys)
-    constants = (_CREDIT_SPLIT.pattern, _CREDIT_SPLIT.flags, _HOMONYM, sorted(_PLAIN.items()))
+    constants = (
+        _CREDIT_SPLIT.pattern,
+        _CREDIT_SPLIT.flags,
+        _ALIAS_SQL,
+        _HOMONYM,
+        sorted(_PLAIN.items()),
+    )
     return "".join(inspect.getsource(part) for part in builders) + repr(
         (*constants, unicodedata.unidata_version)
     )
@@ -271,7 +292,8 @@ def dump_keys(dump: Path) -> Path:
     holds a row group of text, and more threads pass the memory limit on a large dump.
 
         credits.parquet     one row per credit: song id, source artist id, artist key, lead key
-        alias_keys.parquet  one row per source artist id and key of one of its names
+        alias_keys.parquet  one row per source artist id and key of one of its names;
+                            an id with two or more primary keys has no row
         songs.parquet       one row per song: artist, title and hash of its first credit,
                             its title key, and `has_key` (an artist name of it has a key)
         lengths.parquet     one row per song: the length of the lyric text of its first
@@ -310,9 +332,10 @@ def dump_keys(dump: Path) -> Path:
             "FROM (SELECT DISTINCT song_name AS title FROM d)"
         )
         connection.execute(
-            "CREATE TEMP TABLE alias AS SELECT DISTINCT a.source_artist_id, nk.key "
-            "FROM a JOIN nk ON a.artist_name = nk.name WHERE nk.key <> ''"
+            "CREATE TEMP VIEW named AS SELECT a.source_artist_id, a.name_type, nk.key "
+            "FROM a JOIN nk ON a.artist_name = nk.name"
         )
+        connection.execute(f"CREATE TEMP TABLE alias AS {_ALIAS_SQL}")
         connection.execute(f"COPY alias TO {_quoted(work / 'alias_keys.parquet')}")
         connection.execute("SET threads = 2")
         connection.execute(

@@ -177,6 +177,32 @@ def test_lead_artist_splits_featuring_and_joining_words():
     assert lead_artist("& Bára") == "" and lead_artist(None) == ""
 
 
+def test_a_song_of_a_merged_artist_id_reaches_only_its_credited_name(tmp_path):
+    _, country = make_folders(tmp_path)
+    dump = paths.clean_dump_dir(tmp_path, "example", "20260103")
+    merged = ("Nicki Minaj", "Rosa Linn", "KIDZ BOP Kids", "Mura Masa", "Magic System", "Kygo")
+    names = [
+        {"source_artist_id": "353676", "artist_name": name, "name_type": "primary"}
+        for name in (*merged, "Anna Jons")
+    ] + [
+        {"source_artist_id": "x4", "artist_name": "AJ", "name_type": "primary"},
+        {"source_artist_id": "x4", "artist_name": "Anna Jóns", "name_type": "alias"},
+    ]
+    write(schemas.DUMP_ARTIST_NAMES, dump, [{"source": "example"} | name for name in names])
+    write(
+        schemas.DUMP_SONGS,
+        dump,
+        [
+            credit("m1", "KIDZ BOP Kids", "Cover Song", "g1", artist_id="353676"),
+            credit("m2", "Anna Jons", "Own Song", "g2", artist_id="353676"),
+            credit("m3", "AJ", "Alias Song", "g3", artist_id="x4"),
+        ],
+    )
+    result = match_dump(dump, country)
+    by_id = {row["source_song_id"]: row["roster_artist_ids"] for row in result["songs"]}
+    assert by_id == {"m2": ["a1"], "m3": ["a1"]}
+
+
 def test_the_lead_of_a_featuring_credit_matches_and_is_counted(tmp_path):
     _, country = make_folders(tmp_path)
     dump = paths.clean_dump_dir(tmp_path, "example", "20260103")
