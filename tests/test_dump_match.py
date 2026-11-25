@@ -450,10 +450,15 @@ def test_import_dump_leaves_out_the_songs_of_an_artist_of_another_country(tmp_pa
             for code, decision in (("ISL", schemas.OTHER_COUNTRY), ("NOR", schemas.KEEP))
         ],
     )
-    assert dump_match.other_country_artists(data, "ISL") == (None, frozenset())
+    repo = tmp_path / "repo"
+    (repo / dump_match.ARTIST_COUNTRIES_FILE).parent.mkdir(parents=True)
+    (repo / dump_match.ARTIST_COUNTRIES_FILE).write_text(
+        "artist_id,country_iso3\n", encoding="utf-8"
+    )
+    assert dump_match.other_country_artists(data, "ISL", repo) == (None, frozenset())
     manifests.write_manifest(data, table, "clean_artist_country", inputs=["lyrics/isl/"])
-    assert dump_match.other_country_artists(data, "ISL") == (table, frozenset({"a1"}))
-    assert dump_match.other_country_artists(data, "NOR") == (table, frozenset())
+    assert dump_match.other_country_artists(data, "ISL", repo) == (table, frozenset({"a1"}))
+    assert dump_match.other_country_artists(data, "NOR", repo) == (table, frozenset())
 
     (found,) = survey(data, "ISL", ["kasilyrics"], tmp_path / "discogs")
     assert (found["would_add"], found["rejected"]["artist_other_country"]) == (0, 2)
@@ -468,6 +473,30 @@ def test_import_dump_leaves_out_the_songs_of_an_artist_of_another_country(tmp_pa
     (record,) = run_records.read_run_records("ISL", countries)
     assert record.songs_rejected["artist_other_country"] == 2
     assert record.songs_accepted + sum(record.songs_rejected.values()) == record.songs_attempted
+
+
+def test_the_tracked_artist_countries_win_over_the_table_in_the_import(tmp_path):
+    data = tmp_path / "data"
+    table = paths.clean_artist_country_dir(data, "20260103")
+    evidence = {"stated_country": "", "home_word": False, "releases": 0, "releases_home": 0}
+    write(
+        schemas.ARTIST_COUNTRY,
+        table,
+        [
+            evidence
+            | {"country_iso3": "ISL", "artist_id": artist, "discogs_artist_id": "11"}
+            | {"top_release_country": "", "decision": schemas.OTHER_COUNTRY}
+            for artist in ("a1", "a2")
+        ],
+    )
+    manifests.write_manifest(data, table, "clean_artist_country", inputs=["lyrics/isl/"])
+    tracked = tmp_path / "repo" / dump_match.ARTIST_COUNTRIES_FILE
+    tracked.parent.mkdir(parents=True)
+    tracked.write_text("artist_id,country_iso3\na1,ISL\na3,NOR\n", encoding="utf-8")
+    folder, other = dump_match.other_country_artists(data, "ISL", root=tmp_path / "repo")
+    assert (folder, other) == (table, frozenset({"a2", "a3"}))
+    # An artist that the list gives ISL belongs to another country for NOR.
+    assert dump_match.other_country_artists(data, "NOR", root=tmp_path / "repo")[1] == {"a1"}
 
 
 def import_with_review(root: Path, reviewed: dict, close_title: str = "Another New Song 2") -> dict:

@@ -62,7 +62,8 @@ its Discogs track. Its run record counts every other song of the dump by class.
 A song that the import would add is left out as `artist_other_country` when the
 newest complete table of artist countries (`clean/quality/artist_country/<YYYYMMDD>/`,
 written by `songs.stage_10_clean.artist_country`) gives its roster artist the
-decision `other_country` for the country. With no such table, no song is left out.
+decision `other_country` for the country, or when `ARTIST_COUNTRIES_FILE` gives the
+artist another country. The tracked list wins over the table for an artist that it names.
 A song that the import would add is left out as `held_text` when it is a text copy
 (`songs.common.lyric_hash`) of a song that the country holds, or of a song that the
 same import adds: the two songs have the same `text_key`, for any artists, or the
@@ -144,6 +145,8 @@ HELD_TEXT = "held_text"
 ROUTE = "dump_name"
 # A person's decision on a close match wins over `same_numbers`.
 REVIEWED_FILE = Path("resources") / "lyrics" / "reviewed_close_matches.csv"
+# The tracked country of an artist; it wins over the table of artist countries.
+ARTIST_COUNTRIES_FILE = Path("resources") / "lyrics" / "artist_countries.csv"
 REVIEW_COLUMNS = (
     "source",
     "country_iso3",
@@ -1111,27 +1114,34 @@ def load_reviewed_matches(root: Path | None = None) -> dict[tuple[str, ...], str
     return decisions
 
 
-def other_country_artists(data: Path, iso3: str) -> tuple[Path | None, frozenset[str]]:
+def other_country_artists(
+    data: Path, iso3: str, root: Path | None = None
+) -> tuple[Path | None, frozenset[str]]:
     """Return the roster artists of a country that belong to another country.
 
     The first value is the newest complete table of artist countries of the data
-    folder, and the second holds each `artist_id` with the decision `other_country`
-    for `iso3`. With no such table, return None and no artist.
+    folder, or None. The second holds each `artist_id` with the decision `other_country`
+    for `iso3` in that table, and each artist that `ARTIST_COUNTRIES_FILE` gives another
+    country. The tracked list wins over the table for an artist that it names, as in the
+    rule for eligible songs.
     """
+    paths.check_iso3(iso3)
+    path = (root or paths.resolve_project_root()) / ARTIST_COUNTRIES_FILE
+    with path.open(encoding="utf-8", newline="") as handle:
+        named = {line["artist_id"]: line["country_iso3"] for line in csv.DictReader(handle)}
     folder = paths.latest_clean_artist_country_dir(data)
-    if folder is None:
-        return None, frozenset()
-    with duckdb.connect() as connection:
-        rows = (
-            schemas.read_table(schemas.ARTIST_COUNTRY, folder, connection)
-            .filter(
-                f"country_iso3 = '{paths.check_iso3(iso3)}' "
-                f"AND decision = '{schemas.OTHER_COUNTRY}'"
+    checked: set[str] = set()
+    if folder is not None:
+        with duckdb.connect() as connection:
+            rows = (
+                schemas.read_table(schemas.ARTIST_COUNTRY, folder, connection)
+                .filter(f"country_iso3 = '{iso3}' AND decision = '{schemas.OTHER_COUNTRY}'")
+                .project("artist_id")
+                .fetchall()
             )
-            .project("artist_id")
-            .fetchall()
-        )
-    return folder, frozenset(row[0] for row in rows)
+        checked = {row[0] for row in rows}
+    tracked = {artist for artist, country in named.items() if country != iso3}
+    return folder, frozenset((checked - named.keys()) | tracked)
 
 
 def held_text(dump: Path, country: Path, artists: dict[str, str]) -> set[str]:
