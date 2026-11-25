@@ -87,6 +87,12 @@ def answer(kind: str = "song_lyrics", value: str = "40") -> dict:
         "status": "completed",
         "model": f"{MODEL}-2026-01-01",
         "output": [{"type": "message", "content": [{"type": "output_text", "text": text}]}],
+        "usage": {
+            "input_tokens": 1000,
+            "input_tokens_details": {"cached_tokens": 400},
+            "output_tokens": 300,
+            "output_tokens_details": {"reasoning_tokens": 200},
+        },
     }
     return {"response": {"status_code": 200, "body": body}}
 
@@ -181,6 +187,8 @@ def test_collect_writes_the_new_scores_over_the_old_ones_and_counts_each_failure
     result = scoring_run.collect(data, run, FakeBatches(lines=lines), countries)
     counts = result["counts"]["TGO"]
     assert counts["requests"] == 3 and counts["answers"] == 2 and counts["bad_answer"] == 1
+    assert counts["input_tokens"] == 3000 and counts["cached_input_tokens"] == 1200
+    assert counts["output_tokens"] == 900 and counts["reasoning_tokens"] == 600
     folder = paths.latest_country_scores_dir(data, "TGO")
     assert result["written"] == [paths.data_relative(data, folder)]
     topics = schemas.read_table(schemas.SCORE_TOPICS, folder).order("song_id").fetchall()
@@ -193,6 +201,7 @@ def test_collect_writes_the_new_scores_over_the_old_ones_and_counts_each_failure
         record["prompt_sha256"] == PROMPT.sha256 and record["scores_folder"] == result["written"][0]
     )
     assert record["prepared"]["requests"] == 3 and record["collected"] == counts
+    assert record["usage_usd"] == round(0.5 * (3000 * 0.20 + 900 * 1.20) / 1_000_000, 4)
     assert record["run_requests"] == 3 and record["batch_status"] == "completed"
     with pytest.raises(ValueError, match="collected"):
         scoring_run.collect(data, run, FakeBatches(lines=lines), countries)
