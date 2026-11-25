@@ -253,7 +253,9 @@ def dump_artists(
     """Return the artists of the dump rule for `iso3`: artist id -> (credited name, Discogs id).
 
     `rosters` is the name and the Discogs id of each roster artist, for each country
-    (`_rosters`). The order is by Discogs id.
+    (`_rosters`). A dump name finds a Discogs artist by its name key, its loose key, or
+    its `dump_match.spelling_key` when no other free dump name has that spelling key.
+    The order is by Discogs id.
     """
     held, taken_ids, keys_with_id = set(), set(), set()
     no_id: dict[str, set[str]] = defaultdict(set)
