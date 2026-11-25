@@ -196,6 +196,21 @@ What the command does:
 
 The command prints the two commands that follow it. `songs dumps build` turns the raw folder into a dump, and `songs lyrics import-dump` adds the songs that match a Discogs track.
 
+## Read a saved site
+
+Some sites are on this disk as saved pages, packed into `pages-*.tar.gz` parts (`textpesenok`). `songs dumps build` cannot read pages, so one command reads them first. One parser exists, for `textpesenok`:
+
+```bash
+uv run songs dumps parse textpesenok raw/textpesenok/20261004/
+```
+
+- It reads the parts as a stream. It extracts no file to disk and sends no request.
+- It writes a new folder `raw/textpesenok/<YYYYMMDD>/`: one lyric table, one table of the performers of each song, and a manifest whose input is the packed folder. It never writes over a folder.
+- It prints the pages read, the songs written, and the pages left out by reason: an error status, a page that is not a song page, a page that does not decode, no lyric block, no artist, no title, an empty text, an instrumental marker, a second copy of a song.
+- A title with the word "перевод" (translation) or "аккорды" (chords) gives the text kind `translation` or `chords`. `songs dumps build` leaves such a text out.
+
+The command prints the `songs dumps build` command that follows it.
+
 ## Run records
 
 A collection command writes one record when it ends, also when it fails. Nobody writes or edits a record by hand, and a record is never overwritten. The file name is `<run id>_<route>_<source>.json`.
