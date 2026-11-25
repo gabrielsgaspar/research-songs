@@ -62,6 +62,7 @@ BATCH_PRICE_FACTOR = 0.5
 DONE_STATES = ("completed", "expired", "cancelled", "failed")
 TEXT_KINDS = ("song_lyrics", "non_song", "uncertain")
 FAILURES = ("no_answer", "request_error", "http_error", "not_completed", "bad_answer")
+USAGE = ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_tokens")
 # Decision 0011: the old combined topics-and-values prompt.
 ACCEPTED_PROMPTS = {
     "8a51ce6792177109997b9720f2e18fca1ccdcca553cf7cc46ec1f830d172dc51": "gpt-5.6-luna",
@@ -262,6 +263,29 @@ def _donors(
     return donors
 
 
+def _usd(input_tokens: int, output_tokens: int) -> float:
+    """The batch price in US dollars, with no discount for cached input."""
+    return (
+        BATCH_PRICE_FACTOR
+        * (
+            input_tokens * USD_PER_MILLION_INPUT_TOKENS
+            + output_tokens * USD_PER_MILLION_OUTPUT_TOKENS
+        )
+        / 1_000_000
+    )
+
+
+def _usage(record: dict[str, Any]) -> dict[str, int]:
+    """The tokens that one line of the batch output used, also for an answer that fails."""
+    usage = ((record.get("response") or {}).get("body") or {}).get("usage") or {}
+    return {
+        "input_tokens": usage.get("input_tokens") or 0,
+        "cached_input_tokens": (usage.get("input_tokens_details") or {}).get("cached_tokens") or 0,
+        "output_tokens": usage.get("output_tokens") or 0,
+        "reasoning_tokens": (usage.get("output_tokens_details") or {}).get("reasoning_tokens") or 0,
+    }
+
+
 def _custom_id(iso3: str, lyrics_sha256: str, decade: str | None) -> str:
     key = f"{iso3}|{lyrics_sha256}|{decade or ''}"
     return f"{iso3}-{hashlib.sha256(key.encode('utf-8')).hexdigest()[:40]}"
@@ -271,13 +295,11 @@ def _estimate(input_bytes: int, requests: int) -> dict[str, float | int]:
     """An upper estimate: about 4 bytes of request per input token, and no cache reads."""
     input_tokens = input_bytes // 4
     output_tokens = requests * OUTPUT_TOKENS_PER_REQUEST
-    usd = BATCH_PRICE_FACTOR * (
-        input_tokens * USD_PER_MILLION_INPUT_TOKENS + output_tokens * USD_PER_MILLION_OUTPUT_TOKENS
-    )
+    usd = _usd(input_tokens, output_tokens)
     return {
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
-        "usd": round(usd / 1_000_000, 4),
+        "usd": round(usd, 4),
     }
 
 
@@ -577,9 +599,10 @@ def collect(
     counts: dict[str, Counter] = {}
     for item in _read_lines(folder / ASSIGNMENTS_FILE):
         code = item["country_iso3"]
-        tally = counts.setdefault(code, Counter({name: 0 for name in FAILURES}))
+        tally = counts.setdefault(code, Counter(dict.fromkeys((*FAILURES, *USAGE), 0)))
         tally["requests"] += 1
         record = records.get(item["custom_id"])
+        tally.update(_usage(record or {}))
         answer, reason = read_answer(record, plan["model"]) if record else (None, "no_answer")
         if answer is None:
             tally[reason] += 1
@@ -623,6 +646,7 @@ def collect(
             "code_commit": git_sha(resolve_project_root()),
             "run_requests": plan["requests"],
             "run_estimate_usd": plan["estimate"]["usd"],
+            "usage_usd": round(_usd(tally["input_tokens"], tally["output_tokens"]), 4),
             "scores_folder": written.get(code),
             "prepared": plan["countries"][code],
             "collected": dict(tally),
