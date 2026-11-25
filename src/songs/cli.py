@@ -1165,7 +1165,8 @@ def score_submit(
 
     plan = scoring_run.read_plan(data_root(), run_id)
     typer.echo(f"run {run_id}: {plan['requests']} requests, about {plan['estimate']['usd']} USD")
-    if typer.prompt("Type the run id to send the batch", default="") != run_id:
+    if typer.prompt("Type the run id to send the batch", default="").strip() != run_id:
+        typer.echo(f"The text typed is not {run_id}. Nothing was sent.", err=True)
         raise typer.Exit(1)
     batch = scoring_run.submit(data_root(), run_id, max_usd)
     typer.echo(f"started batch {batch['batch_id']}")
