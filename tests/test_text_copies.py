@@ -85,6 +85,12 @@ def test_a_song_that_another_rule_leaves_out_does_not_represent_the_group(tmp_pa
         song("o2", "a1", ONE, OLD) | {"year": 1950, "quality_status": "quarantine"},
         song("o3", "a1", ONE, OLD) | {"year": 1970},
         song("o4", "a1", ONE, OLD) | {"year": 1980},
+        # Every older song is left out, so the campaign song represents the group.
+        song("o5", "a2", TWO, OLD) | {"re_release": True, "year": 1990},
+        song("c1", "a2", TWO, FIRST) | {"year": 1995},
+        # Two campaign songs: the one that the rule lets in represents the group.
+        song("c2", "a3", THREE, FIRST) | {"quality_status": "quarantine"},
+        song("c3", "a3", THREE, LATER),
     ]
     folder = make_country(tmp_path, "TGO", rows)
     found, _ = text_copies.country_copies(folder, "TGO", tmp_path)
@@ -92,6 +98,8 @@ def test_a_song_that_another_rule_leaves_out_does_not_represent_the_group(tmp_pa
         "o1": "o3",
         "o2": "o3",
         "o4": "o3",
+        "o5": "c1",
+        "c2": "c3",
     }
 
 
@@ -117,7 +125,7 @@ def test_an_older_song_with_no_flag_and_the_earliest_year_represents_the_group(t
         song("o4", "a1", ONE, OLD),
         song("o5", "a1", ONE, OLD) | {"year": 1985},
         song("o6", "a1", ONE, OLD) | {"year": 1980, "canonical_song_id": "o6"},
-        # A campaign song with a year never takes the place of an older song.
+        # A campaign song with a year never takes the place of an eligible older song.
         song("c1", "a1", ONE, FIRST) | {"year": 1970},
         song("o7", "a2", TWO, OLD) | {"duplicate_decision": "suppress_duplicate", "year": 1990},
         song("o8", "a2", TWO, OLD),

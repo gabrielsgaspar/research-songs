@@ -18,16 +18,15 @@ of the older copies, so the rule also reads the older songs.
 The songs of one key are a group, and one song represents the group, in this order
 (`ORDER`):
 
-1. An older song before a campaign song. So a campaign song never takes the place
-   of an older song, and the order of the older songs does not change which
-   campaign songs are marked, or their reasons.
-2. Of the older songs, a song that the rule for eligible songs lets in before a
-   song that it leaves out for another reason than `text_copy`
+1. A song that the rule for eligible songs lets in before a song that it leaves
+   out for another reason than `text_copy`
    (`songs.stage_50_analysis.eligible_songs.classify`, with no text copies). A song
    left out that represents a group would leave out the whole text. The rule reads
    its lists as `eligible_songs.load_rule` does: the tracked files in
    `resources/lyrics/`, the newest song quarantine folder of the data folder (it
    must exist), and the newest artist country table when the data folder has one.
+2. An older song before a campaign song. So a campaign song represents a group
+   only when another rule leaves out every older song of the group.
 3. Of the older songs, the song with the earliest year, and a song with no year
    last. An analysis by country and year cannot use a song with no year, and the
    year of a re-release or of a cover is later than the year of the first release.
@@ -56,7 +55,7 @@ from songs.stage_50_analysis import eligible_songs
 
 ROUTE = "dump_name"
 # The order of the songs of a group; `campaign` is true for the route `ROUTE`.
-ORDER = "campaign, old_left_out, old_year NULLS LAST, run_id, song_id"
+ORDER = "left_out, campaign, old_year NULLS LAST, run_id, song_id"
 NO_COPIES = "SELECT NULL::VARCHAR AS country_iso3, NULL::VARCHAR AS song_id WHERE false"
 
 
@@ -81,7 +80,7 @@ def country_copies(folder: Path, iso3: str, data: Path) -> tuple[list[tuple], di
         connection.execute(
             "CREATE TEMP TABLE keyed AS SELECT song_id, artist_id, run_id, "
             f"coalesce(route = '{ROUTE}', false) AS campaign, "
-            "NOT campaign AND ineligible_reason IS NOT NULL AS old_left_out, "
+            "ineligible_reason IS NOT NULL AS left_out, "
             f"CASE WHEN NOT campaign THEN year END AS old_year, {lyric_hash.text_keys_sql()} "
             "FROM songs"
         )

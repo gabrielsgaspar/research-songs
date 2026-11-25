@@ -374,8 +374,8 @@ The keys are those of `songs.common.lyric_hash`: the text in lower case with onl
 
 A song of any route can be a copy. The songs of one key are a group. One song represents the group, in this order:
 
-1. An older song before a campaign song (route `dump_name`). So a campaign song never takes the place of an older song.
-2. Of the older songs, a song that the rule for eligible songs lets in before a song that it leaves out for another reason than `text_copy` (for example an old duplicate flag, the song quarantine list or a year out of range). The check calls `classify` with no text copies, and reads its lists as `load_rule` does, so the data folder needs a song quarantine folder. A song left out that represents a group would leave out the whole text.
+1. A song that the rule for eligible songs lets in before a song that it leaves out for another reason than `text_copy` (for example an old duplicate flag, the song quarantine list or a year out of range). The check calls `classify` with no text copies, and reads its lists as `load_rule` does, so the data folder needs a song quarantine folder. A song left out that represents a group would leave out the whole text.
+2. An older song before a campaign song (route `dump_name`). So a campaign song represents a group only when another rule leaves out every older song of the group.
 3. Of the older songs, the song with the earliest year, and a song with no year last. An analysis by country and year cannot use a song with no year, and the year of a re-release or of a cover is later than the year of the first release.
 4. The smallest `run_id`, then the smallest `song_id`.
 
@@ -410,7 +410,7 @@ Folder: `clean/quality/text_copies/<YYYYMMDD>/`. Key: `country_iso3`, `song_id`.
 | --- | --- | --- | --- |
 | `country_iso3` | string | yes | Country of the song |
 | `song_id` | string | yes | The copy: a song of any route in `songs.parquet` of the country |
-| `kept_song_id` | string | yes | The song of the same country that represents the group: an older song before a song of the route `dump_name`; of the older songs, one that no other rule for eligible songs leaves out, then the earliest year, with no year last; then the smallest `run_id` and the smallest `song_id` |
+| `kept_song_id` | string | yes | The song of the same country that represents the group: a song that no other rule for eligible songs leaves out; then an older song before a song of the route `dump_name`; of the older songs, the earliest year, with no year last; then the smallest `run_id` and the smallest `song_id` |
 | `reason` | string | yes | `same_text`: the same `text_key` as the kept song (`songs.common.lyric_hash`). `same_artist_start`: the same artist and the same `start_key` |
 
 <!-- generated:quality_tables:end -->
