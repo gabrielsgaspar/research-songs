@@ -470,9 +470,7 @@ def test_import_dump_leaves_out_the_songs_of_an_artist_of_another_country(tmp_pa
     assert record.songs_accepted + sum(record.songs_rejected.values()) == record.songs_attempted
 
 
-def import_with_review(
-    root: Path, reviewed: dict, close_title: str = "Another New Song 2"
-) -> dict:
+def import_with_review(root: Path, reviewed: dict, close_title: str = "Another New Song 2") -> dict:
     data = root / "data"
     dump, country = make_folders(data, "kasilyrics")
     manifests.write_manifest(
