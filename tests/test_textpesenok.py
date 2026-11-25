@@ -12,7 +12,7 @@ import pytest
 
 from songs.common import manifests, paths
 from songs.common import tar_parts as t
-from songs.stage_00_ingest import dumps
+from songs.stage_00_ingest import dumps, site_pages
 from songs.stage_00_ingest import textpesenok as site
 
 PAGES = Path(__file__).parent / "fixtures" / "textpesenok"
@@ -22,7 +22,7 @@ PACKED = "raw/textpesenok/20260101/"
 
 
 def html(name: str) -> str:
-    return site.decode((PAGES / name).read_bytes(), None)
+    return site_pages.decode((PAGES / name).read_bytes(), None)
 
 
 def test_a_song_page_gives_its_title_performers_and_lines():
@@ -58,11 +58,11 @@ def test_a_page_in_another_charset_decodes_by_its_header_or_its_meta():
     body = (PAGES / "song_cp1251.html").read_bytes()
     with pytest.raises(UnicodeDecodeError):
         body.decode("utf-8")
-    row, artists, _ = site.parse_song(site.decode(body, None), f"{BASE}/t4-x")
+    row, artists, _ = site.parse_song(site_pages.decode(body, None), f"{BASE}/t4-x")
     assert artists == [("103", "Выдуманный певец")]
     assert row["song_name"] == "Выдуманная песня"
-    assert site.decode("абв".encode("cp1251"), "text/html; charset=windows-1251") == "абв"
-    assert site.decode(b"\xff\xfe\xfa", None) is None
+    assert site_pages.decode("абв".encode("cp1251"), "text/html; charset=windows-1251") == "абв"
+    assert site_pages.decode(b"\xff\xfe\xfa", None) is None
 
 
 def receipt(key: str, url: str, status: int = 200, error: str = "") -> bytes:
@@ -110,7 +110,7 @@ def packed_folder(data: Path, tmp: Path) -> Path:
 def test_a_packed_folder_parses_to_a_lyric_table_that_the_builder_reads(tmp_path):
     data = tmp_path / "data"
     packed_folder(data, tmp_path)
-    result = site.parse_folder(data, PACKED, day="20260102")
+    result = site_pages.parse_folder(data, site.SOURCE, PACKED, day="20260102")
     assert result == {
         "path": "raw/textpesenok/20260102/",
         "pages_in": 7,
@@ -128,7 +128,8 @@ def test_a_packed_folder_parses_to_a_lyric_table_that_the_builder_reads(tmp_path
         columns = {
             row[0]
             for row in connection.execute(
-                "DESCRIBE SELECT * FROM read_parquet(?)", [(folder / site.LYRIC_FILE).as_posix()]
+                "DESCRIBE SELECT * FROM read_parquet(?)",
+                [(folder / f"{site.SOURCE}_lyrics.parquet").as_posix()],
             ).fetchall()
         }
     assert dumps.detect_family(columns) == "site_snapshot"
@@ -150,11 +151,17 @@ def test_a_packed_folder_parses_to_a_lyric_table_that_the_builder_reads(tmp_path
     ]
 
     with pytest.raises(FileExistsError):
-        site.parse_folder(data, PACKED, day="20260102")
+        site_pages.parse_folder(data, site.SOURCE, PACKED, day="20260102")
 
 
 def test_a_folder_of_another_source_is_refused(tmp_path):
     (tmp_path / "raw" / "other" / "20260101").mkdir(parents=True)
-    with pytest.raises(site.ParseError):
-        site.parse_folder(tmp_path, "raw/other/20260101/", day="20260102")
+    with pytest.raises(site_pages.ParseError):
+        site_pages.parse_folder(tmp_path, site.SOURCE, "raw/other/20260101/", day="20260102")
     assert not paths.raw_dir(tmp_path, site.SOURCE, "20260102").exists()
+
+
+def test_a_source_with_no_page_reader_is_refused():
+    with pytest.raises(site_pages.ParseError):
+        site_pages.site_module("no_such_site")
+    assert site_pages.site_module(site.SOURCE) is site
