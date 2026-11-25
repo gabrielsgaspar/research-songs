@@ -1,0 +1,42 @@
+{
+  "batch_status": "completed",
+  "code_commit": "24c6eb354fbe092f428a3a2a1ae1c6448f5ee41b",
+  "collected": {
+    "answers": 522,
+    "bad_answer": 0,
+    "cached_input_tokens": 0,
+    "http_error": 0,
+    "input_tokens": 1840025,
+    "no_answer": 0,
+    "not_completed": 0,
+    "output_tokens": 221067,
+    "reasoning_tokens": 110404,
+    "request_error": 0,
+    "requests": 522,
+    "songs_non_song": 1,
+    "songs_song_lyrics": 521
+  },
+  "collected_utc": "2026-11-25T14:00:03Z",
+  "decades": [],
+  "iso3": "BOL",
+  "model": "gpt-5.6-luna",
+  "prepared": {
+    "eligible": 1709,
+    "in_open_run": 0,
+    "left_for_next_run": 0,
+    "other_decade": 0,
+    "requests": 522,
+    "reused": 0,
+    "scored": 1187,
+    "scores_folder": "lyrics/BOL/scores/20261124T214010Z/",
+    "songs": 2085,
+    "songs_folder": "lyrics/BOL/songs/20261123T221517Z/",
+    "songs_to_score": 522
+  },
+  "prompt_sha256": "c51d257f2d6be1f2117aee6e9684117ae61c693c8752517d8d4e36bcb30e4793",
+  "run_estimate_usd": 10.1802,
+  "run_id": "20261125T121443Z",
+  "run_requests": 10000,
+  "scores_folder": "lyrics/BOL/scores/20261125T140005Z/",
+  "usage_usd": 0.3166
+}
