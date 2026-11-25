@@ -198,6 +198,7 @@ def build(
             connection, excluded_artists_file, artist_countries_file, data
         )
         | eligible_songs.load_text_copies(connection, data)
+        | eligible_songs.load_held_countries(connection)
     )
     eligible_songs.classify(connection.table("songs"), exceptions, lists).create("classified")
     _release_songs(connection).create("release_songs")

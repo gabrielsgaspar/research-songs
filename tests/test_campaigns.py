@@ -227,3 +227,23 @@ def test_commands(tmp_path, monkeypatch, clock):
     assert plan.exit_code == 0 and "next time: Try the archive." in plan.output
     assert invoke("plan", "BRAZIL").exit_code != 0
     assert invoke("campaign", "list", "ARG").output.strip() == "No campaigns recorded."
+
+
+def test_a_country_is_held_while_its_newest_campaign_stopped_after_it_added_songs(tmp_path, clock):
+    def campaign(iso3: str, outcome: str, before: int | None, after: int | None) -> None:
+        campaigns.open_campaign(iso3, "An invented goal", songs_before=before, countries=tmp_path)
+        reason = "" if outcome == "complete" else "An invented reason"
+        campaigns.close_campaign(
+            iso3, outcome, "Try x.", reason=reason, songs_after=after, countries=tmp_path
+        )
+
+    campaign("BRA", "stopped", 10, 12)  # held
+    campaign("ARG", "stopped", 10, 10)  # stopped, added nothing
+    campaign("CHL", "stopped", 10, 12)
+    campaign("CHL", "complete", 12, 15)  # a later campaign ends the hold
+    campaign("PER", "complete", 10, 12)
+    campaign("PER", "stopped", 12, 14)  # held
+    campaign("URY", "stopped", None, 14)  # the counts are not recorded: held
+    campaign("BOL", "abandoned", 10, 12)
+    campaigns.open_campaign("ECU", "An open campaign", countries=tmp_path)
+    assert campaigns.held_countries(tmp_path) == ["BRA", "PER", "URY"]

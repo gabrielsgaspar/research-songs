@@ -935,7 +935,7 @@ def lyrics_copy_check(
         bool, typer.Option("--write", help="Write the table. Without it, the command only prints.")
     ] = False,
 ) -> None:
-    """Mark the campaign songs of every country whose text is a copy of another song.
+    """Mark the songs of every country whose text is a copy of another song.
 
     The rule compares the letters and digits of each text. It takes about 3 minutes.
     With --write, the command writes clean/quality/text_copies/<YYYYMMDD>/ in the data folder.
@@ -956,10 +956,12 @@ def lyrics_copy_check(
     typer.echo(f"copies (rows out): {counts['copies']}")
     for reason in (SAME_TEXT, SAME_ARTIST_START):
         typer.echo(f"  {reason}: {counts[reason]}")
-    typer.echo("country	copies	campaign songs	songs	share of campaign songs")
+    typer.echo(f"  campaign songs: {counts['campaign_copies']}")
+    typer.echo(f"  older songs: {counts['copies'] - counts['campaign_copies']}")
+    typer.echo("country	copies	songs	share of songs")
     by_share = sorted(result["by_country"].items(), key=lambda item: -item[1][0] / item[1][1])
-    for code, (copies, campaign, songs) in by_share[:15]:
-        typer.echo(f"{code}	{copies}	{campaign}	{songs}	{100 * copies / campaign:.1f}%")
+    for code, (copies, songs) in by_share[:15]:
+        typer.echo(f"{code}	{copies}	{songs}	{100 * copies / songs:.1f}%")
     typer.echo(f"wrote {result['folder']}" if write else "dry run: nothing written")
 
 

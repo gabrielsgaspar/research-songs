@@ -525,7 +525,7 @@ SAME_TEXT, SAME_ARTIST_START = "same_text", "same_artist_start"
 TEXT_COPIES = Table(
     file="text_copies.parquet",
     folder=TEXT_COPIES_FOLDER,
-    rows="one row per campaign song that is a text copy of another song of its country",
+    rows="one row per song that is a text copy of another song of its country",
     key=("country_iso3", "song_id"),
     columns=(
         Column("country_iso3", "string", True, "Country of the song"),
@@ -533,15 +533,16 @@ TEXT_COPIES = Table(
             "song_id",
             "string",
             True,
-            "The copy: a song with the route `dump_name` in `songs.parquet` of the country",
+            "The copy: a song of any route in `songs.parquet` of the country",
         ),
         Column(
             "kept_song_id",
             "string",
             True,
-            "The song of the same country that represents the group: an older song when "
-            "the group has one, else the campaign song with the smallest `run_id`, then "
-            "the smallest `song_id`",
+            "The song of the same country that represents the group: a song that no other "
+            "rule for eligible songs leaves out; then an older song before a song of the "
+            "route `dump_name`; of the older songs, the earliest year, with no year last; "
+            "then the smallest `run_id` and the smallest `song_id`",
         ),
         Column(
             "reason",

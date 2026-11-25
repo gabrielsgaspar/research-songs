@@ -25,23 +25,31 @@ filter. The rules, in the order that they are checked:
    artist on the roster of the country of the song. The list wins: only the list
    decides for an artist that it names. An artist that neither source names passes,
    and with no such folder only the list decides.
-6. `suppressed_duplicate`: the duplicate check suppressed the song
+6. `held_country`: the song is a campaign song (route `dump_name`) of a country
+   whose newest campaign stopped after it added songs
+   (`songs.common.campaigns.held_countries`, from the tracked campaign records in
+   `countries/<ISO3>/campaigns/`). Such a campaign failed a check, such as the
+   roster check, after its runs. The older songs of the country stay eligible, and
+   a later campaign that closes `complete` or `abandoned` ends the hold.
+7. `suppressed_duplicate`: the duplicate check suppressed the song
    (`duplicate_decision` is `suppress_duplicate`).
-7. `not_canonical`: another row represents the song (`canonical_song_id` is set and
+8. `not_canonical`: another row represents the song (`canonical_song_id` is set and
    is not the `song_id` of the row): a duplicate or a re-release.
-8. `re_release`: the re-release check of the old pipeline says that the row is a
+9. `re_release`: the re-release check of the old pipeline says that the row is a
    re-release (`re_release` is true). A row that no check saw is not left out.
-9. `text_copy`: the table of text copies (`clean/quality/text_copies/<YYYYMMDD>/` in
-   the data folder, the newest complete folder) lists the song: a campaign song whose
-   text another song of its country already has. With no such folder, no song is
-   left out for this reason.
-10. `uncredited_song`: the table of uncredited songs
+10. `text_copy`: the table of text copies (`clean/quality/text_copies/<YYYYMMDD>/` in
+   the data folder, the newest complete folder) lists the song: a song of any route
+   whose text another song of its country already has. A listed song that an
+   earlier rule already leaves out reports that rule, so this count holds only the
+   songs that the old duplicate checks did not find. With no such folder, no song is left
+   out for this reason.
+11. `uncredited_song`: the table of uncredited songs
    (`clean/quality/uncredited_songs/<YYYYMMDD>/` in the data folder, the newest
    complete folder) lists the song: a campaign song whose dump credit does not name
    its roster artist. With no such folder, no song is left out for this reason.
-11. `entered_by_hand`: a person collected the song (route `manual_review`), and its
+12. `entered_by_hand`: a person collected the song (route `manual_review`), and its
    country has no group in the exceptions file.
-12. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
+13. `year_out_of_range`: the year is outside `MIN_SONG_YEAR` to `MAX_SONG_YEAR`.
 
 A song with no year is eligible. An analysis by year cannot use it, and reports
 how many such songs it leaves out.
@@ -67,7 +75,8 @@ names. `load_artist_lists` reads them, and the table of artist countries, which
 `songs.stage_10_clean.artist_country` writes from Discogs evidence.
 `load_text_copies` reads the table of text copies, which
 `songs.stage_10_clean.text_copies` writes, and the table of uncredited songs, which
-`songs.stage_10_clean.uncredited_songs` writes.
+`songs.stage_10_clean.uncredited_songs` writes. `load_held_countries` reads the held
+countries from the campaign records.
 
 `country_folders` and `read_country_tables` read the songs of every country, and
 `year_counts` and `reason_counts` count the songs that `classify` lets in and
@@ -83,7 +92,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from songs.common import manifests, schemas
+from songs.common import campaigns, manifests, schemas
 from songs.common.paths import (
     check_iso3,
     clean_song_quarantine_dir,
@@ -101,6 +110,7 @@ from songs.common.years import MAX_SONG_YEAR, MIN_SONG_YEAR
 EXCEPTIONS_FILE = Path("resources") / "lyrics" / "eligibility_exceptions.csv"
 EXCEPTION_COLUMNS = ["country_iso3", "reason", "decided"]
 MANUAL_ROUTE = "manual_review"
+CAMPAIGN_ROUTE = "dump_name"
 SUSPECT_FILE = Path("resources") / "lyrics" / "suspect_text_hashes.csv"
 SUSPECT_COLUMNS = ["source", "lyrics_text_hash", "check_id"]
 QUARANTINE_COLUMNS = ["song_id", "artist_id", "source", "lyrics_text_hash", "check_id"]
@@ -117,6 +127,7 @@ MATCHES = {
     "excluded_artist": "q.artist_id = s.artist_id",
     "artist_country": "q.artist_id = s.artist_id "
     "AND (q.country_iso3 = s.country_iso3) = q.other_country",
+    "held_country": f"q.country_iso3 = s.country_iso3 AND s.route = '{CAMPAIGN_ROUTE}'",
     "text_copy": "q.country_iso3 = s.country_iso3 AND q.song_id = s.song_id",
     "uncredited_song": "q.country_iso3 = s.country_iso3 AND q.song_id = s.song_id",
 }
@@ -300,6 +311,21 @@ def load_text_copies(
     return lists
 
 
+def load_held_countries(
+    connection: duckdb.DuckDBPyConnection, countries: Path | None = None
+) -> dict[str, duckdb.DuckDBPyRelation]:
+    """Read the countries of `campaigns.held_countries` into `connection`.
+
+    The default is the tracked `countries/` folder.
+    """
+    frame = pd.DataFrame({"country_iso3": campaigns.held_countries(countries)}, dtype="string")
+    return {
+        "held_country": connection.from_df(frame).project(
+            "CAST(country_iso3 AS VARCHAR) AS country_iso3"
+        )
+    }
+
+
 def _load(
     connection: duckdb.DuckDBPyConnection, *lists: tuple[str, Path, list[str]]
 ) -> dict[str, duckdb.DuckDBPyRelation]:
@@ -319,6 +345,7 @@ def load_rule(
     quarantine: Path | None = None,
     excluded_artists: Path | None = None,
     artist_countries: Path | None = None,
+    countries: Path | None = None,
 ) -> tuple[list[NamedGroup], dict[str, duckdb.DuckDBPyRelation]]:
     """Return the exceptions and the lists that `classify` takes, read into `connection`.
 
@@ -326,12 +353,14 @@ def load_rule(
     in quarantine to the newest complete quarantine folder of `data`. The tables of
     artist countries, of text copies and of uncredited songs are the newest complete ones
     of `data`, when
-    `data` has them.
+    `data` has them. The held countries come from the campaign records in
+    `countries`, by default the tracked `countries/` folder.
     """
     lists = (
         load_hash_lists(connection, suspect, quarantine or quarantine_file(data))
         | load_artist_lists(connection, excluded_artists, artist_countries, data)
         | load_text_copies(connection, data)
+        | load_held_countries(connection, countries)
     )
     return load_exceptions(exceptions), lists
 
@@ -347,7 +376,8 @@ def classify(
     song is eligible. `by_exception` is true for an eligible song that entered
     through a group of the exceptions file. The songs need `country_iso3` and the
     columns in `COLUMNS`. `lists` joins the results of `load_hash_lists`,
-    `load_artist_lists` and `load_text_copies` on the connection of the songs.
+    `load_artist_lists`, `load_text_copies` and `load_held_countries` on the
+    connection of the songs.
     """
     for name, condition in MATCHES.items():
         hits = songs.set_alias("s").join(lists[name].set_alias("q"), condition, how="semi")
