@@ -111,8 +111,8 @@ A run record may name only a source on this page. To use a new source, add its e
 | `pevcheskipodsetnik` | [Pevcheski Podsetnik](https://pevcheskipodsetnik.com) | Countries: BGR | archive | unknown | - | yes | - |
 | `bgtekstove` | [BG Tekstove](https://bgtekstove.start.bg) | Countries: BGR | archive | unknown | - | yes | - |
 | `tekstomanija` | Tekstomanija | Countries: BIH, HRV, MNE, SRB | archive | unknown | - | no | A site archive dated 2026-09-25 exists. The address and the countries are not confirmed. |
-| `cuspajz` | Cuspajz | Countries: BIH, HRV, MNE, SRB | archive | unknown | - | no | A site archive dated 2026-09-25 exists. The address and the countries are not confirmed. |
-| `pesmarica` | Pesmarica | Countries: BIH, HRV, MNE, SRB | archive | unknown | - | no | A site archive dated 2026-09-25 exists. The address and the countries are not confirmed. |
+| `cuspajz` | [Cuspajz](https://cuspajz.com) | Countries: BIH, GBR, HRV, MKD, MNE, SRB, SVN, USA | archive | unknown | - | yes | Site archive crawled 2026-09-25, packed as raw/cuspajz/20261002/. Parsed and built 2026-11-25: raw/cuspajz/20261125/ and clean/dumps/cuspajz/20261125/ (29,519 songs, 2,646 artists, no years). The countries are those with at least 0.5 % of songs by artists that match the roster of one country only. The site also holds poems by poets; 839 traditional songs with no artist are left out. |
+| `pesmarica` | [Pesmarica](https://www.pesmarica.rs) | Countries: BIH, GBR, HRV, MKD, MNE, SRB, USA | archive | unknown | - | yes | A chord site. Site archive crawled 2026-09-25, packed as raw/pesmarica/20261002/. Parsed and built 2026-11-25: raw/pesmarica/20261125/ and clean/dumps/pesmarica/20261125/ (10,269 songs, 2,282 artists, no years). The reader removes chord lines from each chord sheet. Some songs have more than one chord version, so 1,401 songs repeat an artist and title. The countries are those with at least 0.5 % of songs by artists that match the roster of one country only. |
 | `dainuzodziai` | [Dainu zodziai](https://dainuzodziai.lt) | Countries: LTU | archive | unknown | - | yes | - |
 | `pisni_org_ua` | [Pisni.org.ua](https://www.pisni.org.ua) | Countries: UKR | archive | unknown | - | yes | - |
 | `nashe_com_ua` | [Nashe](https://nashe.com.ua) | Countries: UKR | archive | unknown | - | yes | - |
@@ -267,6 +267,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | ETH | `ethiozeima`, `oromolyrics` |
 | FRA | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | GAB | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
+| GBR | `cuspajz`, `pesmarica` |
 | GEO | `georgianlyrics` |
 | GIN | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | GNB | `letras` |
@@ -309,7 +310,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | MDA | `sergiudo` |
 | MDG | `lacoccinelle`, `paroles2chansons`, `parolesnet`, `tononkira` |
 | MEX | `buenamusica`, `letras`, `musica` |
-| MKD | `tekstovipjesama` |
+| MKD | `cuspajz`, `pesmarica`, `tekstovipjesama` |
 | MLI | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | MNE | `cuspajz`, `hitovi`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama` |
 | MOZ | `letras` |
@@ -342,7 +343,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | STP | `letras` |
 | SUR | `songteksten` |
 | SVK | `karaoketexty`, `supermusic`, `zoznam_hudba` |
-| SVN | `besedilo`, `pesmi`, `slolyrics` |
+| SVN | `besedilo`, `cuspajz`, `pesmi`, `slolyrics` |
 | SYR | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | TCD | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | TGO | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
@@ -357,6 +358,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | UGA | `howwe` |
 | UKR | `nashe_com_ua`, `pisni_org_ua`, `pisniua` |
 | URY | `buenamusica`, `hmpu_uy`, `jaimeroos`, `letras`, `musica`, `todotango` |
+| USA | `cuspajz`, `pesmarica` |
 | UZB | `uzmatn`, `uztext` |
 | VCT | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | VEN | `buenamusica`, `letras`, `musica` |

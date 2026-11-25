@@ -1964,26 +1964,26 @@ id = "cuspajz"
 name = "Cuspajz"
 kind = "site_archive"
 scope = "countries"
-countries = ["BIH", "HRV", "MNE", "SRB"]
-url = ""
+countries = ["BIH", "GBR", "HRV", "MKD", "MNE", "SRB", "SVN", "USA"]
+url = "https://cuspajz.com"
 stored_path = ""
 routes = ["archive"]
 access = "unknown"
-checked = false
-notes = "A site archive dated 2026-09-25 exists. The address and the countries are not confirmed."
+checked = true
+notes = "Site archive crawled 2026-09-25, packed as raw/cuspajz/20261002/. Parsed and built 2026-11-25: raw/cuspajz/20261125/ and clean/dumps/cuspajz/20261125/ (29,519 songs, 2,646 artists, no years). The countries are those with at least 0.5 % of songs by artists that match the roster of one country only. The site also holds poems by poets; 839 traditional songs with no artist are left out."
 
 [[source]]
 id = "pesmarica"
 name = "Pesmarica"
 kind = "site_archive"
 scope = "countries"
-countries = ["BIH", "HRV", "MNE", "SRB"]
-url = ""
+countries = ["BIH", "GBR", "HRV", "MKD", "MNE", "SRB", "USA"]
+url = "https://www.pesmarica.rs"
 stored_path = ""
 routes = ["archive"]
 access = "unknown"
-checked = false
-notes = "A site archive dated 2026-09-25 exists. The address and the countries are not confirmed."
+checked = true
+notes = "A chord site. Site archive crawled 2026-09-25, packed as raw/pesmarica/20261002/. Parsed and built 2026-11-25: raw/pesmarica/20261125/ and clean/dumps/pesmarica/20261125/ (10,269 songs, 2,282 artists, no years). The reader removes chord lines from each chord sheet. Some songs have more than one chord version, so 1,401 songs repeat an artist and title. The countries are those with at least 0.5 % of songs by artists that match the roster of one country only."
 
 [[source]]
 id = "besedilo"
