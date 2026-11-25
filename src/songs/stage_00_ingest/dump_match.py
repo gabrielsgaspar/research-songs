@@ -12,7 +12,9 @@ Each song of the dump counts once, in the first class that it fits:
 
 A song of the dump is one `source_song_id`; it can have more than one credited
 artist. The artists of a song are its credited names and the other names of
-those artists in `artist_names.parquet`. A song that is not held, and whose lyric
+those artists in `artist_names.parquet`. An artist id with two or more primary names
+of different keys holds unrelated artists (`_ALIAS_SQL`), so a song of such an id has
+only its credited name. A song that is not held, and whose lyric
 text has fewer than `MIN_LYRICS_CHARS` characters, is left out as `short_lyrics`:
 such a text is a placeholder, not a lyric. When no artist of a song gives
 same_title or roster_new, the lead part of each credited name is tried next
@@ -119,6 +121,14 @@ DISCOGS_METHODS = {
 CLOSE_CUTOFF = 0.9
 # Added to the match method of a song whose artist got its Discogs id by name.
 BY_NAME = "_artist_by_name"
+# Of several Discogs artists with one name key, the one with this many home releases or
+# more is taken when no other has one. In a sample of 100, 3 of the 16 artists with one
+# home release were wrong, and 1 of the 84 with two or more (2026-11-24).
+MIN_HOME_RELEASES = 2
+# Its home releases must also be this share of its releases or more. Madonna, Michael
+# Jackson, Mariah Carey and Céline Dion are below 0.1% for DZA; the lowest artist of the
+# country above them, Trevor Jones for ZAF, is at 0.7% (2026-11-24).
+MIN_HOME_SHARE = 0.005
 # Discogs marks the second artist of one name as "Name (2)".
 _HOMONYM = r"\s\(\d+\)$"
 # The order in which the result of one roster artist wins over that of another.
@@ -161,6 +171,15 @@ _CREDIT_SPLIT = re.compile(
     rf"\s*(?:\(?(?<!\w)(?:feat|ft|featuring)(?!\w)\.?|[,&]|(?<=\s)(?:{_JOINERS})(?=\s))\s*",
     re.IGNORECASE,
 )
+# The SQL of the names that a credit of an artist id carries, from `named`
+# (source_artist_id, name_type, key). An id with two primary keys holds unrelated artists.
+_ALIAS_SQL = """
+    SELECT DISTINCT source_artist_id, key FROM named
+    WHERE key <> '' AND source_artist_id NOT IN (
+        SELECT source_artist_id FROM named WHERE name_type = 'primary' AND key <> ''
+        GROUP BY source_artist_id HAVING count(DISTINCT key) > 1
+    )
+"""
 
 
 # Letters that Unicode does not split into a plain letter and an accent.
@@ -201,6 +220,10 @@ def lead_artist(name: str | None) -> str:
     """Return the lead performer of a credit such as "A feat. B" or "A & B", or "" for no split.
 
     A name with no featuring or joining word, or with nothing on one side of it, has no split.
+    The split also cuts band names ("As I Lay Dying" gives "As"). On 2026-11-24 about 42%
+    of the 30,493 dump rows that reached a roster artist only through a split were wrong
+    at the name step, and the Discogs title step removed them: 120 sampled of the 999
+    added songs were all right.
     """
     parts = _CREDIT_SPLIT.split(name or "", maxsplit=1)
     return parts[0].strip() if len(parts) == 2 and name_key(parts[0]) and name_key(parts[1]) else ""
@@ -221,7 +244,13 @@ def _table(connection: duckdb.DuckDBPyConnection, name: str, kind: str, values: 
 def _keys_text() -> str:
     """Return everything that decides the content of a key cache, as one text."""
     builders = (_in_key, name_key, lead_artist, dump_keys, _discogs_keys)
-    constants = (_CREDIT_SPLIT.pattern, _CREDIT_SPLIT.flags, _HOMONYM, sorted(_PLAIN.items()))
+    constants = (
+        _CREDIT_SPLIT.pattern,
+        _CREDIT_SPLIT.flags,
+        _ALIAS_SQL,
+        _HOMONYM,
+        sorted(_PLAIN.items()),
+    )
     return "".join(inspect.getsource(part) for part in builders) + repr(
         (*constants, unicodedata.unidata_version)
     )
@@ -271,7 +300,8 @@ def dump_keys(dump: Path) -> Path:
     holds a row group of text, and more threads pass the memory limit on a large dump.
 
         credits.parquet     one row per credit: song id, source artist id, artist key, lead key
-        alias_keys.parquet  one row per source artist id and key of one of its names
+        alias_keys.parquet  one row per source artist id and key of one of its names;
+                            an id with two or more primary keys has no row
         songs.parquet       one row per song: artist, title and hash of its first credit,
                             its title key, and `has_key` (an artist name of it has a key)
         lengths.parquet     one row per song: the length of the lyric text of its first
@@ -310,9 +340,10 @@ def dump_keys(dump: Path) -> Path:
             "FROM (SELECT DISTINCT song_name AS title FROM d)"
         )
         connection.execute(
-            "CREATE TEMP TABLE alias AS SELECT DISTINCT a.source_artist_id, nk.key "
-            "FROM a JOIN nk ON a.artist_name = nk.name WHERE nk.key <> ''"
+            "CREATE TEMP VIEW named AS SELECT a.source_artist_id, a.name_type, nk.key "
+            "FROM a JOIN nk ON a.artist_name = nk.name"
         )
+        connection.execute(f"CREATE TEMP TABLE alias AS {_ALIAS_SQL}")
         connection.execute(f"COPY alias TO {_quoted(work / 'alias_keys.parquet')}")
         connection.execute("SET threads = 2")
         connection.execute(
@@ -540,6 +571,49 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
     }
 
 
+def credited_keys(dump: Path, song_ids: list[str]) -> dict[str, dict[str, set[str]]]:
+    """Return the artist keys of each song of the dump folder `dump` that `song_ids` names.
+
+    `keys` holds the keys through which `match_dump` can give the song a roster artist:
+    the key and the lead key (`lead_artist`) of each credited name, and the keys of the
+    names of its artist id (`_ALIAS_SQL`). `names` holds the keys of the credited
+    names, and `merged` the keys of the names of an artist id with two or more primary
+    keys. A song id that the dump lacks has no item.
+    """
+    found: dict[str, dict[str, set[str]]] = {}
+    with duckdb.connect() as connection:
+        connection.execute("SET memory_limit = '4GB'")
+        connection.execute("SET threads = 2")
+        connection.create_function(
+            "name_key", name_key, ["VARCHAR"], "VARCHAR", null_handling="special"
+        )
+        _table(connection, "wanted", "str", sorted(set(song_ids)))
+        schemas.read_table(schemas.DUMP_SONGS, dump, connection).filter(
+            "source_song_id IN (SELECT value FROM wanted)"
+        ).project("source_song_id, artist_name, source_artist_id").create("credits")
+        schemas.read_table(schemas.DUMP_ARTIST_NAMES, dump, connection).filter(
+            "source_artist_id IN (SELECT source_artist_id FROM credits)"
+        ).project("source_artist_id, name_type, name_key(artist_name) AS key").create("named")
+        names_of: dict[str, set[str]] = {}
+        for artist_id, key in connection.execute(_ALIAS_SQL).fetchall():
+            names_of.setdefault(artist_id, set()).add(key)
+        merged: dict[str, set[str]] = {}
+        for artist_id, key in connection.execute(
+            "SELECT source_artist_id, key FROM named WHERE key <> '' "
+            f"AND source_artist_id NOT IN (SELECT source_artist_id FROM ({_ALIAS_SQL}))"
+        ).fetchall():
+            merged.setdefault(artist_id, set()).add(key)
+        credits = connection.execute("SELECT * FROM credits").fetchall()
+    for song_id, name, artist_id in credits:
+        song = found.setdefault(song_id, {"keys": set(), "names": set(), "merged": set()})
+        song["names"].add(name_key(name))
+        song["keys"] |= {name_key(name), name_key(lead_artist(name)), *names_of.get(artist_id, ())}
+        song["merged"] |= merged.get(artist_id, set())
+    for song in found.values():
+        song["keys"].discard("")
+    return found
+
+
 def loose_key(title: str | None) -> str:
     """Return the title key without parts in brackets and without a featuring part.
 
@@ -639,13 +713,16 @@ def load_home_countries(root: Path | None = None) -> dict[str, frozenset[str]]:
     return {iso3: frozenset(names) for iso3, names in home.items()}
 
 
-def _with_home_release(discogs: Path, artist_ids: list[int], home: frozenset[str]) -> set[int]:
-    """Return the Discogs artists that a release of a country in `home` credits.
+def _home_releases(
+    discogs: Path, artist_ids: list[int], home: frozenset[str]
+) -> dict[int, tuple[int, int]]:
+    """Return, for each Discogs artist, the releases of a country in `home` and all releases.
 
-    The credit is on the release or on one of its tracks.
+    The releases are those that credit the artist, on the release or on one of its
+    tracks. An artist with no release of a country in `home` has no item.
     """
     if not artist_ids or not home:
-        return set()
+        return {}
     table = {
         name: _quoted(discogs / f"{name}.parquet")
         for name in ("release_artists", "release_track_artists", "releases")
@@ -666,14 +743,15 @@ def _with_home_release(discogs: Path, artist_ids: list[int], home: frozenset[str
         )
         rows = connection.sql(
             f"""
-            SELECT DISTINCT artist_id FROM credited WHERE release_id IN (
+            SELECT artist_id, count(DISTINCT release_id) FILTER (WHERE release_id IN (
                 SELECT release_id FROM {table["releases"]}
                 WHERE release_id IN (SELECT release_id FROM credited)
                     AND country IN (SELECT value FROM home)
-            )
+            )), count(DISTINCT release_id)
+            FROM credited GROUP BY artist_id
             """
         ).fetchall()
-    return {row[0] for row in rows}
+    return {artist: (number, total) for artist, number, total in rows if number}
 
 
 @functools.lru_cache(maxsize=8)
@@ -685,7 +763,11 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
     has the same `name_key` (without the homonym mark " (2)"), no other roster artist
     has that id, no other roster artist without an id has that key, and a release
     of a home country of `iso3` credits that artist (`load_home_countries`). The
-    last rule keeps out an artist of another country with the same name. The roster
+    last rule keeps out an artist of another country with the same name. When several
+    Discogs artists have the key, the one that `MIN_HOME_RELEASES` or more releases of
+    a home country credit, at least `MIN_HOME_SHARE` of its releases, is taken when no
+    other of them has a home release, and the
+    other conditions hold; `by_home_release` counts these artists. The roster
     of the folder is not changed: `import_dump` writes the id of an artist that gets
     a song, or that has a link of an earlier import, to the roster of its new folder.
     Such an artist stays an artist found by name in each later folder, because a link
@@ -731,7 +813,7 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
     result["no_name_key"] = sum(not key for key in missing.values())
     shared = Counter(missing.values())
     taken = set(ids.values())
-    alone = {}
+    alone, several = {}, {}
     for artist_id, key in missing.items():
         hits = found.get(key, {})
         if not key:
@@ -739,15 +821,31 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
         if not hits:
             result["none_found"] += 1
         elif len(hits) > 1:
-            result["more_than_one"] += 1
+            several[artist_id] = hits
         elif shared[key] > 1 or next(iter(hits)) in taken:
             result["id_taken"] += 1
         else:
             alone[artist_id] = next(iter(hits.items()))
     home = load_home_countries().get(iso3, frozenset())
-    at_home = _with_home_release(discogs, sorted(pair[0] for pair in alone.values()), home)
+    wanted = {pair[0] for pair in alone.values()} | {n for hits in several.values() for n in hits}
+    at_home = _home_releases(discogs, sorted(wanted), home)
     found_now = {key: pair for key, pair in alone.items() if pair[0] in at_home}
     result["no_home_release"] = len(alone) - len(found_now)
+    result["by_home_release"] = 0
+    for artist_id, hits in several.items():
+        homed = [number for number in hits if number in at_home]
+        one = homed[0] if len(homed) == 1 else None
+        if (
+            one
+            and at_home[one][0] >= MIN_HOME_RELEASES
+            and at_home[one][0] >= MIN_HOME_SHARE * at_home[one][1]
+            and shared[missing[artist_id]] == 1
+            and one not in taken
+        ):
+            found_now[artist_id] = (one, hits[one])
+            result["by_home_release"] += 1
+        else:
+            result["more_than_one"] += 1
     result["by_name"] = stored | found_now
     result["ids"] = ids | {artist_id: pair[0] for artist_id, pair in found_now.items()}
     return result

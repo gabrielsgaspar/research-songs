@@ -141,7 +141,7 @@ What the commands do:
 
 ### Artists with no Discogs id
 
-A roster artist with no Discogs id gets one when exactly one Discogs artist has the same name key. No other roster artist may hold that id or have that key. A release of the country must credit that Discogs artist, so an artist of another country with the same name gets no id. The file `resources/lyrics/discogs_countries.csv` lists the release countries of Discogs that count for each country; a state that no longer exists, such as the USSR, counts for each country that followed it. The songs of the artist still need a title match with a track of that artist. The links of these songs carry a match method that ends with `_artist_by_name`. The import writes the Discogs id of such an artist to the roster of its new folder (`discogs_artist_id` in `artists.parquet`), for each artist that gets a song or that has a link of an earlier import. The match method of the links still shows that the id was found by name.
+A roster artist with no Discogs id gets one when exactly one Discogs artist has the same name key. No other roster artist may hold that id or have that key. A release of the country must credit that Discogs artist, so an artist of another country with the same name gets no id. When several Discogs artists have the name key, the roster artist gets the id of the one that two or more releases of the country credit, when these are at least 0.5% of its releases and no other of them has a release of the country. The share keeps out a world star with a few local releases, such as Madonna for DZA. On 2026-11-24, in a sample of 100 such pairs in 22 countries, 1 was wrong and 4 were doubtful; with one release of the country as the minimum, 3 of 16 were wrong. The file `resources/lyrics/discogs_countries.csv` lists the release countries of Discogs that count for each country; a state that no longer exists, such as the USSR, counts for each country that followed it. The songs of the artist still need a title match with a track of that artist. The links of these songs carry a match method that ends with `_artist_by_name`. The import writes the Discogs id of such an artist to the roster of its new folder (`discogs_artist_id` in `artists.parquet`), for each artist that gets a song or that has a link of an earlier import. The match method of the links still shows that the id was found by name.
 
 ### Artists of another country
 
@@ -166,6 +166,7 @@ An audit on 2026-11-24 read the 978,744 songs that campaigns added to 74 countri
 - Until 2026-11-24, an import held back a text only when its hash was the same as the hash of a held text. The hash changes with punctuation and with small differences between two sources, so the same lyrics from a second source passed this check. Since then, an import also holds back a text copy (see "Copies of a held text"). The copies that earlier imports added stay in their folders. `uv run songs lyrics copy-check --write` lists them in `clean/quality/text_copies/<YYYYMMDD>/`, and the rule for eligible songs leaves them out with the reason `text_copy`. The check also lists the older songs that are copies, because the duplicate checks of the old pipeline found only some of them. A campaign song represents a group of copies only when another rule leaves out every older song of the group. On 2026-11-25 the dry check marked 215,006 of the 990,307 campaign songs and 604,711 of the 4,295,956 older songs.
 - The title checks cannot see an older song that has no title. In the audit, 53% of the older songs had no title, and 95% of the older copies were such songs. The text copy check needs no title.
 - A title with a suffix after a dash, such as "- Remastered" or "- Live", counts as a new title. In the audit, about 2% of the added songs repeated the text of another added song of the same artist. The text copy check now holds back such a song when its text is a copy.
+- Until 2026-11-24, the match gave each dump song every name of its artist id. In the Genius dump, 4,086 ids hold the primary names of unrelated artists (282,810 songs). For example, id 353676 holds Nicki Minaj, Rosa Linn, KIDZ BOP Kids, Mura Masa, Magic System and Kygo. So a song could go to a roster artist that it does not credit: about 1,880 campaign songs did. Since then, the songs of an id with two or more primary names of different keys get only their credited name. `uv run songs lyrics credit-check --write` lists the songs that earlier imports added this way in `clean/quality/uncredited_songs/<YYYYMMDD>/`, and the rule for eligible songs leaves them out with the reason `uncredited_song`. On 2026-11-24 the dry check marked 1,870 of the 990,307 campaign songs.
 - About 2% of the added songs have a text that another country also holds. Most are one artist on the rosters of two countries.
 - About 78% of the added songs belong to an artist whose Discogs id was found by name. In a sample of 30 such artists, 27 were right for their country.
 - The dumps `lrclib` and `genius` hold the lyrics of a song under each recording of it. An instrumental recording of a standard can get the lyrics of the song.
@@ -194,6 +195,21 @@ What the command does:
 - The next run continues a folder that has a file `STOP`. It reads only the songs that the folder lacks, and its new folder holds the songs of both runs. Its run record counts only the songs that it read.
 
 The command prints the two commands that follow it. `songs dumps build` turns the raw folder into a dump, and `songs lyrics import-dump` adds the songs that match a Discogs track.
+
+## Read a saved site
+
+Some sites are on this disk as saved pages, packed into `pages-*.tar.gz` parts (`textpesenok`). `songs dumps build` cannot read pages, so one command reads them first. One parser exists, for `textpesenok`:
+
+```bash
+uv run songs dumps parse textpesenok raw/textpesenok/20261004/
+```
+
+- It reads the parts as a stream. It extracts no file to disk and sends no request.
+- It writes a new folder `raw/textpesenok/<YYYYMMDD>/`: one lyric table, one table of the performers of each song, and a manifest whose input is the packed folder. It never writes over a folder.
+- It prints the pages read, the songs written, and the pages left out by reason: an error status, a page that is not a song page, a page that does not decode, no lyric block, no artist, no title, an empty text, an instrumental marker, a second copy of a song.
+- A title with the word "перевод" (translation) or "аккорды" (chords) gives the text kind `translation` or `chords`. `songs dumps build` leaves such a text out.
+
+The command prints the `songs dumps build` command that follows it.
 
 ## Run records
 

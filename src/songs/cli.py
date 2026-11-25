@@ -568,6 +568,37 @@ def dumps_build(
         typer.echo("note: the crawl is incomplete")
 
 
+@dumps_app.command("parse")
+def dumps_parse(
+    source: Annotated[str, typer.Argument(help="Source key, lower case.")],
+    raw_input: Annotated[
+        str,
+        typer.Argument(help="raw/<source>/<YYYYMMDD>/ of the saved pages, relative to the data."),
+    ],
+) -> None:
+    """Read the saved pages of a site into a lyric table in a new raw/<source>/<YYYYMMDD>/.
+
+    `songs dumps build` reads the new folder. The command only reads the pages folder.
+    """
+    from songs.common.paths import data_root
+    from songs.stage_00_ingest import textpesenok
+
+    if source != textpesenok.SOURCE:
+        typer.echo(f"error: no page parser for {source}; one exists for {textpesenok.SOURCE}")
+        raise typer.Exit(1)
+    data = data_root()
+    try:
+        result = textpesenok.parse_folder(data, raw_input)
+    except (FileExistsError, ValueError) as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    path = result.pop("path")
+    for name, number in result.items():
+        typer.echo(f"{name}: {number}")
+    typer.echo(f"wrote {path}. Next:")
+    typer.echo(f'uv run songs dumps build {source} "{data / path}" {path}')
+
+
 @dumps_app.command("match")
 def dumps_match(
     source: Annotated[str, typer.Argument(help="Source key of the dump, lower case.")],
@@ -934,6 +965,42 @@ def lyrics_copy_check(
     typer.echo(f"wrote {result['folder']}" if write else "dry run: nothing written")
 
 
+@lyrics_app.command("credit-check")
+def lyrics_credit_check(
+    write: Annotated[
+        bool, typer.Option("--write", help="Write the table. Without it, the command only prints.")
+    ] = False,
+) -> None:
+    """Mark the campaign songs of every country whose dump credit does not name their artist.
+
+    With --write, the command writes clean/quality/uncredited_songs/<YYYYMMDD>/ in the data
+    folder.
+    """
+    from songs.common.paths import data_root
+    from songs.stage_10_clean import uncredited_songs
+
+    try:
+        result = uncredited_songs.check_credits(data_root(), write=write)
+    except FileExistsError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    counts = result["counts"]
+    typer.echo(f"countries: {counts['countries']}, campaign songs: {counts['campaign_songs']}")
+    typer.echo(f"left out, not in the newest dump: {counts['not_in_dump']}")
+    typer.echo(f"credited: {counts['credited']}, by a split name: {counts['credited_by_split']}")
+    typer.echo(f"uncredited (rows out): {counts['uncredited']}")
+    for reason in uncredited_songs.REASONS:
+        typer.echo(f"  {reason}: {counts[reason]}")
+    typer.echo("country\tuncredited\tcampaign songs\t" + "\t".join(uncredited_songs.REASONS))
+    rows = [
+        (code, [one.get(reason, 0) for reason in uncredited_songs.REASONS], one["campaign_songs"])
+        for code, one in result["by_country"].items()
+    ]
+    for code, found, campaign in sorted(rows, key=lambda row: -sum(row[1]))[:15]:
+        typer.echo("\t".join(map(str, (code, sum(found), campaign, *found))))
+    typer.echo(f"wrote {result['folder']}" if write else "dry run: nothing written")
+
+
 @campaign_app.command("run")
 def campaign_run_command(
     countries: CountriesArgument,
@@ -1069,6 +1136,22 @@ def score_status(
         typer.echo(f"wrote {scoring_run.write_status(data_root())}")
         return
     typer.echo(scoring_run.render_status(scoring_run.status(data_root(), countries)))
+
+
+@score_app.command("agreement")
+def score_agreement(
+    write: Annotated[
+        bool, typer.Option("--write", help="Write docs/status/prompt_agreement.md.")
+    ] = False,
+) -> None:
+    """Compare the current scores with the scores of other prompts on the same requests."""
+    from songs.common.paths import data_root
+    from songs.stage_30_topics import prompt_agreement
+
+    if write:
+        typer.echo(f"wrote {prompt_agreement.write_agreement(data_root())}")
+        return
+    typer.echo(prompt_agreement.render_agreement(prompt_agreement.agreement(data_root())))
 
 
 @score_app.command("submit")
