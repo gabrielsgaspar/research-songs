@@ -6,6 +6,7 @@ One folder per country, named by its ISO 3166-1 alpha-3 code (`BRA`, `NGA`, `JPN
 countries/<ISO3>/
   runs/        one JSON file per collection run, written by the command that ran
   campaigns/   two JSON files per campaign: one when it opens, one when it closes
+  scoring/     one JSON file per topic scoring run, written by `songs score collect`
   notes.md     known gaps and their causes (optional, written by people)
 ```
 

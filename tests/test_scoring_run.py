@@ -163,12 +163,13 @@ def test_submit_keeps_to_the_cost_limit_and_runs_one_time(data, tmp_path):
 
 
 def test_collect_writes_the_new_scores_over_the_old_ones_and_counts_each_failure(data, tmp_path):
+    countries = tmp_path / "countries"
     plan = prepared(data, tmp_path)
     run = plan["run_id"]
     items = scoring_run._read_lines(scoring_run.run_dir(data, run) / "assignments.jsonl")
     by_songs = {tuple(item["song_ids"]): item["custom_id"] for item in items}
     scoring_run.submit(data, run, 100.0, FakeBatches())
-    assert scoring_run.collect(data, run, FakeBatches("in_progress")) == {
+    assert scoring_run.collect(data, run, FakeBatches("in_progress"), countries) == {
         "status": "in_progress",
         "written": [],
     }
@@ -177,7 +178,7 @@ def test_collect_writes_the_new_scores_over_the_old_ones_and_counts_each_failure
         {"custom_id": by_songs[("s6",)]} | answer("non_song", "unknown"),
         {"custom_id": by_songs[("s3",)]} | answer("non_song", "40"),
     ]
-    result = scoring_run.collect(data, run, FakeBatches(lines=lines))
+    result = scoring_run.collect(data, run, FakeBatches(lines=lines), countries)
     counts = result["counts"]["TGO"]
     assert counts["requests"] == 3 and counts["answers"] == 2 and counts["bad_answer"] == 1
     folder = paths.latest_country_scores_dir(data, "TGO")
@@ -186,8 +187,15 @@ def test_collect_writes_the_new_scores_over_the_old_ones_and_counts_each_failure
     assert [(row[1], row[3]) for row in topics] == [("s1", 40), ("s2", 40), ("s5", 7), ("s6", None)]
     manifest = manifests.read_manifest(folder)
     assert manifest.counts["scores"] == 4 and manifest.counts["scores_carried"] == 1
+    assert [path.name for path in countries.rglob("*.json")] == [f"{run}.json"]
+    record = json.loads((countries / "TGO" / "scoring" / f"{run}.json").read_text(encoding="utf-8"))
+    assert (
+        record["prompt_sha256"] == PROMPT.sha256 and record["scores_folder"] == result["written"][0]
+    )
+    assert record["prepared"]["requests"] == 3 and record["collected"] == counts
+    assert record["run_requests"] == 3 and record["batch_status"] == "completed"
     with pytest.raises(ValueError, match="collected"):
-        scoring_run.collect(data, run, FakeBatches(lines=lines))
+        scoring_run.collect(data, run, FakeBatches(lines=lines), countries)
     again = prepared(data, tmp_path, run_id="20260203T000000Z")
     assert again["countries"]["TGO"]["scored"] == 4 and again["requests"] == 1
 
