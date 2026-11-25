@@ -50,6 +50,11 @@ def test_a_chord_sheet_gives_its_lyric_lines_only():
         "....|....|",
         "Transkripcija: neko",
         "Capo 2",
+        "Kapo na II polju",
+        "Akorde pisao: neko",
+        "Hm,F#.........",
+        "Svira se ovako: Dm H Gm",
+        "Verse Intro:",
     ],
 )
 def test_lines_with_no_lyric_are_chord_lines(line):
@@ -80,3 +85,8 @@ def test_song_ids_come_from_song_urls_only():
     assert site.song_id(f"{site.BASE}/akordi/12/Bend--Pesma") == "12"
     assert site.song_id(f"{site.BASE}/akordi/gitara/77/Izmisljeni-Bend") is None
     assert site.song_id(f"{site.BASE}/Akordi/A/0") is None
+
+
+def test_chords_in_a_lyric_line_go_and_the_words_stay():
+    sheet = "[G]Prvi iz[D7]misljeni [G]stih\n[G][G] [Am]\nA ti [ne] znas"
+    assert site.lyric_lines(sheet) == ["Prvi izmisljeni stih", " ", "A ti [ne] znas"]

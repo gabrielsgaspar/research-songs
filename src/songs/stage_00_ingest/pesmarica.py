@@ -52,11 +52,11 @@ _SECTION = (
     r"|instrumental|interlude|pre-?chorus|me[đd]j?u ?igra|riff?|coda|prelaz|prijelaz|for[sš]pil"
     r"|veza|tema|most|рефрен|реф|увод|строфа)"
 )
-# A credit or note line: a credit word and a colon, or a link.
+# A credit or note line: a credit word and a colon, a capo or tuning note, or a link.
 _CREDIT = re.compile(
-    r"\s*(?:(?:transkripcija|album|tekst|muzika|aran[zž]man|skidao|akordi|chords|autor"
-    r"|napomena|kontakt|ritam|klju[cč]|modulacija|by|tabs?|obrada|instagram|e-?mail)\s*:"
-    r"|capo\b|.*(?:https?://|www\.))",
+    r"[^:]{0,30}?\b(?:transkripcija|album|tekst|muzika|aran[zž]man|skidao|akordi|akorde|chords"
+    r"|autor|napomena|kontakt|ritam|klju[cč]|modulacija|by|tabs?|obrada|instagram|e-?mail"
+    r"|poslao|pisao)\s*:|\s*[ck]apo\b|.*(?:intonacij|https?://|www\.)",
     re.IGNORECASE,
 )
 # A section label: the word with a number, then a bracket, a colon, a dot or the line end.
@@ -64,6 +64,8 @@ _LABEL = re.compile(
     rf"^\s*[\[(]?\s*{_SECTION}\s*\d*\s*(?:[\])]\s*[.:]?|[.:]|(?=\s*$))\s*", re.IGNORECASE
 )
 _LABEL_WORD = re.compile(rf"{_SECTION}\d*", re.IGNORECASE)
+# A chord written in the lyric line (`[G]Bilo je`).
+_INLINE = re.compile(r"\[[A-Ha-h][^\]\s]{0,8}\]")
 _LETTER = re.compile(r"[^\W\d_]")
 _TAB = re.compile(r"\s*[A-Ha-h]?\s*\|?[-\d|hpbrx/\\~^ ]+")
 # Whole texts that stand for no words, as `name_key` values.
@@ -83,29 +85,42 @@ def is_chord_line(line: str) -> bool:
         return True
     if _CREDIT.match(line):
         return True
+    chords, other = _count(line.rsplit(":", 1)[-1])
+    if ":" in line and chords >= 2 and not other:
+        return True
     rest = _LABEL.sub("", line)
-    tokens = [token for token in re.split(r"[\s|/,\-–]+", rest) if token]
+    tokens = _tokens(rest)
     labelled = rest != line
-    if tokens and _LABEL_WORD.fullmatch(tokens[0]):
+    while tokens and _LABEL_WORD.fullmatch(tokens[0]):
         tokens, labelled = tokens[1:], True
     if not tokens:
         return labelled
+    chords, other = _count(" ".join(tokens))
+    return chords >= (2 if labelled else 4) * other and (labelled or chords > 0)
+
+
+def _tokens(text: str) -> list[str]:
+    """Return the words of a line, split at spaces, bars, slashes, commas and dashes."""
+    return [token.strip(".;:") for token in re.split(r"[\s|/,\-–]+", text) if token.strip(".;:")]
+
+
+def _count(text: str) -> tuple[int, int]:
+    """Return the number of chords and of words that are no chord and no mark."""
+    tokens = _tokens(text)
     chords = sum(bool(_CHORD.fullmatch(token)) for token in tokens)
     other = sum(not _CHORD.fullmatch(token) and not _MARK.fullmatch(token) for token in tokens)
-    return chords >= (2 if labelled else 4) * other and (labelled or chords > 0)
+    return chords, other
 
 
 def lyric_lines(sheet: str, *heading: str) -> list[str]:
     """Return the lyric lines of a chord sheet.
 
-    The lines lose chord lines, section labels and syllable marks (`Cu___jem`). Lines
-    at the start that only repeat the `heading` (the title or the artist) go too.
+    The lines lose chord lines, chords in the line, section labels and syllable marks
+    (`Cu___jem`). Lines at the start that only repeat the `heading` (the title or the
+    artist) go too.
     """
-    lines = [
-        re.sub(r"_+", "", _LABEL.sub("", line))
-        for line in sheet.replace("\r", "").split("\n")
-        if not is_chord_line(line)
-    ]
+    lines = [_INLINE.sub("", line) for line in sheet.replace("\r", "").split("\n")]
+    lines = [re.sub(r"_+", "", _LABEL.sub("", line)) for line in lines if not is_chord_line(line)]
     keys = [name_key(name) for name in heading if name_key(name)]
     while lines and _is_heading(name_key(lines[0]), keys):
         lines.pop(0)
