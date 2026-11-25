@@ -1,0 +1,47 @@
+{
+  "batch_status": "completed",
+  "code_commit": "24c6eb354fbe092f428a3a2a1ae1c6448f5ee41b",
+  "collected": {
+    "answers": 904,
+    "bad_answer": 0,
+    "cached_input_tokens": 0,
+    "http_error": 0,
+    "input_tokens": 3245924,
+    "no_answer": 0,
+    "not_completed": 0,
+    "output_tokens": 417390,
+    "reasoning_tokens": 225758,
+    "request_error": 0,
+    "requests": 904,
+    "songs_non_song": 15,
+    "songs_song_lyrics": 888,
+    "songs_uncertain": 1
+  },
+  "collected_utc": "2026-11-25T14:33:44Z",
+  "decades": [
+    "1950s",
+    "1960s",
+    "1970s"
+  ],
+  "iso3": "CZE",
+  "model": "gpt-5.6-luna",
+  "prepared": {
+    "eligible": 41367,
+    "in_open_run": 0,
+    "left_for_next_run": 0,
+    "other_decade": 7213,
+    "requests": 904,
+    "reused": 0,
+    "scored": 33250,
+    "scores_folder": "lyrics/CZE/scores/20261124T214041Z/",
+    "songs": 45404,
+    "songs_folder": "lyrics/CZE/songs/20261123T192500Z/",
+    "songs_to_score": 904
+  },
+  "prompt_sha256": "c51d257f2d6be1f2117aee6e9684117ae61c693c8752517d8d4e36bcb30e4793",
+  "run_estimate_usd": 9.445,
+  "run_id": "20261125T112608Z",
+  "run_requests": 9393,
+  "scores_folder": "lyrics/CZE/scores/20261125T143346Z/",
+  "usage_usd": 0.575
+}

@@ -1,0 +1,42 @@
+{
+  "batch_status": "completed",
+  "code_commit": "5290dd9107079db9ff27413f5ddff4e63ffdf33a",
+  "collected": {
+    "answers": 632,
+    "bad_answer": 0,
+    "cached_input_tokens": 0,
+    "http_error": 0,
+    "input_tokens": 2339397,
+    "no_answer": 0,
+    "not_completed": 0,
+    "output_tokens": 334055,
+    "reasoning_tokens": 200072,
+    "request_error": 0,
+    "requests": 632,
+    "songs_non_song": 1,
+    "songs_song_lyrics": 631
+  },
+  "collected_utc": "2026-11-25T17:22:51Z",
+  "decades": [],
+  "iso3": "MAR",
+  "model": "gpt-5.6-luna",
+  "prepared": {
+    "eligible": 3274,
+    "in_open_run": 0,
+    "left_for_next_run": 0,
+    "other_decade": 0,
+    "requests": 632,
+    "reused": 14,
+    "scored": 2628,
+    "scores_folder": "lyrics/MAR/scores/20261124T214220Z/",
+    "songs": 6965,
+    "songs_folder": "lyrics/MAR/songs/20261125T123542Z/",
+    "songs_to_score": 632
+  },
+  "prompt_sha256": "c51d257f2d6be1f2117aee6e9684117ae61c693c8752517d8d4e36bcb30e4793",
+  "run_estimate_usd": 10.1527,
+  "run_id": "20261125T143504Z",
+  "run_requests": 10000,
+  "scores_folder": "lyrics/MAR/scores/20261125T172255Z/",
+  "usage_usd": 0.4344
+}
