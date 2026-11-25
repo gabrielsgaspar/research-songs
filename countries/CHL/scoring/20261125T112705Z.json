@@ -1,0 +1,45 @@
+{
+  "batch_status": "completed",
+  "code_commit": "24c6eb354fbe092f428a3a2a1ae1c6448f5ee41b",
+  "collected": {
+    "answers": 435,
+    "bad_answer": 0,
+    "cached_input_tokens": 0,
+    "http_error": 0,
+    "input_tokens": 1535180,
+    "no_answer": 0,
+    "not_completed": 0,
+    "output_tokens": 198039,
+    "reasoning_tokens": 105819,
+    "request_error": 0,
+    "requests": 435,
+    "songs_song_lyrics": 435
+  },
+  "collected_utc": "2026-11-25T14:17:42Z",
+  "decades": [
+    "1950s",
+    "1960s",
+    "1970s"
+  ],
+  "iso3": "CHL",
+  "model": "gpt-5.6-luna",
+  "prepared": {
+    "eligible": 17288,
+    "in_open_run": 0,
+    "left_for_next_run": 0,
+    "other_decade": 5224,
+    "requests": 435,
+    "reused": 0,
+    "scored": 11629,
+    "scores_folder": "lyrics/CHL/scores/20261124T214023Z/",
+    "songs": 20000,
+    "songs_folder": "lyrics/CHL/songs/20261124T000018Z/",
+    "songs_to_score": 435
+  },
+  "prompt_sha256": "c51d257f2d6be1f2117aee6e9684117ae61c693c8752517d8d4e36bcb30e4793",
+  "run_estimate_usd": 9.3453,
+  "run_id": "20261125T112705Z",
+  "run_requests": 9304,
+  "scores_folder": "lyrics/CHL/scores/20261125T141743Z/",
+  "usage_usd": 0.2723
+}
