@@ -177,6 +177,32 @@ def test_lead_artist_splits_featuring_and_joining_words():
     assert lead_artist("& Bára") == "" and lead_artist(None) == ""
 
 
+def test_a_song_of_a_merged_artist_id_reaches_only_its_credited_name(tmp_path):
+    _, country = make_folders(tmp_path)
+    dump = paths.clean_dump_dir(tmp_path, "example", "20260103")
+    merged = ("Nicki Minaj", "Rosa Linn", "KIDZ BOP Kids", "Mura Masa", "Magic System", "Kygo")
+    names = [
+        {"source_artist_id": "353676", "artist_name": name, "name_type": "primary"}
+        for name in (*merged, "Anna Jons")
+    ] + [
+        {"source_artist_id": "x4", "artist_name": "AJ", "name_type": "primary"},
+        {"source_artist_id": "x4", "artist_name": "Anna Jóns", "name_type": "alias"},
+    ]
+    write(schemas.DUMP_ARTIST_NAMES, dump, [{"source": "example"} | name for name in names])
+    write(
+        schemas.DUMP_SONGS,
+        dump,
+        [
+            credit("m1", "KIDZ BOP Kids", "Cover Song", "g1", artist_id="353676"),
+            credit("m2", "Anna Jons", "Own Song", "g2", artist_id="353676"),
+            credit("m3", "AJ", "Alias Song", "g3", artist_id="x4"),
+        ],
+    )
+    result = match_dump(dump, country)
+    by_id = {row["source_song_id"]: row["roster_artist_ids"] for row in result["songs"]}
+    assert by_id == {"m2": ["a1"], "m3": ["a1"]}
+
+
 def test_the_lead_of_a_featuring_credit_matches_and_is_counted(tmp_path):
     _, country = make_folders(tmp_path)
     dump = paths.clean_dump_dir(tmp_path, "example", "20260103")
@@ -718,6 +744,46 @@ def write_named_discogs(folder: Path, artists: str) -> None:
     }
     for name, sql in tables.items():
         duckdb.sql(sql).write_parquet(str(folder / f"{name}.parquet"))
+
+
+def test_of_artists_with_one_name_the_only_one_with_home_releases_gets_the_id(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [
+            artist("a1", "Thanh Tuyền"),
+            artist("a2", "Elín"),
+            artist("a3", "Finnur"),
+            artist("a4", "Madonna"),
+        ],
+    )
+    folder = tmp_path / "discogs"
+    write_named_discogs(
+        folder,
+        "(31, 'Thanh Tuyền'), (32, 'Thanh Tuyen (2)'), (41, 'Elin'), (42, 'Elín (2)'), "
+        "(51, 'Finnur'), (52, 'Finnur (2)'), (61, 'Madonna'), (62, 'Madonna (2)')",
+    )
+    # 31 has two releases in Iceland and 32 one elsewhere; 41 has only one home release;
+    # 51 and 52 both have a home release; 61 has two home releases of 500, under 0.5%.
+    credits = "(1, 31), (2, 31), (3, 32), (4, 41), (5, 51), (5, 52), (6, 52), (1, 61), (2, 61)"
+    duckdb.sql(
+        f"SELECT * FROM (VALUES {credits}) AS t(release_id, artist_id) "
+        "UNION ALL SELECT range, 61 FROM range(100, 598)"
+    ).write_parquet(str(folder / "release_artists.parquet"))
+    countries = (
+        "(1, 'Iceland'), (2, 'Iceland'), (3, 'US'), (4, 'Iceland'), (5, 'Iceland'), (6, 'US')"
+    )
+    duckdb.sql(
+        f"SELECT release_id, NULL::BIGINT AS master_id, '1990' AS released, country "
+        f"FROM (VALUES {countries}) AS t(release_id, country) "
+        "UNION ALL SELECT range, NULL, '1990', 'US' FROM range(100, 598)"
+    ).write_parquet(str(folder / "releases.parquet"))
+
+    found = dump_match.discogs_ids(country, folder, "ISL")
+
+    assert found["by_name"] == {"a1": (31, "Thanh Tuyền")}
+    assert (found["by_home_release"], found["more_than_one"]) == (1, 3)
 
 
 def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_path):

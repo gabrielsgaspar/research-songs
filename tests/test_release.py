@@ -251,6 +251,38 @@ def test_the_newest_table_of_text_copies_leaves_out_a_listed_song(tmp_path, song
 def test_with_no_table_of_text_copies_no_song_is_a_copy(tmp_path):
     lists = eligible_songs.load_text_copies(duckdb.default_connection(), tmp_path)
     assert lists["text_copy"].fetchall() == []
+    assert lists["uncredited_song"].fetchall() == []
+
+
+UNCREDITED = [
+    ("listed", {}, "uncredited_song"),
+    ("listed_in_another_country", {"country_iso3": "BEN"}, None),
+    ("listed_and_a_copy", {}, "text_copy"),
+]
+
+
+@pytest.mark.parametrize(("song_id", "over", "reason"), UNCREDITED, ids=[c[0] for c in UNCREDITED])
+def test_the_newest_table_of_uncredited_songs_leaves_out_a_listed_song(
+    tmp_path, song_id, over, reason
+):
+    data = tmp_path / "data"
+    write_text_copies(data, "20260101", [("TGO", "listed_and_a_copy")])
+    folder = paths.clean_uncredited_songs_dir(data, "20260102")
+    folder.mkdir(parents=True)
+    rows = [
+        {"country_iso3": "TGO", "song_id": name, "reason": schemas.MERGED_ARTIST_ID}
+        for name in ("listed", "listed_in_another_country", "listed_and_a_copy")
+    ]
+    schemas.write_table(schemas.UNCREDITED_SONGS, frame(schemas.UNCREDITED_SONGS, rows), folder)
+    manifests.write_manifest(data, folder, "clean_uncredited_songs", inputs=["z"])
+    connection = duckdb.default_connection()
+    lists = eligible_songs.load_hash_lists(connection, *list_files(tmp_path))
+    lists |= eligible_songs.load_artist_lists(connection, *artist_files(tmp_path), data)
+    lists |= eligible_songs.load_text_copies(connection, data)
+    lists |= eligible_songs.load_held_countries(connection, tmp_path)
+    songs = frame(schemas.COUNTRY_SONGS, [song(song_id, **over)])
+    result = eligible_songs.classify(songs, [], lists)
+    assert result.project("ineligible_reason").fetchall() == [(reason,)]
 
 
 CASES = [
@@ -540,6 +572,7 @@ def test_the_manifest_counts_songs_in_out_and_left_out(built):
         "left_out_not_canonical": 0,
         "left_out_re_release": 1,
         "left_out_text_copy": 1,
+        "left_out_uncredited_song": 0,
         "left_out_entered_by_hand": 0,
         "left_out_year_out_of_range": 0,
         "countries": 2,

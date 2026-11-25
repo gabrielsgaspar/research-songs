@@ -21,6 +21,7 @@ KINDS = (
     "lyrics/*/songs/",
     "clean/quality/artist_country/",
     "clean/quality/text_copies/",
+    "clean/quality/uncredited_songs/",
     "lyrics/*/scores/",
     "analysis/",
 )
