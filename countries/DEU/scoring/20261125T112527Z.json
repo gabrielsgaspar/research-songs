@@ -1,0 +1,46 @@
+{
+  "batch_status": "completed",
+  "code_commit": "24c6eb354fbe092f428a3a2a1ae1c6448f5ee41b",
+  "collected": {
+    "answers": 1506,
+    "bad_answer": 0,
+    "cached_input_tokens": 0,
+    "http_error": 0,
+    "input_tokens": 5407238,
+    "no_answer": 0,
+    "not_completed": 0,
+    "output_tokens": 690279,
+    "reasoning_tokens": 371014,
+    "request_error": 0,
+    "requests": 1506,
+    "songs_non_song": 5,
+    "songs_song_lyrics": 1501
+  },
+  "collected_utc": "2026-11-25T14:16:28Z",
+  "decades": [
+    "1950s",
+    "1960s",
+    "1970s"
+  ],
+  "iso3": "DEU",
+  "model": "gpt-5.6-luna",
+  "prepared": {
+    "eligible": 195125,
+    "in_open_run": 0,
+    "left_for_next_run": 0,
+    "other_decade": 49694,
+    "requests": 1506,
+    "reused": 0,
+    "scored": 143925,
+    "scores_folder": "lyrics/DEU/scores/20261124T214044Z/",
+    "songs": 257147,
+    "songs_folder": "lyrics/DEU/songs/20261124T093607Z/",
+    "songs_to_score": 1506
+  },
+  "prompt_sha256": "c51d257f2d6be1f2117aee6e9684117ae61c693c8752517d8d4e36bcb30e4793",
+  "run_estimate_usd": 9.4883,
+  "run_id": "20261125T112527Z",
+  "run_requests": 9433,
+  "scores_folder": "lyrics/DEU/scores/20261125T141630Z/",
+  "usage_usd": 0.9549
+}
