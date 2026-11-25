@@ -329,3 +329,25 @@ def test_new_artists_adds_the_dump_rule_only_with_a_dump_and_the_home_rule_wins(
         artist_id("ISL", "Björk", "1"): ("Björk", "1"),
         artist_id("ISL", "Topper", "2"): ("Topper", "2"),
     }
+
+
+def test_a_dump_name_spelled_another_way_finds_its_discogs_artist(tmp_path):
+    data, discogs = tmp_path / "data", tmp_path / "discogs"
+    roster(data, "ISL", [])
+    many = discogs_roster.MIN_DUMP_SONGS
+    dump = write_dump(data, {"Sherali Jo'rayev": many, "Ali Valiyev": many, "Ali Valiyeva": many})
+    write_discogs(
+        discogs,
+        [
+            (1, "Sherali Juraev", "Icelandic singer.", "Pop"),
+            (2, "Ali Valiev", None, "Pop"),
+            (3, "Ali Valiev (2)", None, "Pop"),
+        ],
+        {1: ["US"], 2: ["Iceland"] * 3, 3: ["Iceland"] * 3},
+    )
+
+    # Sherali: one spelling key on each side. Ali Valiyev: two Discogs artists share its
+    # spelling key and have the same evidence, so neither wins.
+    assert discogs_roster.dump_artists(discogs, "ISL", dump, discogs_roster._rosters(data)) == {
+        artist_id("ISL", "Sherali Jo'rayev", "1"): ("Sherali Jo'rayev", "1")
+    }

@@ -40,7 +40,7 @@ A run record may name only a source on this page. To use a new source, add its e
 | `wikisource` | [Wikisource, songs of India](https://en.wikisource.org) | Countries: IND | local_source | not_applicable | - | yes | - |
 | `kugeci` | KuGeci | Countries: CHN, HKG, TWN | dump_name | not_applicable | - | yes | A clean copy dated 2026-10-12 exists, with about 258,000 song rows. No pages were downloaded. |
 | `nlb_sg` | [National Library Board, Singapore](https://data.gov.sg) | Countries: MYS, SGP | dump_name | not_applicable | - | yes | - |
-| `geniusru` | [Russian Genius dataset](https://huggingface.co/datasets/sevenreasons/genius-lyrics-russian) | Countries: RUS | dump_name | not_applicable | - | yes | A copy dated 2026-09-24 exists. On hold: rows carry no song link. |
+| `geniusru` | [Russian Genius dataset](https://huggingface.co/datasets/sevenreasons/genius-lyrics-russian) | Countries: ARM, AZE, BLR, EST, GEO, KAZ, KGZ, LTU, LVA, MDA, RUS, TJK, TKM, UKR, UZB | dump_name | not_applicable | - | yes | A copy dated 2026-09-24 exists. On hold: rows carry no song link. |
 
 ## Kind: site_archive
 
@@ -110,18 +110,18 @@ A run record may name only a source on this page. To use a new source, add its e
 | `textovenapesni` | [Textove na pesni](https://textovenapesni.com) | Countries: BGR | archive | unknown | - | yes | - |
 | `pevcheskipodsetnik` | [Pevcheski Podsetnik](https://pevcheskipodsetnik.com) | Countries: BGR | archive | unknown | - | yes | - |
 | `bgtekstove` | [BG Tekstove](https://bgtekstove.start.bg) | Countries: BGR | archive | unknown | - | yes | - |
-| `tekstomanija` | Tekstomanija | Countries: BIH, HRV, MNE, SRB | archive | unknown | - | no | A site archive dated 2026-09-25 exists. The address and the countries are not confirmed. |
+| `tekstomanija` | Tekstomanija | Countries: BIH, HRV, MKD, MNE, SRB, SVN | archive | unknown | - | no | A site archive dated 2026-09-25 exists. The address and the countries are not confirmed. |
 | `cuspajz` | Cuspajz | Countries: BIH, HRV, MNE, SRB | archive | unknown | - | no | A site archive dated 2026-09-25 exists. The address and the countries are not confirmed. |
 | `pesmarica` | Pesmarica | Countries: BIH, HRV, MNE, SRB | archive | unknown | - | no | A site archive dated 2026-09-25 exists. The address and the countries are not confirmed. |
 | `dainuzodziai` | [Dainu zodziai](https://dainuzodziai.lt) | Countries: LTU | archive | unknown | - | yes | - |
 | `pisni_org_ua` | [Pisni.org.ua](https://www.pisni.org.ua) | Countries: UKR | archive | unknown | - | yes | - |
 | `nashe_com_ua` | [Nashe](https://nashe.com.ua) | Countries: UKR | archive | unknown | - | yes | - |
-| `tekstpesni` | Tekst-pesni | Languages: Russian | archive, live, roster_update, recover | allowed, 1 s between requests | - | no | A site archive exists. The address of the site is not confirmed. |
-| `textpesenok` | [Text-pesenok](https://text-pesenok.ru) | Languages: Russian | archive | blocked | - | yes | A site archive exists. Blocked for live runs: they returned almost no rows. |
+| `tekstpesni` | Tekst-pesni | Countries: ARM, AZE, BLR, EST, GEO, KAZ, KGZ, LTU, LVA, MDA, RUS, TJK, TKM, UKR, UZB | archive, live, roster_update, recover | allowed, 1 s between requests | - | no | A site archive exists. The address of the site is not confirmed. |
+| `textpesenok` | [Text-pesenok](https://text-pesenok.ru) | Countries: ARM, AZE, BLR, EST, GEO, KAZ, KGZ, LTU, LVA, MDA, RUS, TJK, TKM, UKR, UZB | archive | blocked | - | yes | A site archive exists. Blocked for live runs: they returned almost no rows. |
 | `akkordlar` | [Akkordlar](https://akkordlar.az) | Countries: AZE | archive | unknown | - | yes | - |
 | `georgianlyrics` | [Georgian Lyrics](https://georgianlyrics.com) | Countries: GEO | archive | unknown | - | yes | - |
-| `uztext` | Uztext | Countries: UZB | archive | unknown | - | no | A site archive dated 2026-09-13 exists. The address of the site is not confirmed. |
-| `uzmatn` | Uzmatn | Countries: UZB | archive | unknown | - | no | A site archive dated 2026-09-13 exists. The address of the site is not confirmed. |
+| `uztext` | Uztext | Countries: KAZ, KGZ, TJK, TKM, UZB | archive | unknown | - | no | A site archive dated 2026-09-13 exists. The address of the site is not confirmed. |
+| `uzmatn` | Uzmatn | Countries: KAZ, KGZ, TJK, TKM, UZB | archive | unknown | - | no | A site archive dated 2026-09-13 exists. The address of the site is not confirmed. |
 
 ## Kind: manual
 
@@ -192,9 +192,9 @@ A run record may name only a source on this page. To use a new source, add its e
 | `versurius` | [Versuri.us](https://www.versuri.us) | Countries: ROU | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `textove` | [Textove](https://textove.com) | Countries: BGR | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `akordite` | [Akordite](https://akordite.com) | Countries: BGR | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
-| `tekstovi` | [Tekstovi.net](https://tekstovi.net) | Countries: BIH, HRV, MNE, SRB | live, roster_update, recover | blocked | - | yes | Do not send requests: the site forbids mass download. A site archive dated 2026-09-25 exists, and rows from earlier runs stay. |
-| `tekstovipesama` | [Tekstovi Pesama](https://tekstovi-pesama.com) | Countries: BIH, HRV, MNE, SRB | live, roster_update, recover | allowed, 1 s between requests | - | yes | A site archive dated 2026-09-25 exists. |
-| `tekstovipjesama` | [Tekstovi Pjesama](https://tekstovi-pjesama.com) | Countries: HRV, MKD, SRB | live, roster_update, recover | allowed, 1 s between requests | - | yes | A site archive dated 2026-09-25 exists. |
+| `tekstovi` | [Tekstovi.net](https://tekstovi.net) | Countries: BIH, HRV, MKD, MNE, SRB, SVN | live, roster_update, recover | blocked | - | yes | Do not send requests: the site forbids mass download. A site archive dated 2026-09-25 exists, and rows from earlier runs stay. |
+| `tekstovipesama` | [Tekstovi Pesama](https://tekstovi-pesama.com) | Countries: BIH, HRV, MKD, MNE, SRB, SVN | live, roster_update, recover | allowed, 1 s between requests | - | yes | A site archive dated 2026-09-25 exists. |
+| `tekstovipjesama` | [Tekstovi Pjesama](https://tekstovi-pjesama.com) | Countries: BIH, HRV, MKD, MNE, SRB, SVN | live, roster_update, recover | allowed, 1 s between requests | - | yes | A site archive dated 2026-09-25 exists. |
 | `hitovi` | [Hitovi.ba](https://hitovi.ba) | Countries: BIH, MNE | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `besedilo` | [Besedilo.si](https://www.besedilo.si) | Countries: SVN | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `slolyrics` | [SloLyrics](https://slolyrics.com) | Countries: SVN | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
@@ -223,10 +223,10 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | AND | `catorze` |
 | ARE | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | ARG | `buenamusica`, `letras`, `musica`, `todotango` |
-| ARM | `armlyric` |
+| ARM | `armlyric`, `geniusru`, `tekstpesni`, `textpesenok` |
 | ATG | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | AUT | `songtexte`, `volksmusikdatenbank` |
-| AZE | `akkordlar`, `gitar` |
+| AZE | `akkordlar`, `geniusru`, `gitar`, `tekstpesni`, `textpesenok` |
 | BDI | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | BEL | `lacoccinelle`, `paroles2chansons`, `parolesnet`, `songteksten` |
 | BEN | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
@@ -235,8 +235,8 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | BGR | `akordite`, `bgtekstove`, `pevcheskipodsetnik`, `repertukul`, `textove`, `textovenapesni` |
 | BHR | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | BHS | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
-| BIH | `cuspajz`, `hitovi`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama` |
-| BLR | `ilyrics`, `tekstpesni`, `tekstpesnionline`, `textpesenok` |
+| BIH | `cuspajz`, `hitovi`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
+| BLR | `geniusru`, `ilyrics`, `tekstpesni`, `tekstpesnionline`, `textpesenok` |
 | BOL | `buenamusica`, `letras`, `musica` |
 | BRA | `letras` |
 | BRB | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
@@ -264,10 +264,11 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | EGY | `aama`, `aghanylyrics`, `altkia`, `arabiclyrics_net`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | ERI | `afrikalyrics`, `tewle` |
 | ESP | `buenamusica`, `catorze`, `letras`, `musica` |
+| EST | `geniusru`, `tekstpesni`, `textpesenok` |
 | ETH | `ethiozeima`, `oromolyrics` |
 | FRA | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | GAB | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
-| GEO | `georgianlyrics` |
+| GEO | `geniusru`, `georgianlyrics`, `tekstpesni`, `textpesenok` |
 | GIN | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | GNB | `letras` |
 | GNQ | `buenamusica`, `letras`, `musica` |
@@ -291,9 +292,9 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | JAM | `gutenberg_jamaica`, `jahlyrics`, `lyricsaz`, `mentomusic`, `reggaetranslate`, `socarecords` |
 | JOR | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | JPN | `utanet`, `utaten` |
-| KAZ | `ilyrics`, `tekstpesni`, `tekstpesnionline`, `textpesenok` |
+| KAZ | `geniusru`, `ilyrics`, `tekstpesni`, `tekstpesnionline`, `textpesenok`, `uzmatn`, `uztext` |
 | KEN | `bongolyrics` |
-| KGZ | `ilyrics`, `tekstpesni`, `tekstpesnionline`, `textpesenok` |
+| KGZ | `geniusru`, `ilyrics`, `tekstpesni`, `tekstpesnionline`, `textpesenok`, `uzmatn`, `uztext` |
 | KNA | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | KOR | `bugs`, `genie`, `kpoplyrics`, `lyricscokr` |
 | KWT | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
@@ -301,17 +302,18 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | LBY | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | LCA | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | LKA | `lankawebsites`, `lyricslk` |
-| LTU | `dainutekstai`, `dainuzodziai` |
+| LTU | `dainutekstai`, `dainuzodziai`, `geniusru`, `tekstpesni`, `textpesenok` |
 | LUX | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
+| LVA | `geniusru`, `tekstpesni`, `textpesenok` |
 | MAC | `kugou`, `lyricsasia`, `mulanci`, `qqmusic` |
 | MAR | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | MCO | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
-| MDA | `sergiudo` |
+| MDA | `geniusru`, `sergiudo`, `tekstpesni`, `textpesenok` |
 | MDG | `lacoccinelle`, `paroles2chansons`, `parolesnet`, `tononkira` |
 | MEX | `buenamusica`, `letras`, `musica` |
-| MKD | `tekstovipjesama` |
+| MKD | `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
 | MLI | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
-| MNE | `cuspajz`, `hitovi`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama` |
+| MNE | `cuspajz`, `hitovi`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
 | MOZ | `letras` |
 | MRT | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | MYS | `kapanlagi`, `nlb_sg` |
@@ -342,12 +344,13 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | STP | `letras` |
 | SUR | `songteksten` |
 | SVK | `karaoketexty`, `supermusic`, `zoznam_hudba` |
-| SVN | `besedilo`, `pesmi`, `slolyrics` |
+| SVN | `besedilo`, `pesmi`, `slolyrics`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
 | SYR | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | TCD | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | TGO | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | THA | `siamzone` |
-| TJK | `mustext` |
+| TJK | `geniusru`, `mustext`, `tekstpesni`, `textpesenok`, `uzmatn`, `uztext` |
+| TKM | `geniusru`, `tekstpesni`, `textpesenok`, `uzmatn`, `uztext` |
 | TLS | `letras` |
 | TTO | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | TUN | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `lyricstn`, `songnu`, `tarab_hf` |
@@ -355,9 +358,9 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | TWN | `kugeci`, `kugou`, `lyricsasia`, `mulanci`, `pmdb_taipei`, `qqmusic` |
 | TZA | `bongolyrics` |
 | UGA | `howwe` |
-| UKR | `nashe_com_ua`, `pisni_org_ua`, `pisniua` |
+| UKR | `geniusru`, `nashe_com_ua`, `pisni_org_ua`, `pisniua`, `tekstpesni`, `textpesenok` |
 | URY | `buenamusica`, `hmpu_uy`, `jaimeroos`, `letras`, `musica`, `todotango` |
-| UZB | `uzmatn`, `uztext` |
+| UZB | `geniusru`, `tekstpesni`, `textpesenok`, `uzmatn`, `uztext` |
 | VCT | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | VEN | `buenamusica`, `letras`, `musica` |
 | VNM | `amnhacmiennam`, `lyricsvn`, `lyricvn`, `nhac_vn`, `nhaccuatui`, `tkaraoke` |

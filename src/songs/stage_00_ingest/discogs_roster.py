@@ -274,10 +274,12 @@ def dump_artists(
     }
     if not free or not (discogs / "artists.parquet").is_file():
         return {}
-    by_loose = defaultdict(set)
-    for key, (_, _, loose) in free.items():
+    by_loose, by_spelling = defaultdict(set), defaultdict(set)
+    for key, (name, _, loose) in free.items():
         if loose:
             by_loose[loose].add(key)
+        by_spelling[dump_match.spelling_key(name)].add(key)
+    by_spelling = {key: keys for key, keys in by_spelling.items() if key and len(keys) == 1}
     table = {
         name: dump_match._quoted(discogs / f"{name}.parquet")
         for name in ("artists", "release_artists", "releases", "release_genres")
@@ -294,6 +296,13 @@ def dump_artists(
                 OR {_LOOSE_SQL} IN (SELECT value FROM free_loose)
             """
         ).fetchall()
+        dump_match._table(connection, "free_spelling", "str", sorted(by_spelling))
+        for number, name in connection.sql(
+            f"SELECT artist_id, name FROM {dump_match._discogs_spellings(connection, discogs)} "
+            "WHERE spelling IN (SELECT value FROM free_spelling)"
+        ).fetchall():
+            bare = re.sub(dump_match._HOMONYM, "", name or "")
+            candidates.append((number, name, dump_match.name_key(bare), loose_key(bare)))
         wanted = sorted(
             {number for number, *_ in candidates}
             - set(NOT_ARTISTS)
@@ -346,7 +355,8 @@ def dump_artists(
         bare = re.sub(dump_match._HOMONYM, "", name or "")
         code, home = _country_of(profiles.get(number), bare, by_country[number], alone)
         if code:
-            for free_key in ({key} & free.keys()) | by_loose.get(loose, set()):
+            spelled = by_spelling.get(dump_match.spelling_key(bare), set())
+            for free_key in ({key} & free.keys()) | by_loose.get(loose, set()) | spelled:
                 scored[free_key].add((home, code, number))
     chosen: dict[int, tuple[str, int]] = {}
     for free_key, found in scored.items():

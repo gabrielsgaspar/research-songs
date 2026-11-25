@@ -224,6 +224,54 @@ def name_key(text: str | None) -> str:
     return " ".join(kept.split())
 
 
+# Cyrillic letters as the Latin letters of `spelling_key`.
+_CYRILLIC = str.maketrans(
+    {
+        **dict(zip("абвгдезийклмнопрстуфхцыэ", "abvgdeziiklmnoprstufhsie", strict=True)),
+        **dict(zip("ғёжқңөүұўһіїєә", "gejknouuuhiiea", strict=True)),
+        "ч": "ch",
+        "ш": "sh",
+        "щ": "sh",
+        "ю": "iu",
+        "я": "ia",
+        "ъ": "",
+        "ь": "",
+    }
+)
+# Letter groups that two transliterations of one name write in two ways, in this order.
+_SPELLINGS = (("dzh", "j"), ("dj", "j"), ("zh", "j"), ("kh", "h"), ("x", "h"), ("q", "k"))
+_SPELLINGS += (("gh", "g"), ("w", "v"), ("ph", "f"), ("ts", "s"), ("y", "i"))
+MIN_SPELLING_CHARS = 6
+
+
+def spelling_key(name: str | None) -> str:
+    """Return a key that two spellings of one name share, or "" for a name that is too short.
+
+    Transliterations write one name in several ways: "Sherali Jo'rayev" in Uzbek
+    Latin letters, "Sherali Juraev" in Discogs, "Шерали Жураев" in Cyrillic. The key
+    drops the apostrophes, writes Cyrillic in Latin letters, joins the letter groups of
+    `_SPELLINGS`, and keeps of each word its first letter (a vowel becomes "a"), its
+    consonants without doubles, and its last letter when that is a vowel ("o" becomes
+    "a"). All three names above give "shrli jrv". A name of one word, or of fewer than
+    `MIN_SPELLING_CHARS` key letters, gives "", because such keys join other names.
+    """
+    text = re.sub(r"[ʻʼ’‘'`]", "", unicodedata.normalize("NFKC", name or "").casefold())
+    key = name_key(text.translate(_CYRILLIC))
+    for written, spelled in _SPELLINGS:
+        key = key.replace(written, spelled)
+    words = []
+    for word in key.split():
+        if not word.isascii() or not word.isalpha():
+            return ""
+        head = "a" if word[0] in "aeiou" else word[0]
+        body = re.sub(r"(.)\1+", r"\1", re.sub("[aeiou]", "", word[1:]))
+        tail = {"o": "a"}.get(word[-1], word[-1]) if len(word) > 1 and word[-1] in "aeiou" else ""
+        words.append(head + body + tail)
+    if len(words) < 2 or len("".join(words)) < MIN_SPELLING_CHARS:
+        return ""
+    return " ".join(words)
+
+
 def lead_artist(name: str | None) -> str:
     """Return the lead performer of a credit such as "A feat. B" or "A & B", or "" for no split.
 
@@ -410,6 +458,37 @@ def _discogs_keys(connection: duckdb.DuckDBPyConnection, discogs: Path) -> str:
         connection.execute(f"COPY ({select}) TO {_quoted(work / 'artist_keys.parquet')}")
         _keep(work, folder)
     return _quoted(folder / "artist_keys.parquet")
+
+
+def _discogs_spellings(connection: duckdb.DuckDBPyConnection, discogs: Path) -> str:
+    """Return the SQL source of the Discogs artists with a spelling key: artist_id, name, spelling.
+
+    Only names with a `spelling_key` are in it. Like `_discogs_keys`, the table is
+    built one time under `cache/discogs_spellings/` for a catalog folder.
+    """
+    connection.create_function(
+        "spelling_key",
+        lambda name: spelling_key(re.sub(_HOMONYM, "", name or "")),
+        ["VARCHAR"],
+        "VARCHAR",
+        null_handling="special",
+    )
+    select = (
+        "SELECT artist_id, name, spelling FROM (SELECT artist_id, name, spelling_key(name) AS "
+        f"spelling FROM {_quoted(discogs / 'artists.parquet')} WHERE name LIKE '% %') "
+        "WHERE spelling <> ''"
+    )
+    if discogs.parent.parent.name != "catalog" or discogs.parents[2].name != "clean":
+        return f"({select})"
+    code = inspect.getsource(spelling_key) + repr((_SPELLINGS, sorted(_CYRILLIC.items())))
+    version = hashlib.sha256((_keys_text() + code).encode()).hexdigest()[:12]
+    folder = discogs.parents[3] / "cache" / "discogs_spellings" / discogs.parent.name
+    folder = folder / discogs.name / version
+    if not folder.is_dir():
+        work = _work_folder(folder.parent)
+        connection.execute(f"COPY ({select}) TO {_quoted(work / 'artist_spellings.parquet')}")
+        _keep(work, folder)
+    return _quoted(folder / "artist_spellings.parquet")
 
 
 def match_dump(
@@ -941,7 +1020,9 @@ MIN_VARIANT_CHARS = 4
 
 
 @functools.lru_cache(maxsize=8)
-def variant_keys(country: Path, discogs: Path, iso3: str) -> dict[str, str]:
+def variant_keys(
+    country: Path, discogs: Path, iso3: str, dump: Path | None = None
+) -> dict[str, str]:
     """Return more name keys of the roster artists with a Discogs id: key -> roster artist id.
 
     A roster artist with a Discogs id (`discogs_ids`) also matches a dump credit under
@@ -952,8 +1033,10 @@ def variant_keys(country: Path, discogs: Path, iso3: str) -> dict[str, str]:
     has `MIN_VARIANT_CHARS` or more characters, is the key of no roster artist of the
     country, and comes from one Discogs id only. A variant of one word must also be the
     key of no other Discogs artist, because a single name such as "Soraya" is often the
-    name of several artists. The songs still need a title match with a track of that
-    Discogs id. In a sample of 40
+    name of several artists. With a `dump`, each credited name of the dump whose
+    `spelling_key` is the spelling key of the names of one Discogs id only is a variant
+    of that id too ("Sherali Jo'rayev" for "Sherali Juraev"). The songs still need a
+    title match with a track of that Discogs id. In a sample of 40
     artists of the Spanish-speaking countries with the most songs added this way, 33
     were right and 7 doubtful (2026-11-25).
     """
@@ -999,6 +1082,20 @@ def variant_keys(country: Path, discogs: Path, iso3: str) -> dict[str, str]:
                 ).fetchall()
     for number, name in names:
         found.setdefault(name_key(name), set()).add(number)
+    if dump is not None:
+        spelled: dict[str, set[int]] = {}
+        for key, numbers in found.items():
+            spelled.setdefault(spelling_key(key), set()).update(numbers)
+        spelled.pop("", None)
+        with duckdb.connect() as connection:
+            credited = connection.sql(
+                f"SELECT DISTINCT artist_name FROM {_quoted(dump / 'songs.parquet')} "
+                "WHERE artist_name LIKE '% %'"
+            ).fetchall()
+        for (name,) in credited:
+            numbers, key = spelled.get(spelling_key(name), set()), name_key(name)
+            if len(numbers) == 1 and key not in found:
+                found[key] = set(numbers)
     found = {
         key: numbers
         for key, numbers in found.items()
@@ -1390,7 +1487,7 @@ def would_add(
     holds those of them that get a song.
     """
     result = match_dump(
-        dump, country, new_artists=new_artists, variants=variant_keys(country, discogs, iso3)
+        dump, country, new_artists=new_artists, variants=variant_keys(country, discogs, iso3, dump)
     )
     found = match_discogs(result["songs"], country, discogs, iso3, new_artists)
     reviewed = load_reviewed_matches() if reviewed is None else reviewed
