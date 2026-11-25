@@ -1,0 +1,37 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 2,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/repertukul/20261121/",
+  "campaign_id": "20261125T082851Z",
+  "code_commit": "50ab74b8710c06979e72eb5cdf06e5bcd5627947",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-25T08:31:13Z",
+  "iso3": "TUR",
+  "known_gaps": [
+    "close: 4 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 2 songs to add. 2 artists joined the roster by the Discogs home rule (country tag discogs_home_releases).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 2,
+  "run_id": "20261125T083104Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 2,
+  "songs_attempted": 3394,
+  "songs_rejected": {
+    "close": 4,
+    "held": 117,
+    "held_loose_title": 1,
+    "no_track": 30,
+    "not_roster": 3233,
+    "same_title": 6,
+    "short_lyrics": 1
+  },
+  "source": "repertukul",
+  "started_utc": "2026-11-25T08:31:04Z",
+  "state": "complete"
+}

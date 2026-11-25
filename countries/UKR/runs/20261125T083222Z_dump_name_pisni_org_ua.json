@@ -1,0 +1,40 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 30,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/pisni_org_ua/20261119/",
+  "campaign_id": "20261125T083222Z",
+  "code_commit": "50ab74b8710c06979e72eb5cdf06e5bcd5627947",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-25T08:32:32Z",
+  "iso3": "UKR",
+  "known_gaps": [
+    "close: 149 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 462 songs to add. 16 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name). 27 artists joined the roster by the Discogs home rule (country tag discogs_home_releases).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 462,
+  "run_id": "20261125T083222Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 462,
+  "songs_attempted": 24687,
+  "songs_rejected": {
+    "already_linked": 44,
+    "close": 149,
+    "held": 3414,
+    "held_loose_title": 52,
+    "held_text": 35,
+    "no_track": 2949,
+    "not_roster": 14553,
+    "out_of_scope": 15,
+    "same_title": 3008,
+    "track_taken": 6
+  },
+  "source": "pisni_org_ua",
+  "started_utc": "2026-11-25T08:32:22Z",
+  "state": "complete"
+}

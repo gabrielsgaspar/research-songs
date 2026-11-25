@@ -208,11 +208,11 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [TON](../../countries/TON/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [TTO](../../countries/TTO/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 1555 |
 | [TUN](../../countries/TUN/) | 7 | 2026-11-24 | dump_name, old_layout | aama, aghanilyrics, genius, lrclib, old_pipeline, tarab_hf | 1654 |
-| [TUR](../../countries/TUR/) | 6 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline, repertukul, sarkisozum | 45502 |
+| [TUR](../../countries/TUR/) | 10 | 2026-11-25 | dump_name, old_layout | genius, lrclib, old_pipeline, repertukul, sarkisozum | 48602 |
 | [TWN](../../countries/TWN/) | 4 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline | 62618 |
 | [TZA](../../countries/TZA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 3540 |
 | [UGA](../../countries/UGA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 958 |
-| [UKR](../../countries/UKR/) | 6 | 2026-11-23 | dump_name, old_layout | genius, lrclib, nashe_com_ua, old_pipeline, pisni_org_ua | 19419 |
+| [UKR](../../countries/UKR/) | 10 | 2026-11-25 | dump_name, old_layout | genius, lrclib, nashe_com_ua, old_pipeline, pisni_org_ua | 20436 |
 | [URY](../../countries/URY/) | 6 | 2026-11-23 | dump_name, old_layout | genius, lrclib, musica, old_pipeline, todotango | 8058 |
 | [USA](../../countries/USA/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 1527432 |
 | [UZB](../../countries/UZB/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 320 |
