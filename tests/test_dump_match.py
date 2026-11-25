@@ -848,6 +848,99 @@ def test_of_artists_with_one_name_the_only_one_with_home_releases_gets_the_id(tm
     assert (found["by_home_release"], found["more_than_one"]) == (1, 3)
 
 
+def test_variant_keys_add_discogs_name_variations_and_articles_of_roster_artists(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [
+            artist("a1", "Los Temerarios") | {"discogs_artist_id": "11"},
+            artist("a2", "Sora Ruiz") | {"discogs_artist_id": "12"},
+            artist("a3", "Temerarios Band"),
+            artist("a4", "Rakim y Ken-Y (Dúo)") | {"discogs_artist_id": "15"},
+        ],
+    )
+    folder = tmp_path / "discogs"
+    folder.mkdir(parents=True)
+    tables = {
+        "artists": "SELECT * FROM (VALUES (11, 'Los Temerarios'), (12, 'Sora Ruiz'), "
+        "(14, 'Sora'), (15, 'Rakim Y Ken-Y')) AS t(artist_id, name)",
+        "artist_namevariations": "SELECT * FROM (VALUES (11, 'Temerarios Band'), "
+        "(12, 'Sora'), (12, 'Ruiz')) AS t(artist_id, namevariation)",
+        "release_artists": "SELECT * FROM (VALUES (1, 11, 'Los Temerarios', 'Temerarios Y Su "
+        "Grupo')) AS t(release_id, artist_id, artist_name, anv)",
+    }
+    for name, sql in tables.items():
+        duckdb.sql(sql).write_parquet(str(folder / f"{name}.parquet"))
+
+    variants = dump_match.variant_keys(country, folder, "ISL")
+
+    # A roster name loses or gets an article. A roster key ("temerarios band") and a single
+    # word that is the key of another Discogs artist ("sora", artist 14) are no variants.
+    assert variants == {
+        "temerarios": "a1",
+        "temerarios y su grupo": "a1",
+        "el sora ruiz": "a2",
+        "la sora ruiz": "a2",
+        "las sora ruiz": "a2",
+        "los sora ruiz": "a2",
+        "ruiz": "a2",
+        "rakim ken y": "a4",
+        "rakim y ken y": "a4",
+        "el rakim y ken y duo": "a4",
+        "la rakim y ken y duo": "a4",
+        "las rakim y ken y duo": "a4",
+        "los rakim y ken y duo": "a4",
+    }
+
+
+def test_a_dominant_artist_a_shared_key_and_a_stated_country_give_an_id(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [
+            artist("a1", "Lola"),
+            artist("a2", "Sol"),
+            artist("a3", "SOL"),
+            artist("a4", "Rita"),
+            artist("a5", "Vera"),
+        ],
+    )
+    folder = tmp_path / "discogs"
+    folder.mkdir(parents=True)
+    artists = (
+        "(71, 'Lola', ''), (72, 'Lola (2)', ''), (81, 'Sol', ''), "
+        "(91, 'Rita', 'Icelandic singer from Reykjavik.'), (92, 'Rita (2)', 'American singer.'), "
+        "(95, 'Vera', ''), (96, 'Vera (2)', '')"
+    )
+    duckdb.sql(f"SELECT * FROM (VALUES {artists}) AS t(artist_id, name, profile)").write_parquet(
+        str(folder / "artists.parquet")
+    )
+    # 71 has 10 home releases and 72 has 2: 71 has 5 times the home releases of 72.
+    # 95 has 6 home releases and 96 has 2: under 5 times, so Vera gets no id.
+    credits = [(n, 71) for n in range(1, 11)] + [(11, 72), (12, 72), (13, 81)]
+    credits += [(n, 95) for n in range(20, 26)] + [(26, 96), (27, 96)]
+    duckdb.sql(
+        "SELECT * FROM (VALUES "
+        + ", ".join(f"({release}, {number})" for release, number in credits)
+        + ") AS t(release_id, artist_id)"
+    ).write_parquet(str(folder / "release_artists.parquet"))
+    duckdb.sql(
+        "SELECT range AS release_id, NULL::BIGINT AS master_id, '1990' AS released, "
+        "'Iceland' AS country FROM range(1, 30)"
+    ).write_parquet(str(folder / "releases.parquet"))
+    duckdb.sql(
+        "SELECT * FROM (VALUES (1, 1, 1)) AS t(release_id, track_index, artist_id) WHERE false"
+    ).write_parquet(str(folder / "release_track_artists.parquet"))
+
+    found = dump_match.discogs_ids(country, folder, "ISL")
+
+    assert found["ids"] == {"a1": 71, "a2": 81, "a3": 81, "a4": 91}
+    assert (found["by_dominance"], found["by_same_key"], found["by_stated"]) == (1, 2, 1)
+    assert found["more_than_one"] == 1
+
+
 def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_path):
     country = tmp_path / "country"
     write(
@@ -881,11 +974,12 @@ def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_pat
     # One artist with the name, with or without the homonym mark: the id is used.
     assert found["by_name"] == {"a2": (21, "BÁRA (2)")}
     assert found["ids"] == {"a1": 11, "a2": 21}
-    # Two homonyms block. An id of another roster artist blocks, and so does a shared name.
-    assert (found["more_than_one"], found["id_taken"]) == (3, 3)
+    # Two homonyms with no home release block. An id of another roster artist blocks.
+    assert (found["more_than_one"], found["id_taken"]) == (3, 1)
     assert (found["none_found"], found["no_name_key"]) == (1, 1)
-    # The only Discogs artist with the name has no release in Iceland: the id is not used.
-    assert found["no_home_release"] == 1
+    # The only Discogs artist with the name has no release in Iceland: the id is not used,
+    # for Hanna and for the two roster artists that share the key of Gunnar.
+    assert found["no_home_release"] == 3
     assert dump_match.discogs_ids(country, tmp_path / "discogs", "USA")["by_name"] == {
         "a11": (81, "Hanna")
     }
