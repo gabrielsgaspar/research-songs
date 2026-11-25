@@ -1,0 +1,41 @@
+{
+  "batch_status": "completed",
+  "code_commit": "24c6eb354fbe092f428a3a2a1ae1c6448f5ee41b",
+  "collected": {
+    "answers": 45,
+    "bad_answer": 0,
+    "cached_input_tokens": 0,
+    "http_error": 0,
+    "input_tokens": 180127,
+    "no_answer": 0,
+    "not_completed": 0,
+    "output_tokens": 23740,
+    "reasoning_tokens": 14200,
+    "request_error": 0,
+    "requests": 45,
+    "songs_song_lyrics": 45
+  },
+  "collected_utc": "2026-11-25T14:00:03Z",
+  "decades": [],
+  "iso3": "GIN",
+  "model": "gpt-5.6-luna",
+  "prepared": {
+    "eligible": 132,
+    "in_open_run": 0,
+    "left_for_next_run": 0,
+    "other_decade": 0,
+    "requests": 45,
+    "reused": 0,
+    "scored": 87,
+    "scores_folder": "lyrics/GIN/scores/20261124T214120Z/",
+    "songs": 169,
+    "songs_folder": "lyrics/GIN/songs/20261121T154110Z/",
+    "songs_to_score": 45
+  },
+  "prompt_sha256": "c51d257f2d6be1f2117aee6e9684117ae61c693c8752517d8d4e36bcb30e4793",
+  "run_estimate_usd": 10.1802,
+  "run_id": "20261125T121443Z",
+  "run_requests": 10000,
+  "scores_folder": "lyrics/GIN/scores/20261125T140008Z/",
+  "usage_usd": 0.0323
+}
