@@ -1,10 +1,13 @@
 """Shared test setup: markers that keep CI free of data and network needs."""
 
 import os
+from pathlib import Path
 
 import pytest
 
-from songs.common.paths import DATA_ROOT_ENV
+from songs import cli
+from songs.common import config
+from songs.common.paths import DATA_ROOT_ENV, resolve_project_root
 
 
 def pytest_collection_modifyitems(config, items):
@@ -16,3 +19,17 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(no_data)
         if "network" in item.keywords:
             item.add_marker(no_network)
+
+
+@pytest.fixture(autouse=True)
+def no_project_env_file(monkeypatch):
+    """Keep the real `.env` and its keys out of every test; other `.env` files still load."""
+    load = config.load_env_file
+    project_env = (resolve_project_root() / ".env").resolve()
+
+    def load_unless_project_env(path):
+        if Path(path).resolve() != project_env:
+            load(path)
+
+    monkeypatch.setattr(config, "load_env_file", load_unless_project_env)
+    monkeypatch.setattr(cli, "load_env_file", load_unless_project_env)
