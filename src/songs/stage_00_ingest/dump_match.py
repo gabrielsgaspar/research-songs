@@ -36,7 +36,7 @@ credit it. The first title step that finds a track wins:
 
     exact           the title keys are the same
     loose           the keys are the same without parts in brackets and featuring parts
-    close           the loose keys are similar (`CLOSE_CUTOFF` or more); a person reviews these
+    close           the loose keys are similar (`CLOSE_CUTOFF` or more)
 
 A song is `held_loose_title` when the country holds a song of the same roster
 artist with the same loose key. A song is `already_linked` when a track with its
@@ -50,7 +50,9 @@ lowest release id. The year is the earlier of the release date and the year of
 its master.
 
 `import_dump` adds the `exact` and `loose` songs to the country, with the route
-`dump_name`:
+`dump_name`. It also adds a `close` song when both titles hold the same numbers in the
+same order (`same_numbers`), unless `REVIEWED_FILE` rejects it for that track, and when
+`REVIEWED_FILE` accepts it:
 
     out  lyrics/<ISO3>/songs/<run id>/   artists.parquet, songs.parquet, links.parquet,
                                          _MANIFEST.json
@@ -140,7 +142,7 @@ ARTIST_OTHER_COUNTRY = "artist_other_country"
 # The class of a song that the import would add, whose text the country holds or the import adds.
 HELD_TEXT = "held_text"
 ROUTE = "dump_name"
-# A person's decision on each close match: accept adds the song, reject leaves it out.
+# A person's decision on a close match wins over `same_numbers`.
 REVIEWED_FILE = Path("resources") / "lyrics" / "reviewed_close_matches.csv"
 REVIEW_COLUMNS = (
     "source",
@@ -1075,6 +1077,18 @@ def _ids_of_earlier_links(country: Path, named: dict[str, tuple]) -> dict[str, s
     return {row[0]: str(named[row[0]][0]) for row in linked if row[0] in named}
 
 
+_NUMBERS = re.compile(r"\d+")
+
+
+def same_numbers(title: str, other: str) -> bool:
+    """Return True when the two titles hold the same numbers in the same order.
+
+    A close title match whose numbers differ ("Saludo 2010" and "Saludo 2004") was the
+    most common wrong match in a sample of close matches of 2026-11-25.
+    """
+    return _NUMBERS.findall(title or "") == _NUMBERS.findall(other or "")
+
+
 def load_reviewed_matches(root: Path | None = None) -> dict[tuple[str, ...], str]:
     """Return the decision on each reviewed close match.
 
@@ -1189,7 +1203,8 @@ def would_add(
     """Decide which songs of the dump folder `dump` an import adds to the folder `country`.
 
     A song is added when `match_discogs` gives it the class `exact` or `loose`, or
-    the class `close` and `REVIEWED_FILE` accepts it for the same Discogs track.
+    the class `close` and `REVIEWED_FILE` accepts it for the same Discogs track. A
+    `close` song that `REVIEWED_FILE` does not name is added when `same_numbers` holds.
     `reviewed` replaces the decisions of that file (for tests). Such a song of a roster
     artist in `other_country` (`other_country_artists`) is not added; it gets the class
     `ARTIST_OTHER_COUNTRY`. Of the songs left, a text copy (`held_text`) gets the class
@@ -1206,9 +1221,14 @@ def would_add(
     found = match_discogs(result["songs"], country, discogs, iso3, new_artists)
     reviewed = load_reviewed_matches() if reviewed is None else reviewed
 
+    titles = {song["source_song_id"]: song["song_name"] for song in result["songs"]}
+
     def accepted(row: dict) -> bool:
         key = (source, iso3, row["source_song_id"], row.get("discogs_release_id", ""))
-        return reviewed.get((*key, row.get("discogs_track_index", ""))) == "accept"
+        decision = reviewed.get((*key, row.get("discogs_track_index", "")))
+        if decision is not None:
+            return decision == "accept"
+        return same_numbers(titles[row["source_song_id"]], row.get("discogs_title", ""))
 
     def adds(row: dict) -> bool:
         return row["discogs_class"] in ADDED or (row["discogs_class"] == "close" and accepted(row))
@@ -1503,7 +1523,7 @@ def import_dump(
         if rejected["close"]:
             record.known_gaps.append(
                 f"close: {rejected['close']} songs match a Discogs title by close "
-                "spelling and wait for review"
+                "spelling, but the numbers of the titles differ or a person rejected them"
             )
         if by_name:
             record.notes = (
@@ -1517,7 +1537,7 @@ def import_dump(
             ).strip()
         if close_accepted:
             record.notes = (
-                f"{record.notes} {close_accepted} close matches added after review "
-                f"({REVIEWED_FILE.as_posix()})."
+                f"{record.notes} {close_accepted} close matches added: the titles hold the "
+                f"same numbers, or {REVIEWED_FILE.as_posix()} accepts them."
             ).strip()
     return {"path": out, "songs_attempted": plan["songs_in"], "rejected": rejected, **counts}

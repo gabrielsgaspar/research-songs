@@ -244,8 +244,12 @@ def test_cli_prints_counts_and_no_lyrics(tmp_path, monkeypatch):
     assert "invented line" not in result.output
 
 
-def write_discogs(folder: Path) -> None:
-    """Invented Discogs tables with the column names of the Discogs dump."""
+def write_discogs(folder: Path, close_title: str = "Another New Song 2") -> None:
+    """Invented Discogs tables with the column names of the Discogs dump.
+
+    `close_title` is the track that the dump song "Another New Song" matches by close
+    spelling. The default holds a number that the dump title lacks.
+    """
     folder.mkdir(parents=True)
     tables = {
         "release_artists": "SELECT * FROM (VALUES (100, 11), (200, 11), (900, 11)) "
@@ -255,7 +259,7 @@ def write_discogs(folder: Path) -> None:
         "release_tracklist": "SELECT * FROM (VALUES (100, 1, 'Sól Sól'), "
         "(100, 2, 'Morning Light (Remix)'), (200, 1, 'Sól, sól!'), (200, 2, 'Riverside'), "
         "(300, 1, 'Other Artist Song'), (300, 2, 'Night Train'), (900, 1, 'Old Song'), "
-        "(200, 3, 'A New Song'), (100, 3, 'Duet (Radio Edit)'), (200, 4, 'Another New Sng'), "
+        f"(200, 3, 'A New Song'), (100, 3, 'Duet (Radio Edit)'), (200, 4, '{close_title}'), "
         "(100, 4, 'Encore'), (100, 5, 'Encore (Live)')) "
         "AS t(release_id, track_index, title)",
         "releases": "SELECT * FROM (VALUES (100, 50, '1999-05-00'), (200, NULL, '1995'), "
@@ -466,7 +470,9 @@ def test_import_dump_leaves_out_the_songs_of_an_artist_of_another_country(tmp_pa
     assert record.songs_accepted + sum(record.songs_rejected.values()) == record.songs_attempted
 
 
-def import_with_review(root: Path, reviewed: dict) -> dict:
+def import_with_review(
+    root: Path, reviewed: dict, close_title: str = "Another New Song 2"
+) -> dict:
     data = root / "data"
     dump, country = make_folders(data, "kasilyrics")
     manifests.write_manifest(
@@ -475,7 +481,7 @@ def import_with_review(root: Path, reviewed: dict) -> dict:
     manifests.write_manifest(
         data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
     )
-    write_discogs(root / "discogs")
+    write_discogs(root / "discogs", close_title)
     return import_dump(
         data,
         "kasilyrics",
@@ -504,6 +510,35 @@ def test_import_dump_adds_a_close_match_only_for_the_reviewed_track(tmp_path):
     ).fetchall()
     assert method == [("dump_discogs_close_title",)]
     assert manifests.read_manifest(result["path"]).counts["dump_songs_close_accepted"] == 1
+
+
+def test_import_dump_adds_a_close_match_with_the_same_numbers_unless_a_person_rejects_it(
+    tmp_path,
+):
+    result = import_with_review(tmp_path / "a", {}, close_title="Another New Sng")
+    assert result["songs_added"] == 3
+    method = duckdb.sql(
+        f"SELECT match_method FROM '{(result['path'] / 'links.parquet').as_posix()}' "
+        "WHERE source_song_id = 'd4'"
+    ).fetchall()
+    assert method == [("dump_discogs_close_title",)]
+    (record,) = run_records.read_run_records("ISL", tmp_path / "a" / "countries")
+    assert "1 close matches added: the titles hold the same numbers" in record.notes
+    assert "close" not in record.songs_rejected
+    rejected = import_with_review(
+        tmp_path / "b",
+        {("kasilyrics", "ISL", "d4", "200", "4"): "reject"},
+        close_title="Another New Sng",
+    )
+    assert rejected["songs_added"] == 2
+
+
+def test_same_numbers_compares_the_numbers_of_two_titles_in_order():
+    assert dump_match.same_numbers("Las 7 AM", "Las 7 a.m.")
+    assert dump_match.same_numbers("Pobre de mi", "Podre De Mi")
+    assert not dump_match.same_numbers("Saludo 2010 (En Vivo)", "Saludo 2004")
+    assert not dump_match.same_numbers("03 - Tormenta de mar", "Tormenta De Mar")
+    assert not dump_match.same_numbers("Escena 1 y 2", "Escena 2 y 1")
 
 
 def complete_folders(data: Path) -> Path:

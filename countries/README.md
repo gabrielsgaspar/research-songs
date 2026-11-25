@@ -165,6 +165,10 @@ The same lyrics from a second source differ in punctuation, spacing or case, so 
 
 A kept text of fewer than 30 characters has no key and is never a copy. Of two copies in one import, the import adds the song with the lower `source_song_id`. The run record counts each song that the import holds back as `held_text`. The survey estimate uses the same rule, so it does not count these songs. The rule reads the text of each held song of the country and of each song that the import would add, not the text of the whole dump. On 2026-11-24 this added about 35 seconds to an estimate of the `lrclib` dump, and the held songs of a country with 1.5 million songs take about 35 seconds more.
 
+### Close title matches
+
+A dump song can match a Discogs track of its artist only by close spelling: the loose title keys are 90% similar or more (`CLOSE_CUTOFF`), for example "Tu Tenias Razón" and "Tu Tenia Razon". An import adds such a song when both titles hold the same numbers in the same order (`dump_match.same_numbers`). A song whose numbers differ, such as "Saludo 2010 (En Vivo)" and "Saludo 2004", stays out with the class `close`. A decision in `resources/lyrics/reviewed_close_matches.csv` wins over the rule for its track: `reject` keeps a song out, and `accept` adds it. The link of such a song has the match method `dump_discogs_close_title` and its similarity as the score. On 2026-11-25, a sample of 130 close matches of the `musica` dump (70, in DOM, URY, ECU, PAN, CRI, NIC, PRY and SLV) and the `lrclib` dump (60, in ECU and URY) gave these counts: the rule added 126 songs, of which 2 were another song ("No hice nada" and "No dice nada") and 4 were doubtful. It kept out 4 songs, of which 2 were wrong and 2 were right with a track number in the dump title.
+
 ### Limits of a campaign
 
 An audit on 2026-11-24 read the 978,744 songs that campaigns added to 74 countries. It found these limits. Read them before you report the result of a campaign.
