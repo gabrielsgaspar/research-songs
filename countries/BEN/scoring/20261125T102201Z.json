@@ -1,0 +1,42 @@
+{
+  "batch_status": "completed",
+  "code_commit": "9130600c12f47a2577511a4f5cb50d3c44cab9c0",
+  "collected": {
+    "answers": 562,
+    "bad_answer": 0,
+    "cached_input_tokens": 0,
+    "http_error": 0,
+    "input_tokens": 2203332,
+    "no_answer": 0,
+    "not_completed": 0,
+    "output_tokens": 281167,
+    "reasoning_tokens": 162025,
+    "request_error": 0,
+    "requests": 562,
+    "songs_non_song": 2,
+    "songs_song_lyrics": 560
+  },
+  "collected_utc": "2026-11-25T11:27:15Z",
+  "decades": [],
+  "iso3": "BEN",
+  "model": "gpt-5.6-luna",
+  "prepared": {
+    "eligible": 731,
+    "in_open_run": 0,
+    "left_for_next_run": 0,
+    "other_decade": 0,
+    "requests": 562,
+    "reused": 0,
+    "scored": 169,
+    "scores_folder": "lyrics/BEN/scores/20261124T213957Z/",
+    "songs": 1031,
+    "songs_folder": "lyrics/BEN/songs/20261124T145023Z/",
+    "songs_to_score": 562
+  },
+  "prompt_sha256": "c51d257f2d6be1f2117aee6e9684117ae61c693c8752517d8d4e36bcb30e4793",
+  "run_estimate_usd": 0.581,
+  "run_id": "20261125T102201Z",
+  "run_requests": 562,
+  "scores_folder": "lyrics/BEN/scores/20261125T112715Z/",
+  "usage_usd": 0.389
+}
