@@ -1208,3 +1208,8 @@ def test_variant_keys_add_the_dump_names_that_spell_a_roster_artist_another_way(
         "шерали жураев": "a1",
         "ali valiyev": "a2",
     }
+
+
+def test_an_apostrophe_letter_is_an_apostrophe_in_a_key():
+    names = ["Sherali Joʻrayev", "Sherali Jo'rayev", "Sherali Jo’rayev", "Sherali Joʼrayev"]
+    assert {dump_match.name_key(name) for name in names} == {"sherali jo rayev"}

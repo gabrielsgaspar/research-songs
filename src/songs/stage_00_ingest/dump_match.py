@@ -191,7 +191,8 @@ _ALIAS_SQL = """
 
 
 # Letters that Unicode does not split into a plain letter and an accent.
-_PLAIN = str.maketrans({"ı": "i", "đ": "d", "ł": "l", "ø": "o"})
+# The apostrophe letters of Uzbek and other Latin alphabets are apostrophes ("Joʻrayev").
+_PLAIN = str.maketrans({"ı": "i", "đ": "d", "ł": "l", "ø": "o", "ʻ": "'", "ʼ": "'", "ʹ": "'"})
 
 
 def _in_key(char: str) -> bool:
