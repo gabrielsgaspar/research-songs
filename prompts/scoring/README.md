@@ -29,7 +29,7 @@ Run these steps on one computer, in order, for one country or for one decade of 
 6. Collect the answers: `uv run songs score collect <run id>`. While the batch runs, the command prints its state and writes nothing. Run it again later. A batch ends in 24 hours or less.
 7. Build the analysis release from the new scores: `uv run songs analysis release`. The country-year panel (`songs panel countries`) does not read scores, so it does not change.
 8. Upload the new folders: `uv run songs data sync`, read the report, then `uv run songs data sync --write`.
-9. Write the status page, `uv run songs score status --write`, and commit `docs/status/scoring.md` in a pull request.
+9. Write the status page, `uv run songs score status --write`. Commit `docs/status/scoring.md` and the new records in `countries/<ISO3>/scoring/` in a pull request. `collect` writes one record for each country of the run.
 
 Repeat steps 3 to 6 until `requests` is 0. Songs with no valid answer are taken again by the next `prepare`.
 

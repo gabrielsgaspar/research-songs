@@ -12,7 +12,9 @@ A scoring run has three steps. Each one is a command of `songs score`.
              dollars. Only a person runs this step: it costs money.
     collect  Read the answers and write lyrics/<ISO3>/scores/<run id>/ for each
              country: every score of the newest scores folder, with the new scores
-             added or put in place of the old score of the same song.
+             added or put in place of the old score of the same song. It also
+             writes a tracked record of the run for each country:
+             countries/<ISO3>/scoring/<run id>.json.
 
 The request of a song holds only its country, decade and lyric text. So `prepare` sends
 no request for a song when another song of the country with the same text and decade
@@ -45,6 +47,7 @@ import pandas as pd
 
 from songs.common import manifests, paths, run_records, schemas
 from songs.common.paths import resolve_project_root
+from songs.common.repo import git_sha
 from songs.stage_30_topics.scoring_prompt import FIELD_ORDER, ScoringPrompt, load_scoring_prompt
 from songs.stage_30_topics.topic_ids import TOPIC_IDS
 from songs.stage_50_analysis import eligible_songs, release
@@ -400,7 +403,7 @@ def prepare(
         _write_json(folder / PLAN_FILE, plan)
     notes = (
         f"Scores that `songs score prepare` (run {run_id}) copied from another song of the "
-        "country with the same lyric text and decade, from the same prompt and model. No "
+        "country with the same lyric text and decade, from a prompt that counts as scored. No "
         "request was sent. The scores of the earlier scores folder stay."
     )
     plan["reused_written"] = [
@@ -537,11 +540,18 @@ def _write_country(
     return out
 
 
-def collect(data: Path, run_id: str, client: BatchClient | None = None) -> dict[str, Any]:
+def collect(
+    data: Path,
+    run_id: str,
+    client: BatchClient | None = None,
+    countries: Path | None = None,
+) -> dict[str, Any]:
     """Read the answers of a submitted run and write one scores folder for each country.
 
     When the batch has not ended, return its state and write nothing. A song with no
-    valid answer gets no score; the next prepared run takes it again.
+    valid answer gets no score; the next prepared run takes it again. Each country of
+    the run also gets a record in `countries/<ISO3>/scoring/` (`countries` overrides
+    the tracked `countries/` folder).
     """
     folder = run_dir(data, run_id)
     if (folder / COLLECTED_FILE).exists():
@@ -594,13 +604,31 @@ def collect(data: Path, run_id: str, client: BatchClient | None = None) -> dict[
         "scores folder stay, except where this run scored the same song again. "
         "The working files of the run are in staging/scoring/ of the data folder."
     )
-    written = [
-        paths.data_relative(
+    written = {
+        code: paths.data_relative(
             data,
             _write_country(data, code, rows, plan["countries"][code], dict(counts[code]), notes),
         )
         for code, rows in sorted(by_country.items())
-    ]
+    }
+    for code, tally in sorted(counts.items()):
+        record = {
+            "iso3": code,
+            "run_id": run_id,
+            "prompt_sha256": plan["prompt_sha256"],
+            "model": plan["model"],
+            "decades": plan["decades"],
+            "batch_status": batch["status"],
+            "collected_utc": scored_utc,
+            "code_commit": git_sha(resolve_project_root()),
+            "run_requests": plan["requests"],
+            "run_estimate_usd": plan["estimate"]["usd"],
+            "scores_folder": written.get(code),
+            "prepared": plan["countries"][code],
+            "collected": dict(tally),
+        }
+        write_scoring_record(record, countries)
+    written = list(written.values())
     summary = {
         "status": batch["status"],
         "collected_utc": scored_utc,
@@ -609,6 +637,16 @@ def collect(data: Path, run_id: str, client: BatchClient | None = None) -> dict[
     }
     _write_json(folder / COLLECTED_FILE, summary)
     return summary
+
+
+def write_scoring_record(record: dict[str, Any], countries: Path | None = None) -> Path:
+    """Write the record of one country of one run to `countries/<ISO3>/scoring/`, once."""
+    folder = (countries or run_records.countries_dir()) / paths.check_iso3(record["iso3"])
+    path = folder / "scoring" / f"{record['run_id']}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    return path
 
 
 def status(

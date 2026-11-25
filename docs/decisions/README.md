@@ -31,3 +31,4 @@ Then three sections: **Context** (the problem), **Decision** (what we do), **Con
 | 0009 | [A campaign is an effort with a goal for one country, with its own record](0009-campaigns-have-a-goal-and-a-record.md) | accepted | 2026-11-18 |
 | 0010 | [One layout for all data](0010-one-data-layout.md) | accepted | 2026-11-19 |
 | 0011 | [Combined-prompt topic scores count as scored](0011-combined-prompt-scores.md) | accepted | 2026-11-25 |
+| 0012 | [Each topic scoring run leaves a tracked record per country](0012-scoring-run-records.md) | accepted | 2026-11-25 |
