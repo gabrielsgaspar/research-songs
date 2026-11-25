@@ -3,6 +3,7 @@
 import re
 from html.parser import HTMLParser
 
+from songs.stage_00_ingest import site_pages
 from songs.stage_00_ingest.dump_match import name_key
 
 SOURCE = "textpesenok"
@@ -103,8 +104,7 @@ def parse_song(html: str, url: str) -> tuple[dict | None, list[tuple[str, str]],
         return None, [], "no_lyric_block"
     artists = list(dict.fromkeys(page.artists))
     title = " ".join(page.title.split()) or _HEADING_END.sub("", " ".join(page.heading.split()))
-    lines = [" ".join(line.split()) for line in page.lines]
-    lyrics = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+    lyrics = site_pages.lyric_text(page.lines)
     if not artists:
         return None, [], "no_artist"
     if not title:

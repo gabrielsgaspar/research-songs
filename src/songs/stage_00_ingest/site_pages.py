@@ -3,8 +3,9 @@
 The pages are in a packed raw folder (`raw/<source>/<YYYYMMDD>/`, parts
 `pages-*.tar.gz`). Each request of the crawl is one receipt
 (`.../receipts/<id>.json`: URL, HTTP status, error, headers) and one response body
-(`.../responses/<id>.body`: the page as received). The packer writes members in
-name order, so the receipts come before the responses.
+(`.../responses/<id>.body`, or `.../responses/<day>/<id>.body.gz` gzipped: the page as
+received). The packer writes members in name order, so the receipts come before the
+responses.
 
 A site module names `SOURCE`, `BASE`, `COLUMNS` (the lyric columns, with
 `provider_song_id`, `song_url` and `retrieved_at_utc`) and two functions:
@@ -19,6 +20,7 @@ performer of each song, in page order) and a manifest whose input is the packed
 folder. It never writes over a folder.
 """
 
+import gzip
 import importlib
 import json
 import re
@@ -35,7 +37,7 @@ from songs.common import manifests, paths, run_records
 from songs.stage_00_ingest.dumps import check_raw_input
 
 # The sources that have a page reader: a module of the same name in this package.
-SITES = ("textpesenok",)
+SITES = ("geolyrics", "georgianlyrics", "kyrgyzaudio", "matinder", "mediastar", "textpesenok")
 CREDIT_COLUMNS = ("provider_song_id", "credit_position", "provider_artist_id", "artist_name")
 _CHARSET = re.compile(rb"""charset\s*=\s*["']?([A-Za-z0-9_-]+)""")
 
@@ -71,12 +73,17 @@ def decode(body: bytes, content_type: str | None) -> str | None:
         return None
 
 
+def lyric_text(lines: list[str]) -> str:
+    """Join the lines of a lyric block: spaces squeezed, at most one empty line between stanzas."""
+    joined = "\n".join(" ".join(line.split()) for line in lines)
+    return re.sub(r"\n{3,}", "\n\n", joined).strip()
+
+
 def _member_kind(name: str) -> tuple[str, str]:
     """Return ('receipts' or 'responses', the request id) of a member, or ('', '')."""
     parts = name.split("/")
-    if len(parts) >= 2 and parts[-2] in ("receipts", "responses"):
-        return parts[-2], parts[-1].rsplit(".", 1)[0]
-    return "", ""
+    kind = next((part for part in reversed(parts[:-1]) if part in ("receipts", "responses")), "")
+    return (kind, parts[-1].split(".", 1)[0]) if kind else ("", "")
 
 
 def read_pages(folder: Path, site: ModuleType) -> tuple[list[dict], list[tuple], Counter]:
@@ -95,6 +102,8 @@ def read_pages(folder: Path, site: ModuleType) -> tuple[list[dict], list[tuple],
                 if not member.isfile() or not kind:
                     continue
                 data = tar.extractfile(member).read()
+                if member.name.endswith(".gz"):
+                    data = gzip.decompress(data)
                 if kind == "receipts":
                     receipts[key] = json.loads(data.decode("utf-8"))
                     continue
@@ -111,12 +120,13 @@ def _one_page(
     """Add the song of one page to `rows` and `credits`. Return '' or the reason it gives none."""
     if receipt is None:
         return "no_receipt"
-    if receipt.get("status") != 200 or receipt.get("error"):
+    if receipt.get("status", receipt.get("http_status")) != 200 or receipt.get("error"):
         return "error_status"
     url = receipt.get("url") or ""
     if site.song_id(url) is None:
         return "not_song_page"
-    html = decode(data, (receipt.get("headers") or {}).get("content-type"))
+    content_type = (receipt.get("headers") or {}).get("content-type") or receipt.get("content_type")
+    html = decode(data, content_type)
     if html is None:
         return "bad_encoding"
     row, artists, reason = site.parse_song(html, url)
@@ -125,7 +135,9 @@ def _one_page(
     if row["provider_song_id"] in rows:
         return "duplicate_url"
     evidence = receipt.get("source_evidence") or {}
-    row["retrieved_at_utc"] = evidence.get("requested_at") or receipt.get("started_at")
+    row["retrieved_at_utc"] = (
+        evidence.get("requested_at") or receipt.get("started_at") or receipt.get("started_at_utc")
+    )
     rows[row["provider_song_id"]] = row
     credits.extend(
         (row["provider_song_id"], position, artist_id, name)
