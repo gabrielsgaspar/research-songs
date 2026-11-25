@@ -1,0 +1,43 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 2,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/lrclib/20261120/",
+  "campaign_id": "20261125T171440Z",
+  "code_commit": "5290dd9107079db9ff27413f5ddff4e63ffdf33a",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-25T17:15:46Z",
+  "iso3": "KAZ",
+  "known_gaps": [
+    "close: 5 songs match a Discogs title by close spelling and wait for review"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 24 songs to add. 14 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name). 1 artists joined the roster by the Discogs home rule (country tag discogs_home_releases).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 24,
+  "run_id": "20261125T171440Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 24,
+  "songs_attempted": 29206785,
+  "songs_rejected": {
+    "already_linked": 11,
+    "close": 5,
+    "held": 1058,
+    "held_loose_title": 400,
+    "held_text": 17,
+    "no_artist_key": 1121,
+    "no_title_key": 843,
+    "no_track": 2342,
+    "not_roster": 29200222,
+    "out_of_scope": 522,
+    "same_title": 147,
+    "short_lyrics": 1,
+    "track_taken": 72
+  },
+  "source": "lrclib",
+  "started_utc": "2026-11-25T17:14:40Z",
+  "state": "complete"
+}
