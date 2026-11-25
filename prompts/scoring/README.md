@@ -49,6 +49,6 @@ Topic ids, labels and families are in [`docs/standards/topics.md`](../../docs/st
 
 - Do not change a file here without a new decision. A changed prompt or model makes new scores different from old ones.
 - The model, the reasoning effort, the three prompt files, the topic labels and definitions, and the answer format make one hash. It must equal the hash that every stored topics-only score records. A test checks it.
-- Each score records the model, the reasoning effort and the prompt hash that produced it. Scoring code skips a song that already has a score from the same model and prompt. It also copies, at no cost, the score of another song of the same country with the same lyric text and decade, because that song would get the same request.
+- Each score records the model, the reasoning effort and the prompt hash that produced it. Scoring code skips a song that already has a score from the same model and prompt, or from the old combined topics-and-values prompt that [decision 0011](../../docs/decisions/0011-combined-prompt-scores.md) accepts (`scoring_run.ACCEPTED_PROMPTS`). It also copies, at no cost, the score of another song of the same country with the same lyric text and decade, because that song would get the same request.
 - No lyric text in this folder: no examples taken from songs.
 - Tests never call the model.
