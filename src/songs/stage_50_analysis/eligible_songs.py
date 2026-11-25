@@ -33,9 +33,9 @@ filter. The rules, in the order that they are checked:
    re-release (`re_release` is true). A row that no check saw is not left out.
 9. `text_copy`: the table of text copies (`clean/quality/text_copies/<YYYYMMDD>/` in
    the data folder, the newest complete folder) lists the song: a song of any route
-   whose text another song of its country already has. A listed song that rules 6
-   to 8 already leave out reports that reason, so this count holds only the songs
-   that the old duplicate checks did not find. With no such folder, no song is left
+   whose text another song of its country already has. A listed song that an
+   earlier rule already leaves out reports that rule, so this count holds only the
+   songs that the old duplicate checks did not find. With no such folder, no song is left
    out for this reason.
 10. `entered_by_hand`: a person collected the song (route `manual_review`), and its
    country has no group in the exceptions file.

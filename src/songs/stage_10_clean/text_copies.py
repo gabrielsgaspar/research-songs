@@ -21,9 +21,13 @@ The songs of one key are a group, and one song represents the group, in this ord
 1. An older song before a campaign song. So a campaign song never takes the place
    of an older song, and the order of the older songs does not change which
    campaign songs are marked, or their reasons.
-2. Of the older songs, a song that the old pipeline did not flag (`OLD_FLAG`)
-   before a flagged song. The rule for eligible songs leaves a flagged song out, so
-   a flagged song that represents a group would leave out the whole text.
+2. Of the older songs, a song that the rule for eligible songs lets in before a
+   song that it leaves out for another reason than `text_copy`
+   (`songs.stage_50_analysis.eligible_songs.classify`, with no text copies). A song
+   left out that represents a group would leave out the whole text. The rule reads
+   its lists as `eligible_songs.load_rule` does: the tracked files in
+   `resources/lyrics/`, the newest song quarantine folder of the data folder (it
+   must exist), and the newest artist country table when the data folder has one.
 3. Of the older songs, the song with the earliest year, and a song with no year
    last. An analysis by country and year cannot use a song with no year, and the
    year of a re-release or of a cover is later than the year of the first release.
@@ -51,17 +55,15 @@ from songs.common.schemas import SAME_ARTIST_START, SAME_TEXT
 from songs.stage_50_analysis import eligible_songs
 
 ROUTE = "dump_name"
-# The rules for eligible songs by which a duplicate check of the old pipeline left a song out.
-OLD_FLAG = " OR ".join(
-    f"coalesce({eligible_songs.RULES[name]}, false)"
-    for name in ("suppressed_duplicate", "not_canonical", "re_release")
-)
 # The order of the songs of a group; `campaign` is true for the route `ROUTE`.
-ORDER = "campaign, old_flag, old_year NULLS LAST, run_id, song_id"
+ORDER = "campaign, old_left_out, old_year NULLS LAST, run_id, song_id"
+NO_COPIES = "SELECT NULL::VARCHAR AS country_iso3, NULL::VARCHAR AS song_id WHERE false"
 
 
-def country_copies(folder: Path, iso3: str) -> tuple[list[tuple], dict[str, int]]:
+def country_copies(folder: Path, iso3: str, data: Path) -> tuple[list[tuple], dict[str, int]]:
     """Return the rows of the table for one songs folder, and its counts.
+
+    `data` is the data folder whose lists the rule for eligible songs reads.
 
     A row is (country, song id, kept song id, reason). The counts are the songs read
     (`songs_in`), the campaign songs, the songs whose text has no key, the rows by
@@ -72,13 +74,14 @@ def country_copies(folder: Path, iso3: str) -> tuple[list[tuple], dict[str, int]
         connection.execute("SET memory_limit = '4GB'")
         connection.execute("SET threads = 2")
         connection.execute("SET preserve_insertion_order = false")
-        schemas.read_table(schemas.COUNTRY_SONGS, folder, connection, fill_absent=True).create_view(
-            "songs"
-        )
+        songs = schemas.read_table(schemas.COUNTRY_SONGS, folder, connection, fill_absent=True)
+        exceptions, lists = eligible_songs.load_rule(connection, data)
+        lists["text_copy"] = connection.sql(NO_COPIES)
+        eligible_songs.classify(songs, exceptions, lists).create_view("songs")
         connection.execute(
             "CREATE TEMP TABLE keyed AS SELECT song_id, artist_id, run_id, "
             f"coalesce(route = '{ROUTE}', false) AS campaign, "
-            f"NOT campaign AND ({OLD_FLAG}) AS old_flag, "
+            "NOT campaign AND ineligible_reason IS NOT NULL AS old_left_out, "
             f"CASE WHEN NOT campaign THEN year END AS old_year, {lyric_hash.text_keys_sql()} "
             "FROM songs"
         )
@@ -145,7 +148,7 @@ def check_copies(data: Path, *, write: bool = False, today: date | None = None) 
         )
         if folder is None:
             continue
-        found, one = country_copies(folder, parent.name)
+        found, one = country_copies(folder, parent.name, data)
         counts["countries"] += 1
         for name in names:
             counts[name] += one[name]

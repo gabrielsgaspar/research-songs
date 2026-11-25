@@ -538,8 +538,8 @@ TEXT_COPIES = Table(
             "string",
             True,
             "The song of the same country that represents the group: an older song before "
-            "a song of the route `dump_name`; of the older songs, one that the old pipeline "
-            "did not flag as a duplicate, then the earliest year, with no year last; then the "
+            "a song of the route `dump_name`; of the older songs, one that no other rule "
+            "for eligible songs leaves out, then the earliest year, with no year last; then the "
             "smallest `run_id` and the smallest `song_id`",
         ),
         Column(

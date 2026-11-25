@@ -11,6 +11,7 @@ from songs.cli import app
 from songs.common import manifests, paths, schemas, sync
 from songs.common.paths import DATA_ROOT_ENV
 from songs.stage_10_clean import text_copies
+from songs.stage_50_analysis import eligible_songs
 
 OLD, FIRST, LATER = "20260101T000000Z", "20260102T000000Z", "20260103T000000Z"
 START = "an invented verse that comes back again " * 10
@@ -69,12 +70,34 @@ def make_country(data: Path, iso3: str, rows: list[dict]) -> Path:
     frame = pd.DataFrame([row | {"country_iso3": iso3} for row in rows]).reindex(columns=names)
     schemas.write_table(table, schemas.cast_to_schema(table, frame), folder)
     (folder / paths.MANIFEST_NAME).write_text("{}\n", encoding="utf-8")
+    if paths.latest_clean_song_quarantine_dir(data) is None:
+        quarantine = paths.clean_song_quarantine_dir(data, "20260101")
+        quarantine.mkdir(parents=True)
+        columns = ",".join(eligible_songs.QUARANTINE_COLUMNS)
+        (quarantine / manifests.SONG_QUARANTINE_FILE).write_text(f"{columns}\n", encoding="utf-8")
+        manifests.write_manifest(data, quarantine, "clean_song_quarantine", inputs=["z"])
     return folder
+
+
+def test_a_song_that_another_rule_leaves_out_does_not_represent_the_group(tmp_path):
+    rows = [
+        song("o1", "a1", ONE, OLD) | {"year": 1899},
+        song("o2", "a1", ONE, OLD) | {"year": 1950, "quality_status": "quarantine"},
+        song("o3", "a1", ONE, OLD) | {"year": 1970},
+        song("o4", "a1", ONE, OLD) | {"year": 1980},
+    ]
+    folder = make_country(tmp_path, "TGO", rows)
+    found, _ = text_copies.country_copies(folder, "TGO", tmp_path)
+    assert {song_id: kept for _, song_id, kept, _ in found} == {
+        "o1": "o3",
+        "o2": "o3",
+        "o4": "o3",
+    }
 
 
 def test_a_song_of_any_route_is_marked_and_the_order_chooses_the_kept_song(tmp_path):
     folder = make_country(tmp_path, "TGO", SONGS)
-    rows, counts = text_copies.country_copies(folder, "TGO")
+    rows, counts = text_copies.country_copies(folder, "TGO", tmp_path)
     assert rows == EXPECTED
     assert counts == {
         "songs_in": 13,
@@ -102,7 +125,7 @@ def test_an_older_song_with_no_flag_and_the_earliest_year_represents_the_group(t
         song("c3", "a3", THREE, FIRST),
         song("c2", "a3", THREE, FIRST) | {"year": 1990},
     ]
-    found, _ = text_copies.country_copies(make_country(tmp_path, "TGO", rows), "TGO")
+    found, _ = text_copies.country_copies(make_country(tmp_path, "TGO", rows), "TGO", tmp_path)
     kept = {song_id: kept for _, song_id, kept, _ in found}
     assert kept == {
         "o1": "o6",
@@ -127,7 +150,7 @@ def test_each_linked_set_of_groups_keeps_one_song(tmp_path):
             song("c3", "a1", START + "and another end", LATER),
         ],
     )
-    rows, _ = text_copies.country_copies(folder, "TGO")
+    rows, _ = text_copies.country_copies(folder, "TGO", tmp_path)
     assert rows == [("TGO", "c2", "c1", "same_text"), ("TGO", "c3", "c1", "same_artist_start")]
 
 
@@ -146,7 +169,7 @@ def test_a_dry_check_writes_nothing_and_a_write_makes_one_folder(tmp_path):
         "copies": 6,
     }
     assert result == {"counts": counts, "by_country": {"TGO": (6, 13)}, "folder": None}
-    assert not (tmp_path / "clean").exists()
+    assert not (tmp_path / "clean" / "quality" / "text_copies").exists()
 
     result = text_copies.check_copies(tmp_path, write=True, today=date(2026, 1, 4))
     out = paths.clean_text_copies_dir(tmp_path, "20260104")
