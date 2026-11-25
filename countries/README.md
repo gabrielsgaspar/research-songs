@@ -192,6 +192,18 @@ An audit on 2026-11-24 read the 978,744 songs that campaigns added to 74 countri
 
 After a campaign, report the `held_text` count of each run record next to `rows_added`.
 
+### Lessons of the musica campaigns of 2026-11-25
+
+Four rounds of the `musica` dump for the 20 Spanish-speaking countries added 40,064 songs, about 6,460 of them from before 1990. A fifth survey added 0. Read these lessons before the next campaign with a dump that already ran.
+
+- A rule change can make an old dump worth a new run. The first round only ran the import again with the rules of the week before, and it added 20,397 songs to 10 countries. After a change to the matching rules, run `songs lyrics survey` again for every country that a dump already served.
+- The largest class of songs left out is `no_track`: the artist is on the roster with a Discogs id, but Discogs has no track with that title. A looser title match does not help. In DOM, 336 of 2,016 such songs had a Discogs title of the artist that was 50% similar or more, and almost all of them were another song.
+- Most close title matches are the same song with a spelling error. A match whose numbers differ was the most common wrong match.
+- A famous artist was often missing because its name had another form in the dump ("Jesse y Joy" against "Jesse & Joy"), because several Discogs artists had its name, or because it was on no roster. The rules of "Artists with no Discogs id", "Other names of an artist" and "Artists on no roster" now find most of them. Some are still blocked by a homonym on the roster of a country outside the Spanish-speaking world, for example Raphael (FRA), Yuri (JPN), Karina (KOR) and Lucero (USA).
+- An artist with a career in a large market, such as Mexico or Spain, can get that country from its release counts. Such an artist goes to `resources/lyrics/artist_countries.csv`, which the import now reads.
+- The small countries (BOL, CRI, ECU, GTM, HND, NIC, PAN, PRY, SLV) have large rosters with Discogs ids, but musica has songs for only a few of their artists. These countries need a new source, not new rules.
+- 368 of the 39,986 songs of the first three rounds have a text that another of the 20 countries also holds. Most are duets, such as the songs of Leiva with artists of other countries.
+
 ## Collect a lyric site
 
 A site with no dump on this disk is collected first. One collector exists, for `dainutekstai` (LTU). Only a person starts it, because it sends requests to the site:
