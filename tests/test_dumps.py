@@ -109,7 +109,7 @@ def test_a_raw_input_must_be_a_relative_dated_folder():
 def test_held_back_sources_match_the_old_lists():
     held = dumps.load_held_back()
     skipped = sorted(source for source, row in held.items() if not row.build)
-    assert skipped == ["beesona", "cuspajz", "hmpu_uy", "pesmarica"]
+    assert skipped == ["beesona", "hmpu_uy"]
     assert held["geniusru"].build and "HTTP" in held["geniusru"].reason
     assert held["aghanilyrics"].reason == "mirror of SongNu"
     assert held["joinmyjam"].build and "chord" in held["joinmyjam"].reason

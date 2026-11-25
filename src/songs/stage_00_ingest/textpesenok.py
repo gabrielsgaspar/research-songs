@@ -1,12 +1,14 @@
 """The page reader of the lyric site `textpesenok`, for `site_pages.parse_folder`."""
 
 import re
+import sys
 from html.parser import HTMLParser
 
-from songs.stage_00_ingest.dump_match import name_key
+from songs.stage_00_ingest.site_pages import song_row
 
 SOURCE = "textpesenok"
 BASE = "https://text-pesenok.ru"
+ARTIST_URL = BASE + "/artist-{}"
 COLUMNS = (
     "provider_song_id",
     "song_url",
@@ -101,28 +103,5 @@ def parse_song(html: str, url: str) -> tuple[dict | None, list[tuple[str, str]],
     page.close()
     if page.lines is None:
         return None, [], "no_lyric_block"
-    artists = list(dict.fromkeys(page.artists))
-    title = " ".join(page.title.split()) or _HEADING_END.sub("", " ".join(page.heading.split()))
-    lines = [" ".join(line.split()) for line in page.lines]
-    lyrics = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
-    if not artists:
-        return None, [], "no_artist"
-    if not title:
-        return None, [], "no_title"
-    if not name_key(lyrics):
-        return None, [], "empty_text"
-    if name_key(lyrics) in INSTRUMENTAL:
-        return None, [], "instrumental"
-    title_key = name_key(title)
-    kind = next((kind for word, kind in TITLE_KINDS if word in title_key.split()), "lyrics")
-    row = dict.fromkeys(COLUMNS)
-    row.update(
-        provider_song_id=song_id(url),
-        song_url=url,
-        song_name=title,
-        artist_name=artists[0][1],
-        artist_url=f"{BASE}/artist-{artists[0][0]}",
-        lyrics=lyrics,
-        text_kind=kind,
-    )
-    return row, artists, ""
+    title = page.title.strip() or _HEADING_END.sub("", " ".join(page.heading.split()))
+    return song_row(sys.modules[__name__], url, title, page.artists, page.lines)
