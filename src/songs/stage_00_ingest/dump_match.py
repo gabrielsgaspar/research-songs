@@ -563,6 +563,49 @@ def match_dump(dump: Path, country: Path, *, examples: int = 10) -> dict:
     }
 
 
+def credited_keys(dump: Path, song_ids: list[str]) -> dict[str, dict[str, set[str]]]:
+    """Return the artist keys of each song of the dump folder `dump` that `song_ids` names.
+
+    `keys` holds the keys through which `match_dump` can give the song a roster artist:
+    the key and the lead key (`lead_artist`) of each credited name, and the keys of the
+    names of its artist id (`_ALIAS_SQL`). `names` holds the keys of the credited
+    names, and `merged` the keys of the names of an artist id with two or more primary
+    keys. A song id that the dump lacks has no item.
+    """
+    found: dict[str, dict[str, set[str]]] = {}
+    with duckdb.connect() as connection:
+        connection.execute("SET memory_limit = '4GB'")
+        connection.execute("SET threads = 2")
+        connection.create_function(
+            "name_key", name_key, ["VARCHAR"], "VARCHAR", null_handling="special"
+        )
+        _table(connection, "wanted", "str", sorted(set(song_ids)))
+        schemas.read_table(schemas.DUMP_SONGS, dump, connection).filter(
+            "source_song_id IN (SELECT value FROM wanted)"
+        ).project("source_song_id, artist_name, source_artist_id").create("credits")
+        schemas.read_table(schemas.DUMP_ARTIST_NAMES, dump, connection).filter(
+            "source_artist_id IN (SELECT source_artist_id FROM credits)"
+        ).project("source_artist_id, name_type, name_key(artist_name) AS key").create("named")
+        names_of: dict[str, set[str]] = {}
+        for artist_id, key in connection.execute(_ALIAS_SQL).fetchall():
+            names_of.setdefault(artist_id, set()).add(key)
+        merged: dict[str, set[str]] = {}
+        for artist_id, key in connection.execute(
+            "SELECT source_artist_id, key FROM named WHERE key <> '' "
+            f"AND source_artist_id NOT IN (SELECT source_artist_id FROM ({_ALIAS_SQL}))"
+        ).fetchall():
+            merged.setdefault(artist_id, set()).add(key)
+        credits = connection.execute("SELECT * FROM credits").fetchall()
+    for song_id, name, artist_id in credits:
+        song = found.setdefault(song_id, {"keys": set(), "names": set(), "merged": set()})
+        song["names"].add(name_key(name))
+        song["keys"] |= {name_key(name), name_key(lead_artist(name)), *names_of.get(artist_id, ())}
+        song["merged"] |= merged.get(artist_id, set())
+    for song in found.values():
+        song["keys"].discard("")
+    return found
+
+
 def loose_key(title: str | None) -> str:
     """Return the title key without parts in brackets and without a featuring part.
 

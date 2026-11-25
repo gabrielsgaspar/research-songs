@@ -189,6 +189,11 @@ def clean_text_copies_dir(data: Path, day: date | str) -> Path:
     return data / "clean" / "quality" / "text_copies" / check_day(day)
 
 
+def clean_uncredited_songs_dir(data: Path, day: date | str) -> Path:
+    """Return `clean/quality/uncredited_songs/<YYYYMMDD>/`: one check of the campaign songs."""
+    return data / "clean" / "quality" / "uncredited_songs" / check_day(day)
+
+
 def country_songs_dir(data: Path, iso3: str, run_id: str) -> Path:
     """Return `lyrics/<ISO3>/songs/<run id>/`: the full state of a country after a run."""
     return data / "lyrics" / check_iso3(iso3) / "songs" / check_run_id(run_id)
@@ -270,6 +275,11 @@ def latest_clean_artist_country_dir(data: Path) -> Path | None:
 def latest_clean_text_copies_dir(data: Path) -> Path | None:
     """Return the newest complete `clean/quality/text_copies/<YYYYMMDD>/`, or None."""
     return _latest(data / "clean" / "quality" / "text_copies", DAY)
+
+
+def latest_clean_uncredited_songs_dir(data: Path) -> Path | None:
+    """Return the newest complete `clean/quality/uncredited_songs/<YYYYMMDD>/`, or None."""
+    return _latest(data / "clean" / "quality" / "uncredited_songs", DAY)
 
 
 def latest_country_songs_dir(data: Path, iso3: str) -> Path | None:

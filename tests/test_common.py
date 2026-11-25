@@ -66,12 +66,13 @@ def test_each_version_folder_has_one_path_function(tmp_path):
         paths.clean_song_quarantine_dir(tmp_path, day): "clean/quality/song_quarantine/20261105",
         paths.clean_artist_country_dir(tmp_path, day): "clean/quality/artist_country/20261105",
         paths.clean_text_copies_dir(tmp_path, day): "clean/quality/text_copies/20261105",
+        paths.clean_uncredited_songs_dir(tmp_path, day): "clean/quality/uncredited_songs/20261105",
         paths.country_songs_dir(tmp_path, "BRA", run): "lyrics/BRA/songs/20261105T140000Z",
         paths.country_scores_dir(tmp_path, "BRA", run): "lyrics/BRA/scores/20261105T140000Z",
         paths.analysis_dir(tmp_path, day): "analysis/20261105",
     }
     assert {path.relative_to(tmp_path).as_posix() for path in built} == set(built.values())
-    assert len(built) == 11
+    assert len(built) == 12
 
 
 @pytest.mark.parametrize(
@@ -144,6 +145,10 @@ def test_every_kind_of_version_folder_has_a_latest_function(tmp_path):
             paths.clean_text_copies_dir(tmp_path, day),
             paths.latest_clean_text_copies_dir(tmp_path),
         ),
+        (
+            paths.clean_uncredited_songs_dir(tmp_path, day),
+            paths.latest_clean_uncredited_songs_dir(tmp_path),
+        ),
     ]
     assert [found for _, found in pairs] == [None] * len(pairs)
     for folder, _ in pairs:
@@ -158,6 +163,7 @@ def test_every_kind_of_version_folder_has_a_latest_function(tmp_path):
     assert paths.latest_analysis_dir(tmp_path) == pairs[7][0]
     assert paths.latest_clean_artist_country_dir(tmp_path) == pairs[8][0]
     assert paths.latest_clean_text_copies_dir(tmp_path) == pairs[9][0]
+    assert paths.latest_clean_uncredited_songs_dir(tmp_path) == pairs[10][0]
 
 
 def test_workbook_folders_count_without_a_manifest(tmp_path):

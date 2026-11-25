@@ -76,6 +76,7 @@ DUMP_FOLDER = "clean/dumps/<source>/<YYYYMMDD>/"
 ANALYSIS_FOLDER = "analysis/<YYYYMMDD>/"
 ARTIST_COUNTRY_FOLDER = "clean/quality/artist_country/<YYYYMMDD>/"
 TEXT_COPIES_FOLDER = "clean/quality/text_copies/<YYYYMMDD>/"
+UNCREDITED_SONGS_FOLDER = "clean/quality/uncredited_songs/<YYYYMMDD>/"
 
 RAW_MEMBERS = Table(
     file="members.parquet",
@@ -551,6 +552,33 @@ TEXT_COPIES = Table(
     ),
 )
 
+# The reasons of `uncredited_songs.parquet`.
+MERGED_ARTIST_ID, NO_CREDIT = "merged_artist_id", "no_credit"
+
+UNCREDITED_SONGS = Table(
+    file="uncredited_songs.parquet",
+    folder=UNCREDITED_SONGS_FOLDER,
+    rows="one row per campaign song whose dump credit does not name its roster artist",
+    key=("country_iso3", "song_id"),
+    columns=(
+        Column("country_iso3", "string", True, "Country of the song"),
+        Column(
+            "song_id",
+            "string",
+            True,
+            "A song with the route `dump_name` in `songs.parquet` of the country",
+        ),
+        Column(
+            "reason",
+            "string",
+            True,
+            f"`{MERGED_ARTIST_ID}`: a name of the artist id of the credit has the key of the "
+            "roster artist, and the id holds unrelated artists. "
+            f"`{NO_CREDIT}`: no credited name has that key or starts with it",
+        ),
+    ),
+)
+
 # Name of a generated part of the standard -> the tables that it shows.
 GROUPS: dict[str, tuple[Table, ...]] = {
     "raw_tables": (RAW_MEMBERS,),
@@ -558,7 +586,7 @@ GROUPS: dict[str, tuple[Table, ...]] = {
     "score_tables": (SCORE_TOPICS, SCORE_PROVENANCE),
     "dump_tables": (DUMP_SONGS, DUMP_ARTIST_NAMES),
     "analysis_tables": (ANALYSIS_COUNTRY_YEAR, ANALYSIS_SONGS),
-    "quality_tables": (ARTIST_COUNTRY, TEXT_COPIES),
+    "quality_tables": (ARTIST_COUNTRY, TEXT_COPIES, UNCREDITED_SONGS),
 }
 TABLES: tuple[Table, ...] = tuple(table for tables in GROUPS.values() for table in tables)
 

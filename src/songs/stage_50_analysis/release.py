@@ -227,6 +227,7 @@ def build(
     for table in (
         paths.latest_clean_artist_country_dir(data),
         paths.latest_clean_text_copies_dir(data),
+        paths.latest_clean_uncredited_songs_dir(data),
     ):
         if table is not None:
             inputs.append(paths.data_relative(data, table))
