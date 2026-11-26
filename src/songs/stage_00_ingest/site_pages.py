@@ -10,8 +10,9 @@ name order, so the receipts come before the responses.
 
 A site module names `SOURCE`, `BASE`, `COLUMNS` (the lyric columns, with
 `provider_song_id`, `song_url` and `retrieved_at_utc`), `ARTIST_URL` (the artist page
-with `{}` for the artist id), `INSTRUMENTAL` and `TITLE_KINDS` (see `song_row`) and two
-functions: `song_id(url)` returns the song id of a song page URL or None, and
+with `{}` for the artist id, or a function of the artist id), `INSTRUMENTAL` and
+`TITLE_KINDS` (see `song_row`) and two functions: `song_id(url)` returns the song id of
+a song page URL or None, and
 `parse_song(html, url)` returns the row, the performers as (artist id, name) and '',
 or None, [] and the reason the page gives no song. `song_row` makes that result from
 what the page shows.
@@ -41,7 +42,16 @@ from songs.stage_00_ingest.dump_match import name_key
 from songs.stage_00_ingest.dumps import check_raw_input
 
 # The sources that have a page reader: a module of the same name in this package.
-SITES = ("cuspajz", "pesmarica", "textpesenok")
+SITES = (
+    "cuspajz",
+    "geolyrics",
+    "georgianlyrics",
+    "kyrgyzaudio",
+    "matinder",
+    "mediastar",
+    "pesmarica",
+    "textpesenok",
+)
 CREDIT_COLUMNS = ("provider_song_id", "credit_position", "provider_artist_id", "artist_name")
 _CHARSET = re.compile(rb"""charset\s*=\s*["']?([A-Za-z0-9_-]+)""")
 
@@ -87,9 +97,11 @@ def song_row(
 ) -> tuple[dict | None, list[tuple[str, str]], str]:
     """Return the row, the performers and '' of a song page, or None, [] and the reason.
 
-    `lines` are the text lines as the page shows them. A text that is a whole
-    `site.INSTRUMENTAL` value gives no row. A title word of `site.TITLE_KINDS` sets
-    `text_kind`. `columns` fill other lyric columns, such as `release_year_raw`.
+    `lines` are the text lines as the page shows them; the text squeezes spaces and keeps
+    at most one empty line between stanzas. A text that is a whole `site.INSTRUMENTAL`
+    value gives no row. A title word of `site.TITLE_KINDS` sets `text_kind`. `columns`
+    fill or replace other lyric columns, such as `release_year_raw` or `text_kind`. An
+    artist with no id (None) has no `artist_url`.
     """
     artists = list(dict.fromkeys(artists))
     title = " ".join(title.split())
@@ -105,17 +117,24 @@ def song_row(
         return None, [], "instrumental"
     words = name_key(title).split()
     kind = next((kind for word, kind in site.TITLE_KINDS if word in words), "lyrics")
+    artist_id = artists[0][0]
+    if artist_id is None:
+        artist_url = None
+    elif callable(site.ARTIST_URL):
+        artist_url = site.ARTIST_URL(artist_id)
+    else:
+        artist_url = site.ARTIST_URL.format(artist_id)
     row = dict.fromkeys(site.COLUMNS)
-    row.update(columns)
     row.update(
         provider_song_id=site.song_id(url),
         song_url=url,
         song_name=title,
         artist_name=artists[0][1],
-        artist_url=site.ARTIST_URL.format(artists[0][0]),
+        artist_url=artist_url,
         lyrics=lyrics,
         text_kind=kind,
     )
+    row.update(columns)
     return row, artists, ""
 
 

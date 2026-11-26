@@ -2217,7 +2217,59 @@ stored_path = ""
 routes = ["archive"]
 access = "unknown"
 checked = true
-notes = ""
+notes = "A site archive dated 2026-10-07 exists (raw/georgianlyrics/20261007/, 1039 pages). The page reader wrote the clean dump clean/dumps/georgianlyrics/20261125/ (413 songs). The site tags do not tell singers from composers and poets, so every person tag is a credit. 53 posts with only genre tags have no artist and are left out."
+
+[[source]]
+id = "geolyrics"
+name = "Geolyrics"
+kind = "site_archive"
+scope = "countries"
+countries = ["GEO"]
+url = "https://geolyrics.ru"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = "A Russian-language site of Georgian songs; the reader keeps the Georgian text only. A site archive dated 2026-11-16 exists (raw/geolyrics/20261116/, a test crawl of 253 pages). The page reader wrote the clean dump clean/dumps/geolyrics/20261125/ (171 songs)."
+
+[[source]]
+id = "kyrgyzaudio"
+name = "Kyrgyz Audio"
+kind = "site_archive"
+scope = "countries"
+countries = ["KGZ"]
+url = "https://kyrgyz-audio.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = "A site archive dated 2026-11-16 exists (raw/kyrgyzaudio/20261116/, 17921 pages). The page reader wrote the clean dump clean/dumps/kyrgyzaudio/20261125/ (7062 songs). 99% of the songs are in the section of Kyrgyz songs; the sections of Kazakh, Uzbek and Russian songs hold under 1% of them. The reader leaves out the books section."
+
+[[source]]
+id = "matinder"
+name = "Matinder"
+kind = "site_archive"
+scope = "countries"
+countries = ["KAZ"]
+url = "https://matinder.kz"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = "A site archive dated 2026-11-16 exists (raw/matinder/20261116/, 25698 pages). The page reader wrote the clean dump clean/dumps/matinder/20261125/ (6562 songs). 12706 song pages have no text. About 5% of the texts have no Kazakh letters, probably Russian."
+
+[[source]]
+id = "mediastar"
+name = "MediaStar"
+kind = "site_archive"
+scope = "countries"
+countries = ["KAZ"]
+url = "https://mediastar.kz"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = "A database of Kazakh songs. A site archive dated 2026-11-16 exists (raw/mediastar/20261116/, 3974 pages). The page reader wrote the clean dump clean/dumps/mediastar/20261125/ (2087 songs). The site gives 75 songs the performer \"Жасанды интеллект\" (artificial intelligence)."
 
 [[source]]
 id = "uztext"

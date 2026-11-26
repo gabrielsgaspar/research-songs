@@ -119,7 +119,11 @@ A run record may name only a source on this page. To use a new source, add its e
 | `tekstpesni` | Tekst-pesni | Countries: ARM, AZE, BLR, EST, GEO, KAZ, KGZ, LTU, LVA, MDA, RUS, TJK, TKM, UKR, UZB | archive, live, roster_update, recover | allowed, 1 s between requests | - | no | A site archive exists. The address of the site is not confirmed. |
 | `textpesenok` | [Text-pesenok](https://text-pesenok.ru) | Countries: ARM, AZE, BLR, EST, GEO, KAZ, KGZ, LTU, LVA, MDA, RUS, TJK, TKM, UKR, UZB | archive | blocked | - | yes | A site archive exists. Blocked for live runs: they returned almost no rows. |
 | `akkordlar` | [Akkordlar](https://akkordlar.az) | Countries: AZE | archive | unknown | - | yes | - |
-| `georgianlyrics` | [Georgian Lyrics](https://georgianlyrics.com) | Countries: GEO | archive | unknown | - | yes | - |
+| `georgianlyrics` | [Georgian Lyrics](https://georgianlyrics.com) | Countries: GEO | archive | unknown | - | yes | A site archive dated 2026-10-07 exists (raw/georgianlyrics/20261007/, 1039 pages). The page reader wrote the clean dump clean/dumps/georgianlyrics/20261125/ (413 songs). The site tags do not tell singers from composers and poets, so every person tag is a credit. 53 posts with only genre tags have no artist and are left out. |
+| `geolyrics` | [Geolyrics](https://geolyrics.ru) | Countries: GEO | archive | unknown | - | yes | A Russian-language site of Georgian songs; the reader keeps the Georgian text only. A site archive dated 2026-11-16 exists (raw/geolyrics/20261116/, a test crawl of 253 pages). The page reader wrote the clean dump clean/dumps/geolyrics/20261125/ (171 songs). |
+| `kyrgyzaudio` | [Kyrgyz Audio](https://kyrgyz-audio.com) | Countries: KGZ | archive | unknown | - | yes | A site archive dated 2026-11-16 exists (raw/kyrgyzaudio/20261116/, 17921 pages). The page reader wrote the clean dump clean/dumps/kyrgyzaudio/20261125/ (7062 songs). 99% of the songs are in the section of Kyrgyz songs; the sections of Kazakh, Uzbek and Russian songs hold under 1% of them. The reader leaves out the books section. |
+| `matinder` | [Matinder](https://matinder.kz) | Countries: KAZ | archive | unknown | - | yes | A site archive dated 2026-11-16 exists (raw/matinder/20261116/, 25698 pages). The page reader wrote the clean dump clean/dumps/matinder/20261125/ (6562 songs). 12706 song pages have no text. About 5% of the texts have no Kazakh letters, probably Russian. |
+| `mediastar` | [MediaStar](https://mediastar.kz) | Countries: KAZ | archive | unknown | - | yes | A database of Kazakh songs. A site archive dated 2026-11-16 exists (raw/mediastar/20261116/, 3974 pages). The page reader wrote the clean dump clean/dumps/mediastar/20261125/ (2087 songs). The site gives 75 songs the performer "Жасанды интеллект" (artificial intelligence). |
 | `uztext` | Uztext | Countries: KAZ, KGZ, TJK, TKM, UZB | archive | unknown | - | no | A site archive dated 2026-09-13 exists. The address of the site is not confirmed. |
 | `uzmatn` | Uzmatn | Countries: KAZ, KGZ, TJK, TKM, UZB | archive | unknown | - | no | A site archive dated 2026-09-13 exists. The address of the site is not confirmed. |
 
@@ -269,7 +273,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | FRA | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | GAB | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | GBR | `cuspajz`, `pesmarica` |
-| GEO | `geniusru`, `georgianlyrics`, `tekstpesni`, `textpesenok` |
+| GEO | `geniusru`, `geolyrics`, `georgianlyrics`, `tekstpesni`, `textpesenok` |
 | GIN | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | GNB | `letras` |
 | GNQ | `buenamusica`, `letras`, `musica` |
@@ -293,9 +297,9 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | JAM | `gutenberg_jamaica`, `jahlyrics`, `lyricsaz`, `mentomusic`, `reggaetranslate`, `socarecords` |
 | JOR | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | JPN | `utanet`, `utaten` |
-| KAZ | `geniusru`, `ilyrics`, `tekstpesni`, `tekstpesnionline`, `textpesenok`, `uzmatn`, `uztext` |
+| KAZ | `geniusru`, `ilyrics`, `matinder`, `mediastar`, `tekstpesni`, `tekstpesnionline`, `textpesenok`, `uzmatn`, `uztext` |
 | KEN | `bongolyrics` |
-| KGZ | `geniusru`, `ilyrics`, `tekstpesni`, `tekstpesnionline`, `textpesenok`, `uzmatn`, `uztext` |
+| KGZ | `geniusru`, `ilyrics`, `kyrgyzaudio`, `tekstpesni`, `tekstpesnionline`, `textpesenok`, `uzmatn`, `uztext` |
 | KNA | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | KOR | `bugs`, `genie`, `kpoplyrics`, `lyricscokr` |
 | KWT | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
