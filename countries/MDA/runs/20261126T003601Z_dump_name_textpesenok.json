@@ -1,0 +1,33 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 4,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/textpesenok/20261125/",
+  "campaign_id": "20261126T002549Z",
+  "code_commit": "ef7fb8aae1ccfc24974573170ba245dc4e33265a",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T00:36:50Z",
+  "iso3": "MDA",
+  "known_gaps": [],
+  "limits_hit": {},
+  "notes": "The survey estimates 7 songs to add. 6 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 7,
+  "run_id": "20261126T003601Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 7,
+  "songs_attempted": 203135,
+  "songs_rejected": {
+    "held_loose_title": 2,
+    "no_title_key": 3,
+    "no_track": 12,
+    "not_roster": 203082,
+    "same_title": 29
+  },
+  "source": "textpesenok",
+  "started_utc": "2026-11-26T00:36:01Z",
+  "state": "complete"
+}

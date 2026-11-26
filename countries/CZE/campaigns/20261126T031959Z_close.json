@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261126T031959Z",
+  "closed_utc": "2026-11-26T08:47:52Z",
+  "iso3": "CZE",
+  "next_time": "Songs added by source: karaoketexty 3257, lrclib 523, genius 515. Dump songs of roster artists with no Discogs track of their title: up to 126204; songs of artists on no roster: up to 29035691. The dumps we hold are used up under the rules of 2026-11-26 (a third round added 0 to 13 songs). Next: famous artists whose dump songs have no Discogs track; artists whose Discogs id is a homonym; for CZE and SVK, the live site supermusic; for RUS, songs before 1990 (fewer than 6,000 are held).",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 49699
+}

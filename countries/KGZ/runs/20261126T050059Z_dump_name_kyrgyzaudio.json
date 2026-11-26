@@ -1,0 +1,32 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 5,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/kyrgyzaudio/20261125/",
+  "campaign_id": "20261126T050059Z",
+  "code_commit": "ad63d03cbeb3b7fe31972c2fd37a9d24515238f8",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T05:01:10Z",
+  "iso3": "KGZ",
+  "known_gaps": [],
+  "limits_hit": {},
+  "notes": "The survey estimates 25 songs to add. 21 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name). 2 artists joined the roster by the Discogs home rule (country tag discogs_home_releases). 5 close matches added: the titles hold the same numbers, or resources/lyrics/reviewed_close_matches.csv accepts them.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 25,
+  "run_id": "20261126T050059Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 25,
+  "songs_attempted": 7062,
+  "songs_rejected": {
+    "no_track": 229,
+    "not_roster": 6796,
+    "short_lyrics": 1,
+    "track_taken": 11
+  },
+  "source": "kyrgyzaudio",
+  "started_utc": "2026-11-26T05:00:59Z",
+  "state": "complete"
+}

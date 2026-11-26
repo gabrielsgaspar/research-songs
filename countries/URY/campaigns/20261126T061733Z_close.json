@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261126T061733Z",
+  "closed_utc": "2026-11-26T14:24:44Z",
+  "iso3": "URY",
+  "next_time": "Songs added by source: genius 114, letras 85, lrclib 84, todotango 21, musica 4. Dump songs of roster artists with no Discogs track of their title: up to 12822; songs of artists on no roster: up to 29182505. The dumps we hold, letras among them, are used up under the rules of 2026-11-26 (a second round added 0 to 42 songs). The letras crawl is incomplete: a complete crawl is the largest source left for these countries. Most songs left out have no Discogs track of their title. The small countries need a new source (for example the live site buenamusica), not new rules.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 8974
+}

@@ -1,0 +1,41 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/karaoketexty/20261119/",
+  "campaign_id": "20261126T031959Z",
+  "code_commit": "ad63d03cbeb3b7fe31972c2fd37a9d24515238f8",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T08:33:10Z",
+  "iso3": "CZE",
+  "known_gaps": [
+    "close: 15 songs match a Discogs title by close spelling, but the numbers of the titles differ or a person rejected them"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 3 songs to add.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 3,
+  "run_id": "20261126T083243Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 3,
+  "songs_attempted": 251986,
+  "songs_rejected": {
+    "already_linked": 642,
+    "close": 15,
+    "held": 31470,
+    "held_loose_title": 933,
+    "held_text": 266,
+    "no_title_key": 9,
+    "no_track": 6959,
+    "not_roster": 204739,
+    "same_title": 6453,
+    "short_lyrics": 487,
+    "track_taken": 10
+  },
+  "source": "karaoketexty",
+  "started_utc": "2026-11-26T08:32:43Z",
+  "state": "complete"
+}

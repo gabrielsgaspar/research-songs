@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261125T232653Z",
+  "closed_utc": "2026-11-26T02:50:19Z",
+  "iso3": "HRV",
+  "next_time": "Songs added by source: tekstomanija 1625, tekstovipesama 577, lrclib 339, tekstovipjesama 311, genius 198, tekstovi 196, pesmarica 49, cuspajz 12. Dump songs of roster artists with no Discogs track of their title: up to 17266; songs of artists on no roster: up to 29150790. The dumps we hold are used up under the rules of 2026-11-26 (a last round added 0 or 1 song). Next: the live sites hitovi (BIH, MNE), besedilo and slolyrics (SVN); give the right Discogs id to roster artists that hold the id of a homonym (Rasta and Coby in SRB); decide where the artists on the YUG roster belong (Ekatarina Velika, Partibrejkers).",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 26998
+}

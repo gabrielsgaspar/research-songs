@@ -1,0 +1,39 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 2,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/tekstovi/20261120/",
+  "campaign_id": "20261125T230556Z",
+  "code_commit": "972da5a0c1fa1f05dec13851704ccc89c85abadf",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T01:36:54Z",
+  "iso3": "SRB",
+  "known_gaps": [
+    "close: 1 songs match a Discogs title by close spelling, but the numbers of the titles differ or a person rejected them"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 2 songs to add.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 2,
+  "run_id": "20261126T013631Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 2,
+  "songs_attempted": 76036,
+  "songs_rejected": {
+    "already_linked": 514,
+    "close": 1,
+    "held": 1306,
+    "held_loose_title": 1650,
+    "held_text": 18,
+    "no_track": 2875,
+    "not_roster": 50641,
+    "same_title": 19027,
+    "short_lyrics": 2
+  },
+  "source": "tekstovi",
+  "started_utc": "2026-11-26T01:36:31Z",
+  "state": "complete"
+}

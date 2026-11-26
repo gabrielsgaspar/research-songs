@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261126T010433Z",
+  "closed_utc": "2026-11-26T15:08:00Z",
+  "iso3": "MEX",
+  "next_time": "Songs added by source: lrclib 7052, genius 1082, letras 658, musica 288. Dump songs of roster artists with no Discogs track of their title: up to 103335; songs of artists on no roster: up to 28857167. The dumps we hold, letras among them, are used up under the rules of 2026-11-26 (a third round added 0 to a few songs). The letras crawl is incomplete: a complete crawl is the largest source left. Most songs left out have no Discogs track of their title; close-title matches of letras are the weakest class (for example 'Coração Vadio' matched 'Coração Vazio').",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 99807
+}

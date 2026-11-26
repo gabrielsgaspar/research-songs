@@ -1,0 +1,31 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/tekstpesni/20261119/",
+  "campaign_id": "20261125T225551Z",
+  "code_commit": "ef7fb8aae1ccfc24974573170ba245dc4e33265a",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-25T23:07:13Z",
+  "iso3": "UKR",
+  "known_gaps": [],
+  "limits_hit": {},
+  "notes": "The survey estimates 1 songs to add.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 1,
+  "run_id": "20261125T230651Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 1,
+  "songs_attempted": 1462,
+  "songs_rejected": {
+    "no_track": 1,
+    "not_roster": 1459,
+    "same_title": 1
+  },
+  "source": "tekstpesni",
+  "started_utc": "2026-11-25T23:06:51Z",
+  "state": "complete"
+}

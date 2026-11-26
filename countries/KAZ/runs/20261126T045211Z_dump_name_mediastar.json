@@ -1,0 +1,33 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 13,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/mediastar/20261125/",
+  "campaign_id": "20261125T232727Z",
+  "code_commit": "ad63d03cbeb3b7fe31972c2fd37a9d24515238f8",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T04:52:20Z",
+  "iso3": "KAZ",
+  "known_gaps": [],
+  "limits_hit": {},
+  "notes": "The survey estimates 19 songs to add. 1 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name). 1 close matches added: the titles hold the same numbers, or resources/lyrics/reviewed_close_matches.csv accepts them.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 19,
+  "run_id": "20261126T045211Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 19,
+  "songs_attempted": 2087,
+  "songs_rejected": {
+    "already_linked": 3,
+    "held_loose_title": 13,
+    "no_track": 62,
+    "not_roster": 1959,
+    "same_title": 31
+  },
+  "source": "mediastar",
+  "started_utc": "2026-11-26T04:52:11Z",
+  "state": "complete"
+}

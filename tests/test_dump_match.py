@@ -1158,3 +1158,58 @@ def test_the_import_and_the_survey_hold_back_a_text_copy(tmp_path):
     (record,) = run_records.read_run_records("ISL", countries)
     assert record.songs_rejected["held_text"] == 1
     assert record.songs_accepted + sum(record.songs_rejected.values()) == record.songs_attempted
+
+
+def test_spelling_key_joins_transliterations_and_skips_short_names():
+    names = ["Sherali Jo'rayev", "Sherali Juraev", "Шерали Жураев", "Sherali Dzhuraev"]
+    assert {dump_match.spelling_key(name) for name in names} == {"shrli jrv"}
+    assert dump_match.spelling_key("Sevara Nazarxon") == dump_match.spelling_key("Sevara Nazarkhan")
+    # A name of one word or of few letters gives no key; another script gives no key.
+    assert dump_match.spelling_key("Shahzoda") == ""
+    assert dump_match.spelling_key("Al Bo") == ""
+    assert dump_match.spelling_key("ცისფერი ყვავილი") == ""
+    # The last vowel stays, so "Valiev" and "Valieva" differ.
+    assert dump_match.spelling_key("Ali Valiev") != dump_match.spelling_key("Ali Valieva")
+
+
+def test_variant_keys_add_the_dump_names_that_spell_a_roster_artist_another_way(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [
+            artist("a1", "Sherali Juraev") | {"discogs_artist_id": "11"},
+            artist("a2", "Ali Valiev") | {"discogs_artist_id": "12"},
+            artist("a3", "Ali Valieva") | {"discogs_artist_id": "13"},
+        ],
+    )
+    folder = tmp_path / "discogs"
+    folder.mkdir(parents=True)
+    duckdb.sql(
+        "SELECT * FROM (VALUES (11, 'Sherali Juraev'), (12, 'Ali Valiev'), (13, 'Ali Valieva')) "
+        "AS t(artist_id, name)"
+    ).write_parquet(str(folder / "artists.parquet"))
+    dump = paths.clean_dump_dir(tmp_path, "example", "20260102")
+    names = ["Sherali Jo'rayev", "Шерали Жураев", "Ali Valiyev", "Someone Else"]
+    write(
+        schemas.DUMP_SONGS,
+        dump,
+        [
+            credit(f"d{n}", name, "Title", f"h{n}") | {"source": "example"}
+            for n, name in enumerate(names)
+        ],
+    )
+
+    without = dump_match.variant_keys(country, folder, "ISL")
+    with_dump = dump_match.variant_keys(country, folder, "ISL", dump)
+    # Each dump name is a variant of the one roster artist with its spelling key.
+    assert {key: with_dump[key] for key in with_dump.keys() - without.keys()} == {
+        "sherali jo rayev": "a1",
+        "шерали жураев": "a1",
+        "ali valiyev": "a2",
+    }
+
+
+def test_an_apostrophe_letter_is_an_apostrophe_in_a_key():
+    names = ["Sherali Joʻrayev", "Sherali Jo'rayev", "Sherali Jo’rayev", "Sherali Joʼrayev"]
+    assert {dump_match.name_key(name) for name in names} == {"sherali jo rayev"}
