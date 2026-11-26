@@ -1,0 +1,40 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 268,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/tekstomanija/20261120/",
+  "campaign_id": "20261125T230556Z",
+  "code_commit": "c0f3eebf29ac8c5bb7c1e18928f4fe20d5aff176",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-25T23:06:22Z",
+  "iso3": "SRB",
+  "known_gaps": [
+    "close: 2 songs match a Discogs title by close spelling, but the numbers of the titles differ or a person rejected them"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 4209 songs to add. 1914 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name). 91 artists joined the roster by the Discogs home rule (country tag discogs_home_releases). 247 close matches added: the titles hold the same numbers, or resources/lyrics/reviewed_close_matches.csv accepts them.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 4209,
+  "run_id": "20261125T230556Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 4209,
+  "songs_attempted": 79919,
+  "songs_rejected": {
+    "already_linked": 517,
+    "close": 2,
+    "held": 9984,
+    "held_loose_title": 1259,
+    "held_text": 400,
+    "no_track": 2818,
+    "not_roster": 51188,
+    "same_title": 9312,
+    "short_lyrics": 158,
+    "track_taken": 72
+  },
+  "source": "tekstomanija",
+  "started_utc": "2026-11-25T23:05:56Z",
+  "state": "complete"
+}
