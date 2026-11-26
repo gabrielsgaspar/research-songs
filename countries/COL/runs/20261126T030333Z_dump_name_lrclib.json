@@ -1,0 +1,43 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 352,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/lrclib/20261120/",
+  "campaign_id": "20261126T030333Z",
+  "code_commit": "ef7fb8aae1ccfc24974573170ba245dc4e33265a",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T03:08:54Z",
+  "iso3": "COL",
+  "known_gaps": [
+    "close: 13 songs match a Discogs title by close spelling, but the numbers of the titles differ or a person rejected them"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 1752 songs to add. 682 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name). 73 artists joined the roster by the Discogs home rule (country tag discogs_home_releases). 206 close matches added: the titles hold the same numbers, or resources/lyrics/reviewed_close_matches.csv accepts them.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 1752,
+  "run_id": "20261126T030333Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 1752,
+  "songs_attempted": 29206785,
+  "songs_rejected": {
+    "already_linked": 4115,
+    "close": 13,
+    "held": 28394,
+    "held_loose_title": 10991,
+    "held_text": 199,
+    "no_artist_key": 1121,
+    "no_title_key": 843,
+    "no_track": 46427,
+    "not_roster": 29045564,
+    "out_of_scope": 31419,
+    "same_title": 31731,
+    "short_lyrics": 49,
+    "track_taken": 4167
+  },
+  "source": "lrclib",
+  "started_utc": "2026-11-26T03:03:33Z",
+  "state": "complete"
+}

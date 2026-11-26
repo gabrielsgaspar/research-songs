@@ -1,0 +1,41 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 225,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/pevcheskipodsetnik/20261121/",
+  "campaign_id": "20261126T003138Z",
+  "code_commit": "ef7fb8aae1ccfc24974573170ba245dc4e33265a",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T00:32:57Z",
+  "iso3": "BGR",
+  "known_gaps": [
+    "close: 3 songs match a Discogs title by close spelling, but the numbers of the titles differ or a person rejected them"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 2694 songs to add. 295 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name). 153 artists joined the roster by the Discogs home rule (country tag discogs_home_releases). 153 close matches added: the titles hold the same numbers, or resources/lyrics/reviewed_close_matches.csv accepts them.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 2694,
+  "run_id": "20261126T003138Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 2694,
+  "songs_attempted": 132232,
+  "songs_rejected": {
+    "already_linked": 335,
+    "close": 3,
+    "held": 5938,
+    "held_loose_title": 757,
+    "held_text": 420,
+    "no_track": 4355,
+    "not_roster": 113691,
+    "out_of_scope": 1,
+    "same_title": 3956,
+    "short_lyrics": 17,
+    "track_taken": 65
+  },
+  "source": "pevcheskipodsetnik",
+  "started_utc": "2026-11-26T00:31:38Z",
+  "state": "complete"
+}
