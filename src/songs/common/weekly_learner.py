@@ -20,6 +20,7 @@ changed rules, a new rule with no test, or fewer checked rules than before.
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tomllib
@@ -305,18 +306,38 @@ def _git(root: Path, *args: str) -> str:
     return run_command([*base, *args])
 
 
+def special_paths(root: Path) -> list[str]:
+    """Return the tracked and untracked paths that are not regular files, links or folders.
+
+    The Claude Code sandbox mounts device files (such as `.bashrc`) into the checkout. Git
+    cannot add them and a patch cannot carry them, so `check` leaves them out.
+    """
+    listed = _git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+    found = []
+    for path in dict.fromkeys(p for p in listed.split("\0") if p):
+        try:
+            mode = os.lstat(root / path).st_mode
+        except FileNotFoundError:
+            continue
+        if not (stat.S_ISREG(mode) or stat.S_ISLNK(mode) or stat.S_ISDIR(mode)):
+            found.append(path)
+    return found
+
+
 def check(root: Path) -> list[str]:
     """Return every problem with the change in the working tree of `root`, against its HEAD.
 
     New files are marked with `git add --intent-to-add`, so the diff against HEAD shows them.
+    The paths of `special_paths` are left out.
     """
-    _git(root, "add", "--all", "--intent-to-add")
+    scope = ["--", ".", *(f":(top,exclude,literal){path}" for path in special_paths(root))]
+    _git(root, "add", "--all", "--intent-to-add", *scope)
     changes = []
-    for line in _git(root, "diff", "HEAD", "--name-status", "--no-renames").splitlines():
+    for line in _git(root, "diff", "HEAD", "--name-status", "--no-renames", *scope).splitlines():
         status, _, path = line.partition("\t")
         changes.append((status[:1], path))
     deleted, binary = {}, []
-    for line in _git(root, "diff", "HEAD", "--numstat", "--no-renames").splitlines():
+    for line in _git(root, "diff", "HEAD", "--numstat", "--no-renames", *scope).splitlines():
         plus, minus, path = line.split("\t", 2)
         if plus == "-" or minus == "-":
             binary.append(path)
@@ -364,6 +385,9 @@ def main(argv: list[str]) -> int:
         return 0
     if argv[:1] == ["check"] and len(argv) <= 2:
         root = Path(argv[1] if len(argv) == 2 else ".").resolve()
+        special = special_paths(root)
+        if special:
+            print(f"left out {len(special)} path(s) that are not regular files: {special}")
         problems = check(root)
         for problem in problems:
             print(f"problem: {problem}")
