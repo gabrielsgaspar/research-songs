@@ -1,0 +1,42 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 3,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/musica/20261120/",
+  "campaign_id": "20261126T022450Z",
+  "code_commit": "c592c2cfc44bb911c1bca368577a130c2d9f5ebf",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T10:09:59Z",
+  "iso3": "ARG",
+  "known_gaps": [
+    "close: 6 songs match a Discogs title by close spelling, but the numbers of the titles differ or a person rejected them"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 94 songs to add. 3 artists joined the roster by the Discogs home rule (country tag discogs_home_releases). 1 close matches added: the titles hold the same numbers, or resources/lyrics/reviewed_close_matches.csv accepts them.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 94,
+  "run_id": "20261126T100849Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 94,
+  "songs_attempted": 1036356,
+  "songs_rejected": {
+    "already_linked": 1376,
+    "close": 6,
+    "held": 28559,
+    "held_loose_title": 1815,
+    "held_text": 403,
+    "no_title_key": 27,
+    "no_track": 20710,
+    "not_roster": 974714,
+    "out_of_scope": 123,
+    "same_title": 8451,
+    "short_lyrics": 71,
+    "track_taken": 7
+  },
+  "source": "musica",
+  "started_utc": "2026-11-26T10:08:49Z",
+  "state": "complete"
+}

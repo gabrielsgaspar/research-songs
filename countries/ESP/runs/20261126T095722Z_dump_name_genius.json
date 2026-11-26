@@ -1,0 +1,42 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 2,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/genius/20261120/",
+  "campaign_id": "20261126T014240Z",
+  "code_commit": "c592c2cfc44bb911c1bca368577a130c2d9f5ebf",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T09:59:21Z",
+  "iso3": "ESP",
+  "known_gaps": [
+    "close: 19 songs match a Discogs title by close spelling, but the numbers of the titles differ or a person rejected them"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 5 songs to add.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 5,
+  "run_id": "20261126T095722Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 5,
+  "songs_attempted": 5053001,
+  "songs_rejected": {
+    "already_linked": 2026,
+    "close": 19,
+    "held": 16239,
+    "held_loose_title": 2793,
+    "held_text": 1773,
+    "no_title_key": 705,
+    "no_track": 36816,
+    "not_roster": 4964689,
+    "out_of_scope": 559,
+    "same_title": 27336,
+    "short_lyrics": 3,
+    "track_taken": 38
+  },
+  "source": "genius",
+  "started_utc": "2026-11-26T09:57:22Z",
+  "state": "complete"
+}
