@@ -1,0 +1,33 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/textpesenok/20261125/",
+  "campaign_id": "20261126T012908Z",
+  "code_commit": "ad63d03cbeb3b7fe31972c2fd37a9d24515238f8",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T05:13:26Z",
+  "iso3": "GEO",
+  "known_gaps": [],
+  "limits_hit": {},
+  "notes": "The survey estimates 1 songs to add.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 1,
+  "run_id": "20261126T051301Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 1,
+  "songs_attempted": 203135,
+  "songs_rejected": {
+    "no_title_key": 3,
+    "no_track": 1,
+    "not_roster": 203109,
+    "out_of_scope": 20,
+    "same_title": 1
+  },
+  "source": "textpesenok",
+  "started_utc": "2026-11-26T05:13:01Z",
+  "state": "complete"
+}

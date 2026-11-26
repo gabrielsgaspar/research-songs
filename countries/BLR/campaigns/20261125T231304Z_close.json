@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261125T231304Z",
+  "closed_utc": "2026-11-26T08:23:11Z",
+  "iso3": "BLR",
+  "next_time": "Songs added by source: lrclib 189, geniusru 88, genius 14, textpesenok 3. Dump songs of roster artists with no Discogs track of their title: up to 2538; songs of artists on no roster: up to 29193117. The dumps we hold are used up under the rules of 2026-11-26 (a second round added 0 to 37 songs). Most songs of the Central Asian and Caucasian dumps (uztext, matinder, kyrgyzaudio, georgianlyrics) have no Discogs track, so the next campaign needs another catalog of songs or a rule for such songs. Also decide where the artists on the SUN roster belong (for example Агата Кристи, Иверия).",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 3127
+}
