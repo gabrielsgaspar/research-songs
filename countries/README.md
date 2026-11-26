@@ -204,6 +204,19 @@ Four rounds of the `musica` dump for the 20 Spanish-speaking countries added 40,
 - The small countries (BOL, CRI, ECU, GTM, HND, NIC, PAN, PRY, SLV) have large rosters with Discogs ids, but musica has songs for only a few of their artists. These countries need a new source, not new rules.
 - 368 of the 39,986 songs of the first three rounds have a text that another of the 20 countries also holds. Most are duets, such as the songs of Leiva with artists of other countries.
 
+### Lessons of the dump campaigns of 2026-11-26
+
+Campaigns for 53 countries (the former USSR, the Balkans, Bulgaria, the Czech Republic, Slovakia, India, and the Portuguese- and Spanish-speaking countries) added 166,714 songs from the dumps we hold, in up to three rounds. A last round added 0 to 57 songs for each country. At least 32,500 of the new songs are from before 1990. BRA gained 70,113 songs (55,850 of them from `letras`), ESP 19,735, RUS 13,591 and MEX 9,080. Read these lessons before the next campaign.
+
+- Clean every saved site first. Seven archives (`cuspajz`, `pesmarica`, `kyrgyzaudio`, `matinder`, `mediastar`, `georgianlyrics`, `geolyrics`) had raw pages only. Each now has a page reader in `site_pages.SITES` and a clean dump in the bucket. The `letras` clean dump (3.2 million songs) was in the bucket only and had never been matched.
+- Check the countries that each source serves. The Russian dumps served only the Russian-language countries and the Balkan dumps did not serve MKD and SVN, so no campaign tried them there. A source entry must list every country with a real share of its songs.
+- Transliteration was the largest gain after letras. The spelling key and the Discogs name variations brought in Cyrillic and Latin spellings of one artist: RUS gained 9,432 songs from `lrclib`, which had run before. A sample of 45 artists with the most songs under another name was right, except a band and its singer (Неприкасаемые and Гарик Сукачёв) and one cover version.
+- The Uzbek apostrophe letter (ʻ) gave another name key than the plain apostrophe, so "Sherali Joʻrayev" of the roster never met "Sherali Jo'rayev" of the dump. Every apostrophe letter is now an apostrophe in a name key.
+- A homonym on the roster of a country that a dump does not serve blocked a famous artist: the German act "Olympic" blocked the Czech band. Such rosters no longer block a dump name; Olympic joined CZE with 140 songs.
+- Most songs of the Central Asian and Caucasian sites have no Discogs track, so the rule for songs with no year keeps them out: `uztext` added 2 songs of 3,841, `kyrgyzaudio` 25 of 7,062, `matinder` 293 of 6,562. These countries need another catalog of songs, not new matching rules. TJK, TKM, HND, PRY and TLS gained nothing.
+- About 7% of the `letras` songs of BRA came through a close title match, and some of them are other songs ("Coração Vadio" matched "Coração Vazio"). A rule for close titles of letras is the next quality check.
+- The famous-artist check of 1,236 artists in 30 countries found 709 covered. The gaps that remain are mostly in GEO, MOZ, UZB, ARM, MNE, MDA, AZE and KAZ, artists on the SUN or YUG roster (Ekatarina Velika, Агата Кристи), and roster artists that hold the Discogs id of a homonym (Rasta and Coby in SRB).
+
 ## Collect a lyric site
 
 A site with no dump on this disk is collected first. One collector exists, for `dainutekstai` (LTU). Only a person starts it, because it sends requests to the site:
