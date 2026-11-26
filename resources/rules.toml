@@ -43,6 +43,14 @@ tests = ["tests/test_repo_rules.py::test_fixtures_are_small"]
 part = "the size is checked; that a fixture is text is not"
 
 [[check]]
+rule = "Tests never call the network, cloud storage or a model."
+tests = [
+    "tests/test_no_network.py::test_a_connection_to_a_remote_host_is_refused",
+    "tests/test_no_network.py::test_a_connection_on_this_computer_still_works",
+]
+part = "every test refuses a connection or a name lookup outside this computer and has no proxy settings; a call through a subprocess, and the `needs_data` marker, are not checked"
+
+[[check]]
 rule = "Every text read, write and `open()`"
 tests = ["tests/test_repo_rules.py::test_text_io_names_its_encoding"]
 
