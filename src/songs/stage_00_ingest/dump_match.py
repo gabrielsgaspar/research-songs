@@ -36,7 +36,7 @@ credit it. The first title step that finds a track wins:
 
     exact           the title keys are the same
     loose           the keys are the same without parts in brackets and featuring parts
-    close           the loose keys are similar (`CLOSE_CUTOFF` or more); a person reviews these
+    close           the loose keys are similar (`CLOSE_CUTOFF` or more)
 
 A song is `held_loose_title` when the country holds a song of the same roster
 artist with the same loose key. A song is `already_linked` when a track with its
@@ -50,7 +50,9 @@ lowest release id. The year is the earlier of the release date and the year of
 its master.
 
 `import_dump` adds the `exact` and `loose` songs to the country, with the route
-`dump_name`:
+`dump_name`. It also adds a `close` song when both titles hold the same numbers in the
+same order (`same_numbers`), unless `REVIEWED_FILE` rejects it for that track, and when
+`REVIEWED_FILE` accepts it:
 
     out  lyrics/<ISO3>/songs/<run id>/   artists.parquet, songs.parquet, links.parquet,
                                          _MANIFEST.json
@@ -60,7 +62,8 @@ its Discogs track. Its run record counts every other song of the dump by class.
 A song that the import would add is left out as `artist_other_country` when the
 newest complete table of artist countries (`clean/quality/artist_country/<YYYYMMDD>/`,
 written by `songs.stage_10_clean.artist_country`) gives its roster artist the
-decision `other_country` for the country. With no such table, no song is left out.
+decision `other_country` for the country, or when `ARTIST_COUNTRIES_FILE` gives the
+artist another country. The tracked list wins over the table for an artist that it names.
 A song that the import would add is left out as `held_text` when it is a text copy
 (`songs.common.lyric_hash`) of a song that the country holds, or of a song that the
 same import adds: the two songs have the same `text_key`, for any artists, or the
@@ -129,6 +132,9 @@ MIN_HOME_RELEASES = 2
 # Jackson, Mariah Carey and Céline Dion are below 0.1% for DZA; the lowest artist of the
 # country above them, Trevor Jones for ZAF, is at 0.7% (2026-11-24).
 MIN_HOME_SHARE = 0.005
+# Of several Discogs artists with one key, one with this many times the home releases of
+# the next is taken. Of 50 such or `_stated_artists` ids, 48 were right (2026-11-25).
+DOMINANCE = 5
 # Discogs marks the second artist of one name as "Name (2)".
 _HOMONYM = r"\s\(\d+\)$"
 # The order in which the result of one roster artist wins over that of another.
@@ -140,8 +146,10 @@ ARTIST_OTHER_COUNTRY = "artist_other_country"
 # The class of a song that the import would add, whose text the country holds or the import adds.
 HELD_TEXT = "held_text"
 ROUTE = "dump_name"
-# A person's decision on each close match: accept adds the song, reject leaves it out.
+# A person's decision on a close match wins over `same_numbers`.
 REVIEWED_FILE = Path("resources") / "lyrics" / "reviewed_close_matches.csv"
+# The tracked country of an artist; it wins over the table of artist countries.
+ARTIST_COUNTRIES_FILE = Path("resources") / "lyrics" / "artist_countries.csv"
 REVIEW_COLUMNS = (
     "source",
     "country_iso3",
@@ -405,7 +413,12 @@ def _discogs_keys(connection: duckdb.DuckDBPyConnection, discogs: Path) -> str:
 
 
 def match_dump(
-    dump: Path, country: Path, *, examples: int = 10, new_artists: dict | None = None
+    dump: Path,
+    country: Path,
+    *,
+    examples: int = 10,
+    new_artists: dict | None = None,
+    variants: dict[str, str] | None = None,
 ) -> dict:
     """Classify each song of the dump folder `dump` against the country folder `country`.
 
@@ -416,6 +429,7 @@ def match_dump(
     Only the candidates are read into Python. Every other song is counted in SQL as
     not_roster, no_title_key or no_artist_key, and has no row in `songs`.
     `new_artists` (`discogs_roster.new_artists`) counts as more roster artists.
+    `variants` (`variant_keys`) gives more name keys of roster artists.
     """
     keys = dump_keys(dump)
     credits_file, alias_file, songs_file, lengths_file = (
@@ -436,6 +450,8 @@ def match_dump(
         for artist_id, name in roster:
             roster_ids.setdefault(name_key(name), set()).add(artist_id)
             roster_name[artist_id] = name
+        for key, artist_id in (variants or {}).items():
+            roster_ids.setdefault(key, set()).add(artist_id)
         held_pairs = set()
         for artist_id, artist, title in held:
             for key in (name_key(artist), name_key(roster_name.get(artist_id))):
@@ -757,30 +773,97 @@ def _home_releases(
     return {artist: (number, total) for artist, number, total in rows if number}
 
 
+def _stated_artists(discogs: Path, artist_ids: list[int], iso3: str) -> frozenset[int]:
+    """Return the Discogs artists whose profile starts by stating exactly the country `iso3`."""
+    from songs.stage_10_clean import artist_country
+
+    if not artist_ids or not (discogs / "artists.parquet").is_file():
+        return frozenset()
+    codes = artist_country.home_codes(iso3)
+    table = _quoted(discogs / "artists.parquet")
+    with duckdb.connect() as connection:
+        columns = {row[0] for row in connection.sql(f"DESCRIBE SELECT * FROM {table}").fetchall()}
+        if not {"name", "profile"} <= columns:
+            return frozenset()
+        _table(connection, "ids", "int64", artist_ids)
+        rows = connection.sql(
+            f"SELECT artist_id, name, profile FROM {table} "
+            "WHERE artist_id IN (SELECT value FROM ids)"
+        ).fetchall()
+    return frozenset(
+        number
+        for number, name, profile in rows
+        if artist_country.profile_evidence(profile, codes, (re.sub(_HOMONYM, "", name),))[0] == iso3
+    )
+
+
+def _pick_by_name(
+    hits: dict[int, str],
+    at_home: dict[int, tuple[int, int]],
+    stated: frozenset[int],
+    rows: int,
+) -> tuple[int | None, str]:
+    """Choose the Discogs artist of a name key for the `rows` roster artists that have it.
+
+    Return the Discogs id and the counter of `discogs_ids` that it adds to, or None and
+    the reason of the failure.
+    """
+    homed = sorted(
+        ((at_home[number][0], at_home[number][1], number) for number in hits if number in at_home),
+        reverse=True,
+    )
+    if len(hits) == 1 and homed:
+        return homed[0][2], ("by_same_key" if rows > 1 else "")
+    if homed:
+        number, total, best = homed[0]
+        second = homed[1][0] if len(homed) > 1 else 0
+        strong = number >= MIN_HOME_RELEASES and number >= MIN_HOME_SHARE * total
+        if strong and not second:
+            return best, "by_home_release"
+        if strong and number >= DOMINANCE * second:
+            return best, "by_dominance"
+    named = [number for number in hits if number in stated]
+    if len(named) == 1:
+        return named[0], "by_stated"
+    if len(hits) == 1:
+        return None, "no_home_release"
+    return None, "more_than_one"
+
+
 @functools.lru_cache(maxsize=8)
 def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
     """Return the Discogs id of each roster artist of a country folder, also found by name.
 
-    A roster artist with no Discogs id gets the id of a Discogs artist by name when
-    four things hold: exactly one artist in `artists.parquet` of the Discogs folder
-    has the same `name_key` (without the homonym mark " (2)"), no other roster artist
-    has that id, no other roster artist without an id has that key, and a release
-    of a home country of `iso3` credits that artist (`load_home_countries`). The
-    last rule keeps out an artist of another country with the same name. When several
-    Discogs artists have the key, the one that `MIN_HOME_RELEASES` or more releases of
-    a home country credit, at least `MIN_HOME_SHARE` of its releases, is taken when no
-    other of them has a home release, and the
-    other conditions hold; `by_home_release` counts these artists. The roster
+    A roster artist with no Discogs id gets the id of a Discogs artist with the same
+    `name_key` (without the homonym mark " (2)") in `artists.parquet` of the Discogs
+    folder. `_pick_by_name` chooses the artist of a key, in this order:
+
+    1. Exactly one Discogs artist has the key, and a release of a home country of
+       `iso3` credits it (`load_home_countries`). This keeps out an artist of another
+       country with the same name.
+    2. Several Discogs artists have the key. The one with the most home releases is
+       taken when it has `MIN_HOME_RELEASES` or more, these are at least
+       `MIN_HOME_SHARE` of its releases, and no other of them has a home release
+       (`by_home_release`) or the next has fewer than 1 in `DOMINANCE` of its home
+       releases (`by_dominance`).
+    3. Exactly one of them has a profile that starts by stating the country `iso3`
+       itself (`_stated_artists`, `by_stated`), with or without a home release. The
+       profile of a Puerto Rican artist often names the United States, so the rule
+       compares the stated country with `iso3`, not with its home codes.
+
+    Two or more roster artists of the country with the same key all get the chosen id
+    (`by_same_key` counts them when one Discogs artist has the key). No other roster
+    artist may have the id already. The roster
     of the folder is not changed: `import_dump` writes the id of an artist that gets
     a song, or that has a link of an earlier import, to the roster of its new folder.
     Such an artist stays an artist found by name in each later folder, because a link
     of it has a match method that ends
     with `BY_NAME`. Return `ids` (roster artist id -> Discogs id), `by_name` (roster
     artist id -> Discogs id and name, for the ids found by name now or by an earlier
-    import), and the roster artists that stay without an id, counted by reason:
-    `none_found`, `more_than_one`, `id_taken`, `no_home_release` and `no_name_key`.
-    A Discogs folder with no `artists.parquet` finds no id by name. A folder is
-    write-once, so the result of a folder is kept.
+    import), the counters of the steps above, and the roster artists that stay without
+    an id, counted by reason: `none_found`, `more_than_one`, `id_taken`,
+    `no_home_release` and `no_name_key`. A Discogs folder with no `artists.parquet`
+    finds no id by name. A folder is write-once, so the result of a folder is kept.
     """
     with duckdb.connect() as connection:
         roster = _rows(
@@ -814,44 +897,128 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
                 found.setdefault(key, {})[number] = name
     result = {"none_found": 0, "more_than_one": 0, "id_taken": 0}
     result["no_name_key"] = sum(not key for key in missing.values())
-    shared = Counter(missing.values())
-    taken = set(ids.values())
-    alone, several = {}, {}
+    rows_of: dict[str, list[str]] = {}
     for artist_id, key in missing.items():
-        hits = found.get(key, {})
-        if not key:
-            continue
-        if not hits:
-            result["none_found"] += 1
-        elif len(hits) > 1:
-            several[artist_id] = hits
-        elif shared[key] > 1 or next(iter(hits)) in taken:
-            result["id_taken"] += 1
-        else:
-            alone[artist_id] = next(iter(hits.items()))
+        if key:
+            rows_of.setdefault(key, []).append(artist_id)
+    taken = set(ids.values())
     home = load_home_countries().get(iso3, frozenset())
-    wanted = {pair[0] for pair in alone.values()} | {n for hits in several.values() for n in hits}
-    at_home = _home_releases(discogs, sorted(wanted), home)
-    found_now = {key: pair for key, pair in alone.items() if pair[0] in at_home}
-    result["no_home_release"] = len(alone) - len(found_now)
-    result["by_home_release"] = 0
-    for artist_id, hits in several.items():
-        homed = [number for number in hits if number in at_home]
-        one = homed[0] if len(homed) == 1 else None
-        if (
-            one
-            and at_home[one][0] >= MIN_HOME_RELEASES
-            and at_home[one][0] >= MIN_HOME_SHARE * at_home[one][1]
-            and shared[missing[artist_id]] == 1
-            and one not in taken
-        ):
-            found_now[artist_id] = (one, hits[one])
-            result["by_home_release"] += 1
-        else:
-            result["more_than_one"] += 1
+    wanted = sorted({number for key in rows_of for number in found.get(key, {})})
+    at_home = _home_releases(discogs, wanted, home)
+    stated = _stated_artists(discogs, wanted, iso3)
+    found_now: dict[str, tuple[int, str]] = {}
+    for name in ("by_home_release", "by_dominance", "by_same_key", "by_stated"):
+        result[name] = 0
+    result["no_home_release"] = 0
+    for key, artists in rows_of.items():
+        hits = found.get(key, {})
+        if not hits:
+            result["none_found"] += len(artists)
+            continue
+        if len(hits) == 1 and next(iter(hits)) in taken:
+            result["id_taken"] += len(artists)
+            continue
+        pick, reason = _pick_by_name(hits, at_home, stated, len(artists))
+        if pick is None or pick in taken:
+            failed = "id_taken" if pick in taken else reason
+            result[failed] += len(artists)
+            continue
+        if reason:
+            result[reason] += len(artists)
+        for artist_id in artists:
+            found_now[artist_id] = (pick, hits[pick])
     result["by_name"] = stored | found_now
     result["ids"] = ids | {artist_id: pair[0] for artist_id, pair in found_now.items()}
     return result
+
+
+# A leading article that a name can have or lack: "Los Temerarios" and "Temerarios".
+ARTICLES = ("el", "la", "los", "las")
+# A word that joins two names of a duo; "&" has no key.
+JOINING_WORDS = ("y", "and", "e")
+# A variant key needs this many characters.
+MIN_VARIANT_CHARS = 4
+
+
+@functools.lru_cache(maxsize=8)
+def variant_keys(country: Path, discogs: Path, iso3: str) -> dict[str, str]:
+    """Return more name keys of the roster artists with a Discogs id: key -> roster artist id.
+
+    A roster artist with a Discogs id (`discogs_ids`) also matches a dump credit under
+    each name variation of that id (`artist_namevariations.parquet`), each credit name
+    of it on a release (`anv` of `release_artists.parquet`), its name with or without
+    a leading article (`ARTICLES`), its name without `JOINING_WORDS` ("Alexis y Fido"
+    matches "Alexis & Fido"), and its name without text in brackets. A variant key
+    has `MIN_VARIANT_CHARS` or more characters, is the key of no roster artist of the
+    country, and comes from one Discogs id only. A variant of one word must also be the
+    key of no other Discogs artist, because a single name such as "Soraya" is often the
+    name of several artists. The songs still need a title match with a track of that
+    Discogs id. In a sample of 40
+    artists of the Spanish-speaking countries with the most songs added this way, 33
+    were right and 7 doubtful (2026-11-25).
+    """
+    with duckdb.connect() as connection:
+        roster = _rows(
+            schemas.read_table(schemas.COUNTRY_ARTISTS, country, connection),
+            "artist_id, artist_name",
+        )
+    ids = discogs_ids(country, discogs, iso3)["ids"]
+    own = {name_key(name) for _, name in roster}
+    first: dict[int, str] = {}
+    found: dict[str, set[int]] = {}
+    for artist_id, name in sorted(roster):
+        if artist_id not in ids:
+            continue
+        first.setdefault(ids[artist_id], artist_id)
+        key = name_key(name)
+        article, _, rest = key.partition(" ")
+        bare = {rest} if article in ARTICLES and rest else {f"{word} {key}" for word in ARTICLES}
+        unbracketed = name_key(re.sub(r"\([^)]*\)|\[[^]]*\]", " ", name))
+        # "&" has no key, so "Rakim & Ken-Y" gives "rakim ken y": drop an inner "y" too.
+        words = unbracketed.split()
+        inner = [word for word in words[1:-1] if word not in JOINING_WORDS]
+        joined = " ".join(words[:1] + inner + words[-1:]) if len(words) > 2 else unbracketed
+        for variant in {*bare, joined, unbracketed}:
+            found.setdefault(variant, set()).add(ids[artist_id])
+    names: list[tuple[int, str]] = []
+    # The Discogs table and its column with another name of the artist.
+    sources = {"artist_namevariations": "namevariation", "release_artists": "anv"}
+    with duckdb.connect() as connection:
+        _table(connection, "ids", "int64", sorted(first))
+        for table, column in sources.items():
+            path = _quoted(discogs / f"{table}.parquet")
+            if not (discogs / f"{table}.parquet").is_file():
+                continue
+            columns = {
+                row[0] for row in connection.sql(f"DESCRIBE SELECT * FROM {path}").fetchall()
+            }
+            if {"artist_id", column} <= columns:
+                names += connection.sql(
+                    f"SELECT DISTINCT artist_id, {column} FROM {path} "
+                    f"WHERE artist_id IN (SELECT value FROM ids) AND {column} <> ''"
+                ).fetchall()
+    for number, name in names:
+        found.setdefault(name_key(name), set()).add(number)
+    found = {
+        key: numbers
+        for key, numbers in found.items()
+        if len(key) >= MIN_VARIANT_CHARS and key not in own
+    }
+    single = sorted(key for key, numbers in found.items() if len(numbers) == 1 and " " not in key)
+    others: dict[str, set[int]] = {}
+    if single and (discogs / "artists.parquet").is_file():
+        with duckdb.connect() as connection:
+            _table(connection, "single", "str", single)
+            for number, key in connection.sql(
+                f"SELECT artist_id, key FROM {_discogs_keys(connection, discogs)} "
+                "WHERE key IN (SELECT value FROM single)"
+            ).fetchall():
+                others.setdefault(key, set()).add(number)
+    return {
+        key: first[next(iter(numbers))]
+        for key, numbers in sorted(found.items())
+        if len(numbers) == 1 and (" " in key or others.get(key, set()) <= numbers)
+    }
 
 
 def match_discogs(
@@ -1075,6 +1242,18 @@ def _ids_of_earlier_links(country: Path, named: dict[str, tuple]) -> dict[str, s
     return {row[0]: str(named[row[0]][0]) for row in linked if row[0] in named}
 
 
+_NUMBERS = re.compile(r"\d+")
+
+
+def same_numbers(title: str, other: str) -> bool:
+    """Return True when the two titles hold the same numbers in the same order.
+
+    A close title match whose numbers differ ("Saludo 2010" and "Saludo 2004") was the
+    most common wrong match in a sample of close matches of 2026-11-25.
+    """
+    return _NUMBERS.findall(title or "") == _NUMBERS.findall(other or "")
+
+
 def load_reviewed_matches(root: Path | None = None) -> dict[tuple[str, ...], str]:
     """Return the decision on each reviewed close match.
 
@@ -1097,27 +1276,34 @@ def load_reviewed_matches(root: Path | None = None) -> dict[tuple[str, ...], str
     return decisions
 
 
-def other_country_artists(data: Path, iso3: str) -> tuple[Path | None, frozenset[str]]:
+def other_country_artists(
+    data: Path, iso3: str, root: Path | None = None
+) -> tuple[Path | None, frozenset[str]]:
     """Return the roster artists of a country that belong to another country.
 
     The first value is the newest complete table of artist countries of the data
-    folder, and the second holds each `artist_id` with the decision `other_country`
-    for `iso3`. With no such table, return None and no artist.
+    folder, or None. The second holds each `artist_id` with the decision `other_country`
+    for `iso3` in that table, and each artist that `ARTIST_COUNTRIES_FILE` gives another
+    country. The tracked list wins over the table for an artist that it names, as in the
+    rule for eligible songs.
     """
+    paths.check_iso3(iso3)
+    path = (root or paths.resolve_project_root()) / ARTIST_COUNTRIES_FILE
+    with path.open(encoding="utf-8", newline="") as handle:
+        named = {line["artist_id"]: line["country_iso3"] for line in csv.DictReader(handle)}
     folder = paths.latest_clean_artist_country_dir(data)
-    if folder is None:
-        return None, frozenset()
-    with duckdb.connect() as connection:
-        rows = (
-            schemas.read_table(schemas.ARTIST_COUNTRY, folder, connection)
-            .filter(
-                f"country_iso3 = '{paths.check_iso3(iso3)}' "
-                f"AND decision = '{schemas.OTHER_COUNTRY}'"
+    checked: set[str] = set()
+    if folder is not None:
+        with duckdb.connect() as connection:
+            rows = (
+                schemas.read_table(schemas.ARTIST_COUNTRY, folder, connection)
+                .filter(f"country_iso3 = '{iso3}' AND decision = '{schemas.OTHER_COUNTRY}'")
+                .project("artist_id")
+                .fetchall()
             )
-            .project("artist_id")
-            .fetchall()
-        )
-    return folder, frozenset(row[0] for row in rows)
+        checked = {row[0] for row in rows}
+    tracked = {artist for artist, country in named.items() if country != iso3}
+    return folder, frozenset((checked - named.keys()) | tracked)
 
 
 def held_text(dump: Path, country: Path, artists: dict[str, str]) -> set[str]:
@@ -1189,7 +1375,8 @@ def would_add(
     """Decide which songs of the dump folder `dump` an import adds to the folder `country`.
 
     A song is added when `match_discogs` gives it the class `exact` or `loose`, or
-    the class `close` and `REVIEWED_FILE` accepts it for the same Discogs track.
+    the class `close` and `REVIEWED_FILE` accepts it for the same Discogs track. A
+    `close` song that `REVIEWED_FILE` does not name is added when `same_numbers` holds.
     `reviewed` replaces the decisions of that file (for tests). Such a song of a roster
     artist in `other_country` (`other_country_artists`) is not added; it gets the class
     `ARTIST_OTHER_COUNTRY`. Of the songs left, a text copy (`held_text`) gets the class
@@ -1202,13 +1389,20 @@ def would_add(
     (`discogs_roster.new_artists`) count as roster artists; `new_artists` of the result
     holds those of them that get a song.
     """
-    result = match_dump(dump, country, new_artists=new_artists)
+    result = match_dump(
+        dump, country, new_artists=new_artists, variants=variant_keys(country, discogs, iso3)
+    )
     found = match_discogs(result["songs"], country, discogs, iso3, new_artists)
     reviewed = load_reviewed_matches() if reviewed is None else reviewed
 
+    titles = {song["source_song_id"]: song["song_name"] for song in result["songs"]}
+
     def accepted(row: dict) -> bool:
         key = (source, iso3, row["source_song_id"], row.get("discogs_release_id", ""))
-        return reviewed.get((*key, row.get("discogs_track_index", ""))) == "accept"
+        decision = reviewed.get((*key, row.get("discogs_track_index", "")))
+        if decision is not None:
+            return decision == "accept"
+        return same_numbers(titles[row["source_song_id"]], row.get("discogs_title", ""))
 
     def adds(row: dict) -> bool:
         return row["discogs_class"] in ADDED or (row["discogs_class"] == "close" and accepted(row))
@@ -1290,7 +1484,6 @@ def survey(data: Path, iso3: str, sources: list[str], discogs: Path | None = Non
         raise FileNotFoundError(f"no songs folder of {iso3}")
     discogs = _discogs_folder(data, discogs)
     _, other_country = other_country_artists(data, iso3)
-    new_artists = discogs_roster.new_artists(data, discogs, iso3)
     rows = []
     for source in sources:
         dump = paths.latest_clean_dump_dir(data, source)
@@ -1298,6 +1491,7 @@ def survey(data: Path, iso3: str, sources: list[str], discogs: Path | None = Non
             rows.append({"source": source, "dump": None})
             continue
         start = time.monotonic()
+        new_artists = discogs_roster.new_artists(data, discogs, iso3, dump=dump)
         plan = would_add(dump, country, discogs, source, iso3, None, other_country, new_artists)
         rows.append(
             {
@@ -1454,7 +1648,7 @@ def import_dump(
         manifests.read_manifest(dump)
         manifests.read_manifest(earlier)
         table, other_country = other_country_artists(data, iso3)
-        new_artists = discogs_roster.new_artists(data, discogs, iso3)
+        new_artists = discogs_roster.new_artists(data, discogs, iso3, dump=dump)
         plan = would_add(dump, earlier, discogs, source, iso3, reviewed, other_country, new_artists)
         rejected, close_accepted, by_name = (
             plan["rejected"],
@@ -1503,7 +1697,7 @@ def import_dump(
         if rejected["close"]:
             record.known_gaps.append(
                 f"close: {rejected['close']} songs match a Discogs title by close "
-                "spelling and wait for review"
+                "spelling, but the numbers of the titles differ or a person rejected them"
             )
         if by_name:
             record.notes = (
@@ -1517,7 +1711,7 @@ def import_dump(
             ).strip()
         if close_accepted:
             record.notes = (
-                f"{record.notes} {close_accepted} close matches added after review "
-                f"({REVIEWED_FILE.as_posix()})."
+                f"{record.notes} {close_accepted} close matches added: the titles hold the "
+                f"same numbers, or {REVIEWED_FILE.as_posix()} accepts them."
             ).strip()
     return {"path": out, "songs_attempted": plan["songs_in"], "rejected": rejected, **counts}

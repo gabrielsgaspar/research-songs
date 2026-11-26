@@ -1,0 +1,8 @@
+{
+  "campaign_id": "20261125T194434Z",
+  "goal": "Add every musica song that maps to a Discogs track and artist, with the rules for Discogs ids, name variants and dump artists.",
+  "iso3": "BOL",
+  "opened_utc": "2026-11-25T19:44:34Z",
+  "schema_version": 1,
+  "songs_before": 2165
+}

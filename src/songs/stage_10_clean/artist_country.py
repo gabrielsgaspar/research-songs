@@ -56,7 +56,7 @@ WORD_COLUMNS = ("country_iso3", "word")
 PROFILE_CHARS = 160
 MAX_HOME_SHARE = 0.2
 # Country -> more countries that count as its home in the profile text.
-ALSO_HOME = {"DDR": ("DEU",)}
+ALSO_HOME = {"DDR": ("DEU",), "PRI": ("USA",)}
 # Phrases with a country word that say nothing about the country of an artist.
 IGNORED_PHRASES = (
     "New Jersey",

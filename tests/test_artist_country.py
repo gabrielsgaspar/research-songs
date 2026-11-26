@@ -242,6 +242,9 @@ def test_a_home_word_protects_the_artist():
     assert profile_evidence("Syrian singer", home) == ("SYR", False)
     assert "DEU" in artist_country.home_codes("DDR")
     assert "DDR" in artist_country.home_codes("DEU")
+    # Puerto Rico is a US territory: a "New York based" profile is no other country.
+    assert "USA" in artist_country.home_codes("PRI")
+    assert "PRI" not in artist_country.home_codes("USA")
     assert artist_country.home_codes("SUN") == {"SUN"}
 
 

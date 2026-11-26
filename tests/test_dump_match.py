@@ -244,8 +244,12 @@ def test_cli_prints_counts_and_no_lyrics(tmp_path, monkeypatch):
     assert "invented line" not in result.output
 
 
-def write_discogs(folder: Path) -> None:
-    """Invented Discogs tables with the column names of the Discogs dump."""
+def write_discogs(folder: Path, close_title: str = "Another New Song 2") -> None:
+    """Invented Discogs tables with the column names of the Discogs dump.
+
+    `close_title` is the track that the dump song "Another New Song" matches by close
+    spelling. The default holds a number that the dump title lacks.
+    """
     folder.mkdir(parents=True)
     tables = {
         "release_artists": "SELECT * FROM (VALUES (100, 11), (200, 11), (900, 11)) "
@@ -255,7 +259,7 @@ def write_discogs(folder: Path) -> None:
         "release_tracklist": "SELECT * FROM (VALUES (100, 1, 'Sól Sól'), "
         "(100, 2, 'Morning Light (Remix)'), (200, 1, 'Sól, sól!'), (200, 2, 'Riverside'), "
         "(300, 1, 'Other Artist Song'), (300, 2, 'Night Train'), (900, 1, 'Old Song'), "
-        "(200, 3, 'A New Song'), (100, 3, 'Duet (Radio Edit)'), (200, 4, 'Another New Sng'), "
+        f"(200, 3, 'A New Song'), (100, 3, 'Duet (Radio Edit)'), (200, 4, '{close_title}'), "
         "(100, 4, 'Encore'), (100, 5, 'Encore (Live)')) "
         "AS t(release_id, track_index, title)",
         "releases": "SELECT * FROM (VALUES (100, 50, '1999-05-00'), (200, NULL, '1995'), "
@@ -446,10 +450,15 @@ def test_import_dump_leaves_out_the_songs_of_an_artist_of_another_country(tmp_pa
             for code, decision in (("ISL", schemas.OTHER_COUNTRY), ("NOR", schemas.KEEP))
         ],
     )
-    assert dump_match.other_country_artists(data, "ISL") == (None, frozenset())
+    repo = tmp_path / "repo"
+    (repo / dump_match.ARTIST_COUNTRIES_FILE).parent.mkdir(parents=True)
+    (repo / dump_match.ARTIST_COUNTRIES_FILE).write_text(
+        "artist_id,country_iso3\n", encoding="utf-8"
+    )
+    assert dump_match.other_country_artists(data, "ISL", repo) == (None, frozenset())
     manifests.write_manifest(data, table, "clean_artist_country", inputs=["lyrics/isl/"])
-    assert dump_match.other_country_artists(data, "ISL") == (table, frozenset({"a1"}))
-    assert dump_match.other_country_artists(data, "NOR") == (table, frozenset())
+    assert dump_match.other_country_artists(data, "ISL", repo) == (table, frozenset({"a1"}))
+    assert dump_match.other_country_artists(data, "NOR", repo) == (table, frozenset())
 
     (found,) = survey(data, "ISL", ["kasilyrics"], tmp_path / "discogs")
     assert (found["would_add"], found["rejected"]["artist_other_country"]) == (0, 2)
@@ -466,7 +475,31 @@ def test_import_dump_leaves_out_the_songs_of_an_artist_of_another_country(tmp_pa
     assert record.songs_accepted + sum(record.songs_rejected.values()) == record.songs_attempted
 
 
-def import_with_review(root: Path, reviewed: dict) -> dict:
+def test_the_tracked_artist_countries_win_over_the_table_in_the_import(tmp_path):
+    data = tmp_path / "data"
+    table = paths.clean_artist_country_dir(data, "20260103")
+    evidence = {"stated_country": "", "home_word": False, "releases": 0, "releases_home": 0}
+    write(
+        schemas.ARTIST_COUNTRY,
+        table,
+        [
+            evidence
+            | {"country_iso3": "ISL", "artist_id": artist, "discogs_artist_id": "11"}
+            | {"top_release_country": "", "decision": schemas.OTHER_COUNTRY}
+            for artist in ("a1", "a2")
+        ],
+    )
+    manifests.write_manifest(data, table, "clean_artist_country", inputs=["lyrics/isl/"])
+    tracked = tmp_path / "repo" / dump_match.ARTIST_COUNTRIES_FILE
+    tracked.parent.mkdir(parents=True)
+    tracked.write_text("artist_id,country_iso3\na1,ISL\na3,NOR\n", encoding="utf-8")
+    folder, other = dump_match.other_country_artists(data, "ISL", root=tmp_path / "repo")
+    assert (folder, other) == (table, frozenset({"a2", "a3"}))
+    # An artist that the list gives ISL belongs to another country for NOR.
+    assert dump_match.other_country_artists(data, "NOR", root=tmp_path / "repo")[1] == {"a1"}
+
+
+def import_with_review(root: Path, reviewed: dict, close_title: str = "Another New Song 2") -> dict:
     data = root / "data"
     dump, country = make_folders(data, "kasilyrics")
     manifests.write_manifest(
@@ -475,7 +508,7 @@ def import_with_review(root: Path, reviewed: dict) -> dict:
     manifests.write_manifest(
         data, country, "country_songs", country_iso3="ISL", run_id=RUN, inputs=["lyrics/isl/"]
     )
-    write_discogs(root / "discogs")
+    write_discogs(root / "discogs", close_title)
     return import_dump(
         data,
         "kasilyrics",
@@ -504,6 +537,35 @@ def test_import_dump_adds_a_close_match_only_for_the_reviewed_track(tmp_path):
     ).fetchall()
     assert method == [("dump_discogs_close_title",)]
     assert manifests.read_manifest(result["path"]).counts["dump_songs_close_accepted"] == 1
+
+
+def test_import_dump_adds_a_close_match_with_the_same_numbers_unless_a_person_rejects_it(
+    tmp_path,
+):
+    result = import_with_review(tmp_path / "a", {}, close_title="Another New Sng")
+    assert result["songs_added"] == 3
+    method = duckdb.sql(
+        f"SELECT match_method FROM '{(result['path'] / 'links.parquet').as_posix()}' "
+        "WHERE source_song_id = 'd4'"
+    ).fetchall()
+    assert method == [("dump_discogs_close_title",)]
+    (record,) = run_records.read_run_records("ISL", tmp_path / "a" / "countries")
+    assert "1 close matches added: the titles hold the same numbers" in record.notes
+    assert "close" not in record.songs_rejected
+    rejected = import_with_review(
+        tmp_path / "b",
+        {("kasilyrics", "ISL", "d4", "200", "4"): "reject"},
+        close_title="Another New Sng",
+    )
+    assert rejected["songs_added"] == 2
+
+
+def test_same_numbers_compares_the_numbers_of_two_titles_in_order():
+    assert dump_match.same_numbers("Las 7 AM", "Las 7 a.m.")
+    assert dump_match.same_numbers("Pobre de mi", "Podre De Mi")
+    assert not dump_match.same_numbers("Saludo 2010 (En Vivo)", "Saludo 2004")
+    assert not dump_match.same_numbers("03 - Tormenta de mar", "Tormenta De Mar")
+    assert not dump_match.same_numbers("Escena 1 y 2", "Escena 2 y 1")
 
 
 def complete_folders(data: Path) -> Path:
@@ -786,6 +848,99 @@ def test_of_artists_with_one_name_the_only_one_with_home_releases_gets_the_id(tm
     assert (found["by_home_release"], found["more_than_one"]) == (1, 3)
 
 
+def test_variant_keys_add_discogs_name_variations_and_articles_of_roster_artists(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [
+            artist("a1", "Los Temerarios") | {"discogs_artist_id": "11"},
+            artist("a2", "Sora Ruiz") | {"discogs_artist_id": "12"},
+            artist("a3", "Temerarios Band"),
+            artist("a4", "Rakim y Ken-Y (Dúo)") | {"discogs_artist_id": "15"},
+        ],
+    )
+    folder = tmp_path / "discogs"
+    folder.mkdir(parents=True)
+    tables = {
+        "artists": "SELECT * FROM (VALUES (11, 'Los Temerarios'), (12, 'Sora Ruiz'), "
+        "(14, 'Sora'), (15, 'Rakim Y Ken-Y')) AS t(artist_id, name)",
+        "artist_namevariations": "SELECT * FROM (VALUES (11, 'Temerarios Band'), "
+        "(12, 'Sora'), (12, 'Ruiz')) AS t(artist_id, namevariation)",
+        "release_artists": "SELECT * FROM (VALUES (1, 11, 'Los Temerarios', 'Temerarios Y Su "
+        "Grupo')) AS t(release_id, artist_id, artist_name, anv)",
+    }
+    for name, sql in tables.items():
+        duckdb.sql(sql).write_parquet(str(folder / f"{name}.parquet"))
+
+    variants = dump_match.variant_keys(country, folder, "ISL")
+
+    # A roster name loses or gets an article. A roster key ("temerarios band") and a single
+    # word that is the key of another Discogs artist ("sora", artist 14) are no variants.
+    assert variants == {
+        "temerarios": "a1",
+        "temerarios y su grupo": "a1",
+        "el sora ruiz": "a2",
+        "la sora ruiz": "a2",
+        "las sora ruiz": "a2",
+        "los sora ruiz": "a2",
+        "ruiz": "a2",
+        "rakim ken y": "a4",
+        "rakim y ken y": "a4",
+        "el rakim y ken y duo": "a4",
+        "la rakim y ken y duo": "a4",
+        "las rakim y ken y duo": "a4",
+        "los rakim y ken y duo": "a4",
+    }
+
+
+def test_a_dominant_artist_a_shared_key_and_a_stated_country_give_an_id(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [
+            artist("a1", "Lola"),
+            artist("a2", "Sol"),
+            artist("a3", "SOL"),
+            artist("a4", "Rita"),
+            artist("a5", "Vera"),
+        ],
+    )
+    folder = tmp_path / "discogs"
+    folder.mkdir(parents=True)
+    artists = (
+        "(71, 'Lola', ''), (72, 'Lola (2)', ''), (81, 'Sol', ''), "
+        "(91, 'Rita', 'Icelandic singer from Reykjavik.'), (92, 'Rita (2)', 'American singer.'), "
+        "(95, 'Vera', ''), (96, 'Vera (2)', '')"
+    )
+    duckdb.sql(f"SELECT * FROM (VALUES {artists}) AS t(artist_id, name, profile)").write_parquet(
+        str(folder / "artists.parquet")
+    )
+    # 71 has 10 home releases and 72 has 2: 71 has 5 times the home releases of 72.
+    # 95 has 6 home releases and 96 has 2: under 5 times, so Vera gets no id.
+    credits = [(n, 71) for n in range(1, 11)] + [(11, 72), (12, 72), (13, 81)]
+    credits += [(n, 95) for n in range(20, 26)] + [(26, 96), (27, 96)]
+    duckdb.sql(
+        "SELECT * FROM (VALUES "
+        + ", ".join(f"({release}, {number})" for release, number in credits)
+        + ") AS t(release_id, artist_id)"
+    ).write_parquet(str(folder / "release_artists.parquet"))
+    duckdb.sql(
+        "SELECT range AS release_id, NULL::BIGINT AS master_id, '1990' AS released, "
+        "'Iceland' AS country FROM range(1, 30)"
+    ).write_parquet(str(folder / "releases.parquet"))
+    duckdb.sql(
+        "SELECT * FROM (VALUES (1, 1, 1)) AS t(release_id, track_index, artist_id) WHERE false"
+    ).write_parquet(str(folder / "release_track_artists.parquet"))
+
+    found = dump_match.discogs_ids(country, folder, "ISL")
+
+    assert found["ids"] == {"a1": 71, "a2": 81, "a3": 81, "a4": 91}
+    assert (found["by_dominance"], found["by_same_key"], found["by_stated"]) == (1, 2, 1)
+    assert found["more_than_one"] == 1
+
+
 def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_path):
     country = tmp_path / "country"
     write(
@@ -819,11 +974,12 @@ def test_a_discogs_id_is_found_by_name_only_when_one_artist_has_the_name(tmp_pat
     # One artist with the name, with or without the homonym mark: the id is used.
     assert found["by_name"] == {"a2": (21, "BÁRA (2)")}
     assert found["ids"] == {"a1": 11, "a2": 21}
-    # Two homonyms block. An id of another roster artist blocks, and so does a shared name.
-    assert (found["more_than_one"], found["id_taken"]) == (3, 3)
+    # Two homonyms with no home release block. An id of another roster artist blocks.
+    assert (found["more_than_one"], found["id_taken"]) == (3, 1)
     assert (found["none_found"], found["no_name_key"]) == (1, 1)
-    # The only Discogs artist with the name has no release in Iceland: the id is not used.
-    assert found["no_home_release"] == 1
+    # The only Discogs artist with the name has no release in Iceland: the id is not used,
+    # for Hanna and for the two roster artists that share the key of Gunnar.
+    assert found["no_home_release"] == 3
     assert dump_match.discogs_ids(country, tmp_path / "discogs", "USA")["by_name"] == {
         "a11": (81, "Hanna")
     }

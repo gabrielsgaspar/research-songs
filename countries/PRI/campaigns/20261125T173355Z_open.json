@@ -1,0 +1,8 @@
+{
+  "campaign_id": "20261125T173355Z",
+  "goal": "Add every musica song that maps to a Discogs track and artist, with the rules of pull requests 108 and 111.",
+  "iso3": "PRI",
+  "opened_utc": "2026-11-25T17:33:55Z",
+  "schema_version": 1,
+  "songs_before": 28460
+}

@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261125T172529Z",
+  "closed_utc": "2026-11-25T20:10:52Z",
+  "iso3": "MEX",
+  "next_time": "musica is used up under the rules of 2026-11-25: 4 musica runs added 10383 songs, and a new survey adds 0. Of the musica songs of roster artists, 30245 have no Discogs track with their title and 10 have an artist with no Discogs id; 9 close title matches have other numbers. More songs need a new source (build the letras dump), or Discogs tracks for these titles. lrclib and genius were not run again with the new rules.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 90727
+}
