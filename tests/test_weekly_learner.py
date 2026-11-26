@@ -2,6 +2,7 @@
 
 import ast
 import json
+import os
 import re
 import subprocess
 from datetime import UTC, datetime
@@ -242,3 +243,16 @@ def test_a_new_file_outside_the_allowlist_is_found(tmp_path):
     (root / "src").mkdir()
     (root / "src" / "new.py").write_text("x = 1\n", encoding="utf-8")
     assert wl.check(root) == ["src/new.py: outside the files the learner may change"]
+
+
+def test_files_that_git_cannot_add_are_left_out(tmp_path):
+    """The sandbox mounts device files into the checkout; the check must still run."""
+    root = make_repo(tmp_path)
+    (root / "tests" / "test_a.py").unlink()
+    os.mkfifo(root / "tests" / "test_a.py")  # a tracked file, now not a regular file
+    os.mkfifo(root / ".bashrc")  # an untracked one, which git skips by itself
+    with (root / "README.md").open("w", encoding="utf-8") as handle:
+        handle.write("A new line.\n")
+    assert wl.special_paths(root) == ["tests/test_a.py"]
+    problems = wl.check(root)
+    assert not any("README.md" in p or ".bashrc" in p for p in problems), problems
