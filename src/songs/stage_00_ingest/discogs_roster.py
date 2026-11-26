@@ -70,6 +70,7 @@ with a Discogs id. Only an artist that gets a song joins the roster of the new f
 with the country tag `COUNTRY_TAG`.
 """
 
+import csv
 import functools
 import re
 from collections import Counter, defaultdict
@@ -77,7 +78,7 @@ from pathlib import Path
 
 import duckdb
 
-from songs.common import paths, schemas
+from songs.common import lyric_sources, paths, schemas
 from songs.stage_00_ingest import dump_match, review_workbooks
 from songs.stage_10_clean import artist_country
 
@@ -183,8 +184,16 @@ def home_artists(
     return found
 
 
-def _rosters(data: Path) -> dict[str, list[tuple[str, str | None]]]:
-    """Return the name and the Discogs id of each roster artist, for each country."""
+def _rosters(data: Path, root: Path | None = None) -> dict[str, list[tuple[str, str | None]]]:
+    """Return the name and the Discogs id of each roster artist, for each country.
+
+    An artist that `dump_match.ARTIST_COUNTRIES_FILE` gives another country is on no
+    roster here: the roster that holds it imports none of its songs, and the country
+    that the file names can take its Discogs id.
+    """
+    path = (root or paths.resolve_project_root()) / dump_match.ARTIST_COUNTRIES_FILE
+    with path.open(encoding="utf-8", newline="") as handle:
+        named = {line["artist_id"]: line["country_iso3"] for line in csv.DictReader(handle)}
     rosters = {}
     with duckdb.connect() as connection:
         for parent in sorted((data / "lyrics").glob("*")):
@@ -194,12 +203,28 @@ def _rosters(data: Path) -> dict[str, list[tuple[str, str | None]]]:
                 else None
             )
             if folder is not None:
-                rosters[parent.name] = (
+                rows = (
                     schemas.read_table(schemas.COUNTRY_ARTISTS, folder, connection)
-                    .project("artist_name, discogs_artist_id")
+                    .project("artist_id, artist_name, discogs_artist_id")
                     .fetchall()
                 )
+                rosters[parent.name] = [
+                    (name, number)
+                    for artist, name, number in rows
+                    if named.get(artist, parent.name) == parent.name
+                ]
     return rosters
+
+
+def served_countries(source: str, root: Path | None = None) -> frozenset[str] | None:
+    """Return the countries that a source serves, or None for a source of every country."""
+    languages = lyric_sources.load_language_countries(root)
+    for found in lyric_sources.load_lyric_sources(root):
+        if found.id == source:
+            if found.scope == "global":
+                return None
+            return frozenset(lyric_sources.countries_of(found, languages))
+    return None
 
 
 def _dump_names(dump: Path) -> dict[str, tuple[str, int]]:
@@ -255,20 +280,30 @@ def dump_artists(
     `rosters` is the name and the Discogs id of each roster artist, for each country
     (`_rosters`). A dump name finds a Discogs artist by its name key, its loose key, or
     its `dump_match.spelling_key` when no other free dump name has that spelling key.
-    The order is by Discogs id.
+    The roster of a country that the source of the dump does not serve holds no name:
+    "Olympic" of the German roster does not stop the Czech band "Olympic (2)" in a
+    Czech dump, and the Discogs track of each title still decides each song. A roster
+    artist with no Discogs id of another country stops a candidate only when the
+    candidate has a release in a home of that country alone, so a release in
+    "Czechoslovakia" does not stop a Slovak singer on the Czech roster. The order is
+    by Discogs id.
     """
     held, taken_ids, keys_with_id = set(), set(), set()
     no_id: dict[str, set[str]] = defaultdict(set)
+    served = served_countries(dump.parent.name)
     for code, roster in rosters.items():
+        # A roster of a country that the dump does not serve holds no name of the dump.
+        near = served is None or code in served
         for name, number in roster:
-            if code == iso3 or number:
+            if code == iso3 or (number and near):
                 held |= {dump_match.name_key(name), loose_key(name)}
-            else:
+            elif not number:
                 no_id[dump_match.name_key(name)].add(code)
                 no_id[loose_key(name)].add(code)
             if number:
                 taken_ids.add(str(number))
-                keys_with_id.add(dump_match.name_key(name))
+                if near:
+                    keys_with_id.add(dump_match.name_key(name))
     free = {
         key: (name, songs, loose_key(name))
         for key, (name, songs) in _dump_names(dump).items()
@@ -368,7 +403,7 @@ def dump_artists(
             continue
         name, songs, loose = free[free_key]
         others = no_id.get(free_key, set()) | no_id.get(loose, set())
-        if any(set(by_country[number]) & homes.get(other, set()) for other in others):
+        if any(set(by_country[number]) & alone.get(other, set()) for other in others):
             continue
         if code == iso3 and songs > chosen.get(number, ("", 0))[1]:
             chosen[number] = (name, songs)

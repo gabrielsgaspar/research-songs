@@ -181,15 +181,15 @@ def test_a_campaign_adds_the_song_of_a_new_artist_and_the_artist_joins_the_roste
     assert discogs_roster.new_artists(data, discogs, "ISL") == {}
 
 
-def write_dump(data: Path, names: dict[str, int]) -> Path:
+def write_dump(data: Path, names: dict[str, int], source: str = "genius") -> Path:
     """Write a dump folder in which each credited name has the given number of songs."""
-    dump = paths.clean_dump_dir(data, "kasilyrics", "20260102")
+    dump = paths.clean_dump_dir(data, source, "20260102")
     write(
         schemas.DUMP_SONGS,
         dump,
         [
             {
-                "source": "kasilyrics",
+                "source": source,
                 "source_song_id": f"{name}-{index}",
                 "artist_name": name,
                 "source_artist_id": name,
@@ -351,3 +351,46 @@ def test_a_dump_name_spelled_another_way_finds_its_discogs_artist(tmp_path):
     assert discogs_roster.dump_artists(discogs, "ISL", dump, discogs_roster._rosters(data)) == {
         artist_id("ISL", "Sherali Jo'rayev", "1"): ("Sherali Jo'rayev", "1")
     }
+
+
+def test_a_roster_the_dump_does_not_serve_and_a_shared_home_stop_no_artist(tmp_path):
+    data, discogs = tmp_path / "data", tmp_path / "discogs"
+    roster(data, "CZE", [("Hana Singer", None)])
+    roster(data, "DEU", [("Olympic", "1")])
+    roster(data, "SVK", [])
+    many = discogs_roster.MIN_DUMP_SONGS
+    names = {"Olympic": many, "Hana Singer": many}
+    write_discogs(
+        discogs,
+        [
+            (1, "Olympic", "German electronic act.", "Electronic"),
+            (2, "Olympic (2)", "Czech rock group.", "Rock"),
+            (3, "Hana Singer", "Slovak singer.", "Pop"),
+        ],
+        {1: ["Germany"], 2: ["Czechoslovakia"] * 3, 3: ["Czechoslovakia"] * 3},
+    )
+    rosters = discogs_roster._rosters(data)
+
+    # karaoketexty serves CZE and SVK: the German roster holds no name of it. A global
+    # dump keeps the old rule, so "Olympic" of the German roster stops the band.
+    czech = write_dump(data, names, "karaoketexty")
+    assert discogs_roster.dump_artists(discogs, "CZE", czech, rosters) == {
+        artist_id("CZE", "Olympic", "2"): ("Olympic", "2")
+    }
+    assert discogs_roster.dump_artists(discogs, "CZE", write_dump(data, names), rosters) == {}
+    # Hana Singer is on the Czech roster with no id; her releases are in Czechoslovakia,
+    # a home of CZE and of SVK, so she joins the roster of SVK.
+    assert discogs_roster.dump_artists(discogs, "SVK", czech, rosters) == {
+        artist_id("SVK", "Hana Singer", "3"): ("Hana Singer", "3")
+    }
+
+
+def test_an_artist_that_the_tracked_list_gives_another_country_is_on_no_roster(tmp_path):
+    data, root = tmp_path / "data", tmp_path / "root"
+    roster(data, "CZE", [("Band", "7"), ("Other", None)])
+    (root / "resources" / "lyrics").mkdir(parents=True)
+    # roster() names the first artist of CZE "CZE0".
+    (root / "resources" / "lyrics" / "artist_countries.csv").write_text(
+        "artist_id,country_iso3\nCZE0,SVK\n", encoding="utf-8"
+    )
+    assert discogs_roster._rosters(data, root) == {"CZE": [("Other", None)]}
