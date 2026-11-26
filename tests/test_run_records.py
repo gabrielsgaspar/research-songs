@@ -1,6 +1,7 @@
 """Tests for run records, the history text, the coverage page, and their commands."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from typer.testing import CliRunner
 
 from songs.cli import app
 from songs.common import run_records
+from songs.common.paths import resolve_project_root
 from songs.common.run_records import RunRecord
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -164,3 +166,34 @@ def test_history_refuses_an_unknown_route(tmp_path, monkeypatch):
     assert result.exit_code != 0
     assert "route must be one of" in result.output
     assert run_records.ROUTES[0] in result.output
+
+
+def test_each_country_has_one_folder_named_by_its_iso3_code():
+    """countries/ holds README.md and one folder per country, named by its ISO3 code."""
+    folder = resolve_project_root() / "countries"
+    wrong = [
+        entry.name
+        for entry in folder.iterdir()
+        if not (entry.is_dir() and re.fullmatch(r"[A-Z]{3}", entry.name))
+        and entry.name != "README.md"
+    ]
+    assert not wrong, f"countries/ holds entries that are not ISO3 folders: {wrong}"
+
+
+def test_record_run_writes_the_coverage_page_again(tmp_path):
+    countries, page = tmp_path / "countries", tmp_path / "coverage.md"
+    with run_records.record_run(
+        "NGA", "archive", "lrclib", countries=countries, coverage_page=page
+    ) as run:
+        run.rows_added = 7
+    assert page.read_text(encoding="utf-8") == run_records.render_coverage(
+        run_records.read_run_records(countries=countries)
+    )
+    assert "NGA" in page.read_text(encoding="utf-8")
+
+
+def test_only_the_repository_countries_folder_has_a_coverage_page(tmp_path):
+    own = run_records.countries_dir()
+    assert run_records.coverage_page_for(None) == own.parent / run_records.COVERAGE_PAGE
+    assert run_records.coverage_page_for(own) == own.parent / run_records.COVERAGE_PAGE
+    assert run_records.coverage_page_for(tmp_path) is None

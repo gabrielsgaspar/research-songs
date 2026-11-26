@@ -54,7 +54,7 @@ flowchart LR
 | Data layout (paths, table schemas, manifests) | Working: [data layout](docs/standards/data_layout.md). The songs of all 226 countries were imported from the old pipeline (`songs lyrics import-old`). The undated inputs of the country-year table still have the old layout |
 | Version folders in the bucket | Working: `songs data upload`, `songs data download`, `songs data check` and `songs data pull`. `songs lyrics publish` and `songs lyrics audit` upload and check the songs folders of the countries. On 2026-11-24 the objects from before the layout were deleted by list, except 267.941 GiB that stay by choice ([known gaps](docs/standards/data_layout.md#known-gaps)) |
 | Country folders, run records and campaigns | Working: `songs lyrics history`, `songs lyrics plan`, `songs lyrics campaign`, and [coverage by country](docs/status/coverage.md) |
-| Lyric collection and matching | Working for lyric dumps: `songs lyrics survey`, `songs lyrics import-dump`, and the campaign ladder (`songs lyrics campaign run`) in [countries/README.md](countries/README.md). Collection from web sources is not in this repository |
+| Lyric collection and matching | Working for lyric dumps: `songs lyrics survey`, `songs lyrics import-dump`, and the campaign ladder (`songs lyrics campaign run`) in [countries/README.md](countries/README.md). For web sites: `songs lyrics collect` collects one site (`dainutekstai`), and `songs dumps parse` reads the saved pages of eight sites into a lyric table that `songs dumps build` reads |
 | Country-year panel | Working: `songs panel countries` builds `clean/countries/<YYYYMMDD>/` from current files. The song counts, artist counts and analysis tier come from the eligible songs. Populism, banking crises, `in_wvs`, `in_evs` and the Discogs columns have no input yet, so they are empty and the build reports them absent |
 | Topic scoring | Working: `songs score prepare`, `songs score submit` (a person only) and `songs score collect` score new songs through the Batch API. `songs lyrics import-scores` imports the scores of the old pipeline |
 | Figure and topic standards | Working: [figures](docs/standards/figures.md), [topics](docs/standards/topics.md) |
@@ -67,7 +67,7 @@ flowchart LR
 src/songs/                    importable, tested code, in these packages:
 src/songs/common/             paths, schemas, manifests, storage, run and campaign records, rules
 src/songs/stage_00_ingest/    collect lyrics and match them to the catalog: dumps, the campaign ladder, imports
-src/songs/stage_10_clean/     clean the external data: GDP, democracy, fertility, population, crises
+src/songs/stage_10_clean/     clean the external data (GDP, democracy, fertility, population, crises) and mark songs: artist countries, text copies, uncredited songs
 src/songs/stage_30_topics/    topic ids, the scoring prompt, the scoring run, and the import of old scores
 src/songs/stage_50_analysis/  eligible songs, the country-year panel and the analysis release
 tests/            tests and small fixtures

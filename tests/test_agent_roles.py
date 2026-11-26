@@ -79,7 +79,7 @@ def test_the_three_workflows_protect_the_same_paths() -> None:
 
 
 def test_no_agent_workflow_merges_or_trusts_every_bot() -> None:
-    for path in WORKFLOWS.glob("agent-*.yml"):
+    for path in [*WORKFLOWS.glob("agent-*.yml"), WORKFLOWS / "weekly-learner.yml"]:
         text = path.read_text(encoding="utf-8")
         assert "pr merge" not in text, path.name
         assert "id-token" not in re.sub(r"#.*", "", text), path.name

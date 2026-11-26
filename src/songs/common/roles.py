@@ -43,6 +43,7 @@ WORKFLOWS = {
     "planner": ".github/workflows/agent-plan.yml",
     "builder": ".github/workflows/agent-build.yml",
     "reviewer": ".github/workflows/agent-review.yml",
+    "learner": ".github/workflows/weekly-learner.yml",
 }
 REQUIRED = ("role", "model", "max_turns", "workflow")
 OPTIONAL = ("notes",)
@@ -139,7 +140,7 @@ def outputs(fields: dict) -> str:
 def main(argv: list[str]) -> int:
     if len(argv) != 1:
         print(
-            "usage: python3 -I src/songs/common/roles.py <planner|builder|reviewer>",
+            "usage: python3 -I src/songs/common/roles.py <planner|builder|reviewer|learner>",
             file=sys.stderr,
         )
         return 2

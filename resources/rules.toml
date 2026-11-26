@@ -43,6 +43,14 @@ tests = ["tests/test_repo_rules.py::test_fixtures_are_small"]
 part = "the size is checked; that a fixture is text is not"
 
 [[check]]
+rule = "Tests never call the network, cloud storage or a model."
+tests = [
+    "tests/test_no_network.py::test_a_connection_to_a_remote_host_is_refused",
+    "tests/test_no_network.py::test_a_connection_on_this_computer_still_works",
+]
+part = "every test refuses a connection or a name lookup outside this computer and has no proxy settings; a call through a subprocess, and the `needs_data` marker, are not checked"
+
+[[check]]
 rule = "Every text read, write and `open()`"
 tests = ["tests/test_repo_rules.py::test_text_io_names_its_encoding"]
 
@@ -69,9 +77,23 @@ part = "bucket addresses outside `tests/` and defaults in the settings; a projec
 # --- Countries and runs -----------------------------------------------------------
 
 [[check]]
+rule = "Collection work is organized by country."
+tests = ["tests/test_run_records.py::test_each_country_has_one_folder_named_by_its_iso3_code"]
+
+[[check]]
 rule = "Never run the same job twice."
 tests = ["tests/test_campaigns.py::test_the_same_job_does_not_run_twice_without_a_reason"]
 part = "a run through `record_run` that repeats a complete run with the same route, source, bulk file, delay and limits is refused unless it gives a reason; a job that differs only in a setting outside the record is not found"
+
+[[check]]
+rule = "Before a run, read the plan:"
+tests = ["tests/test_docs_commands.py::test_every_documented_command_exists"]
+part = "the command exists as the documents write it; that a person reads the plan is not checked"
+
+[[check]]
+rule = "A campaign is an effort with a goal for one country."
+tests = ["tests/test_docs_commands.py::test_every_documented_command_exists"]
+part = "the commands and options exist as the documents write them; that a person opens and closes each campaign is not checked"
 
 [[check]]
 rule = "Every collection run writes one run record"
@@ -194,6 +216,15 @@ part = "each role file loads and its workflow uses it; who may add a label is se
 rule = "A plan lists every file it changes."
 tests = ["tests/test_agent_roles.py::test_the_three_workflows_protect_the_same_paths"]
 part = "the workflows protect the same paths; the comparison of a build with its plan runs in the workflow, not in a test"
+
+[[check]]
+rule = "A learner agent runs every Monday"
+tests = [
+    "tests/test_weekly_learner.py::test_the_allowlist_keeps_out_every_protected_path",
+    "tests/test_weekly_learner.py::test_a_new_rule_without_a_test_is_refused",
+    "tests/test_weekly_learner.py::test_more_than_five_new_rules_are_refused",
+]
+part = "the check refuses a bad change; that the workflow runs the check before it pushes is read in review"
 
 [[check]]
 rule = "Do not add an agent workflow"

@@ -9,5 +9,8 @@
 /uv.lock @gabrielsgaspar
 /docs/decisions/ @gabrielsgaspar
 /tests/test_repo_rules.py @gabrielsgaspar
-/prompts/roles/ @gabrielsgaspar
+/prompts/ @gabrielsgaspar
+/docs/standards/ @gabrielsgaspar
 /src/songs/common/roles.py @gabrielsgaspar
+/src/songs/common/weekly_learner.py @gabrielsgaspar
+/tests/test_weekly_learner.py @gabrielsgaspar
