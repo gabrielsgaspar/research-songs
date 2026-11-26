@@ -1,0 +1,40 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 6,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/tekstovipesama/20261120/",
+  "campaign_id": "20261125T230556Z",
+  "code_commit": "972da5a0c1fa1f05dec13851704ccc89c85abadf",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T01:36:09Z",
+  "iso3": "SRB",
+  "known_gaps": [
+    "close: 3 songs match a Discogs title by close spelling, but the numbers of the titles differ or a person rejected them"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 71 songs to add. 5 artists joined the roster by the Discogs home rule (country tag discogs_home_releases). 5 close matches added: the titles hold the same numbers, or resources/lyrics/reviewed_close_matches.csv accepts them.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 71,
+  "run_id": "20261126T013548Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 71,
+  "songs_attempted": 81465,
+  "songs_rejected": {
+    "already_linked": 742,
+    "close": 3,
+    "held": 5370,
+    "held_loose_title": 2306,
+    "held_text": 5,
+    "no_track": 3143,
+    "not_roster": 54666,
+    "same_title": 15156,
+    "short_lyrics": 2,
+    "track_taken": 1
+  },
+  "source": "tekstovipesama",
+  "started_utc": "2026-11-26T01:35:48Z",
+  "state": "complete"
+}
