@@ -1,6 +1,7 @@
 """Tests for run records, the history text, the coverage page, and their commands."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from typer.testing import CliRunner
 
 from songs.cli import app
 from songs.common import run_records
+from songs.common.paths import resolve_project_root
 from songs.common.run_records import RunRecord
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -164,3 +166,15 @@ def test_history_refuses_an_unknown_route(tmp_path, monkeypatch):
     assert result.exit_code != 0
     assert "route must be one of" in result.output
     assert run_records.ROUTES[0] in result.output
+
+
+def test_each_country_has_one_folder_named_by_its_iso3_code():
+    """countries/ holds README.md and one folder per country, named by its ISO3 code."""
+    folder = resolve_project_root() / "countries"
+    wrong = [
+        entry.name
+        for entry in folder.iterdir()
+        if not (entry.is_dir() and re.fullmatch(r"[A-Z]{3}", entry.name))
+        and entry.name != "README.md"
+    ]
+    assert not wrong, f"countries/ holds entries that are not ISO3 folders: {wrong}"

@@ -35,8 +35,13 @@ class Rule:
 
 def read_rule_texts(root: Path) -> list[tuple[str, str]]:
     """Return (section, rule text) for every list item under "## Rules" in AGENTS.md."""
+    return parse_rule_texts((root / RULES_SOURCE).read_text(encoding="utf-8"))
+
+
+def parse_rule_texts(text: str) -> list[tuple[str, str]]:
+    """Return (section, rule text) for every list item under "## Rules" in an AGENTS.md text."""
     rules, section, inside = [], "", False
-    for line in (root / RULES_SOURCE).read_text(encoding="utf-8").splitlines():
+    for line in text.splitlines():
         if line.startswith("## "):
             inside = line == "## Rules"
         elif inside and line.startswith("### "):

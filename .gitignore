@@ -9,6 +9,7 @@
 /scratch/
 /overleaf/
 /.local/
+/.agent-learner/
 
 # Secrets
 .env
