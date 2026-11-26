@@ -581,14 +581,11 @@ def dumps_parse(
     `songs dumps build` reads the new folder. The command only reads the pages folder.
     """
     from songs.common.paths import data_root
-    from songs.stage_00_ingest import textpesenok
+    from songs.stage_00_ingest import site_pages
 
-    if source != textpesenok.SOURCE:
-        typer.echo(f"error: no page parser for {source}; one exists for {textpesenok.SOURCE}")
-        raise typer.Exit(1)
     data = data_root()
     try:
-        result = textpesenok.parse_folder(data, raw_input)
+        result = site_pages.parse_folder(data, source, raw_input)
     except (FileExistsError, ValueError) as error:
         typer.echo(f"error: {error}", err=True)
         raise typer.Exit(1) from error

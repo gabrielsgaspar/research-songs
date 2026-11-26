@@ -1,11 +1,9 @@
 source,reason,origin,build
 aghanilyrics,mirror of SongNu,excluded providers,yes
 beesona,no lyric rows,empty dump,no
-cuspajz,no lyric rows published,empty dump,no
 geniusru,no HTTP URL,blocked providers,yes
 hebrew_lyrics_hf,provenance not verified,excluded providers,yes
 hmpu_uy,no lyric rows,empty dump,no
 joinmyjam,chord sheets,blocked providers and excluded providers,yes
-pesmarica,almost all lyric rows are held,near-empty dump,no
 tab4u,chord sheets,blocked providers,yes
 turkish_folk_kaggle,artist name is empty,blocked providers,yes
