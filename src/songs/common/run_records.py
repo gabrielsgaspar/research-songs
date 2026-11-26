@@ -182,9 +182,13 @@ def record_run(
     *,
     countries: Path | None = None,
     repeat_reason: str | None = None,
+    coverage_page: Path | None = None,
     **settings: object,
 ) -> Iterator[RunRecord]:
     """Open a run and write its record when the block ends, also when it fails.
+
+    After the record, the coverage page is written again, so it never needs a separate step.
+    The page is `coverage_page`, or the committed page when `countries` is this repository's.
 
     The caller sets results on the yielded record (`rows_added`, `known_gaps`,
     `state = "partial"`). An exception sets the state to "failed", names the
@@ -220,6 +224,9 @@ def record_run(
     finally:
         record.ended_utc = utc_now()
         write_run_record(record, countries)
+        page = coverage_page or coverage_page_for(countries)
+        if page is not None:
+            write_coverage_page(page, countries or countries_dir())
 
 
 def duration_text(record: RunRecord) -> str:
@@ -301,8 +308,23 @@ def render_coverage(records: list[RunRecord]) -> str:
 def write_coverage(root: Path | None = None) -> Path:
     """Regenerate the coverage page from the records and return its path."""
     base = resolve_project_root(root)
-    path = base / COVERAGE_PAGE
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="\n") as handle:
-        handle.write(render_coverage(read_run_records(countries=base / "countries")))
-    return path
+    return write_coverage_page(base / COVERAGE_PAGE, base / "countries")
+
+
+def write_coverage_page(page: Path, countries: Path) -> Path:
+    """Write the coverage page of the records in `countries` to `page` and return it."""
+    page.parent.mkdir(parents=True, exist_ok=True)
+    with page.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(render_coverage(read_run_records(countries=countries)))
+    return page
+
+
+def coverage_page_for(countries: Path | None) -> Path | None:
+    """Return the coverage page that belongs to a countries folder, or None for another folder.
+
+    Only the countries folder of this repository has a committed coverage page.
+    """
+    own = countries_dir()
+    if countries is None or countries.resolve() == own.resolve():
+        return own.parent / COVERAGE_PAGE
+    return None

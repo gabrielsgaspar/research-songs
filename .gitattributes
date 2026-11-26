@@ -2,3 +2,4 @@
 *.png binary
 *.parquet binary
 *.pdf binary
+docs/status/*.md linguist-generated=true

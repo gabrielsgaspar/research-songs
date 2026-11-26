@@ -123,13 +123,7 @@ This is the order of steps for one country or for several. Each step is one comm
    uv run songs lyrics audit
    ```
 
-10. Write the coverage page again:
-
-    ```bash
-    uv run songs lyrics coverage --write
-    ```
-
-11. Open the pull request with the new run records, the campaign records and the coverage page. Use the report of step 6 as the body of the pull request.
+10. Open the pull request with the new run records, the campaign records and the coverage page. Each run writes the coverage page again, so it is already current. Use the report of step 6 as the body of the pull request.
 
 What the commands do:
 
@@ -290,7 +284,7 @@ Records of schema version 1 do not have the fields from `campaign_id` to `limits
 
 ## Coverage page
 
-[`docs/status/coverage.md`](../docs/status/coverage.md) has one row per country. It is generated from the records, and a test fails when it is out of date:
+[`docs/status/coverage.md`](../docs/status/coverage.md) has one row per country. It is generated from the records. Each collection run writes it again, and a test fails when it is out of date. After you merge `main` into a branch with new records, the page can conflict. Then write it again:
 
 ```bash
 uv run songs lyrics coverage --write
