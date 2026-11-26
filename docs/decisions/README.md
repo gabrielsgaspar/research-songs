@@ -32,3 +32,4 @@ Then three sections: **Context** (the problem), **Decision** (what we do), **Con
 | 0010 | [One layout for all data](0010-one-data-layout.md) | accepted | 2026-11-19 |
 | 0011 | [Combined-prompt topic scores count as scored](0011-combined-prompt-scores.md) | accepted | 2026-11-25 |
 | 0012 | [Each topic scoring run leaves a tracked record per country](0012-scoring-run-records.md) | accepted | 2026-11-25 |
+| 0013 | [A weekly learner keeps the rules and the documentation current](0013-weekly-learner.md) | accepted | 2026-11-26 |
