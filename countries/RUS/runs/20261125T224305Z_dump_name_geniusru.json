@@ -1,0 +1,42 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 179,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/geniusru/20261120/",
+  "campaign_id": "20261125T223901Z",
+  "code_commit": "ef7fb8aae1ccfc24974573170ba245dc4e33265a",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-25T22:43:50Z",
+  "iso3": "RUS",
+  "known_gaps": [
+    "close: 7 songs match a Discogs title by close spelling, but the numbers of the titles differ or a person rejected them"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 1698 songs to add. 484 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name). 51 artists joined the roster by the Discogs home rule (country tag discogs_home_releases). 31 close matches added: the titles hold the same numbers, or resources/lyrics/reviewed_close_matches.csv accepts them.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 1698,
+  "run_id": "20261125T224305Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 1698,
+  "songs_attempted": 192020,
+  "songs_rejected": {
+    "already_linked": 490,
+    "close": 7,
+    "held": 1408,
+    "held_loose_title": 4146,
+    "held_text": 37,
+    "no_title_key": 36,
+    "no_track": 9553,
+    "not_roster": 173508,
+    "out_of_scope": 105,
+    "same_title": 923,
+    "short_lyrics": 45,
+    "track_taken": 64
+  },
+  "source": "geniusru",
+  "started_utc": "2026-11-25T22:43:05Z",
+  "state": "complete"
+}

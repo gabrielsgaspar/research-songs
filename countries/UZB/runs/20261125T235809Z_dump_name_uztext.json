@@ -1,0 +1,33 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 2,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/uztext/20261121/",
+  "campaign_id": "20261125T235030Z",
+  "code_commit": "ef7fb8aae1ccfc24974573170ba245dc4e33265a",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-25T23:58:45Z",
+  "iso3": "UZB",
+  "known_gaps": [],
+  "limits_hit": {},
+  "notes": "The survey estimates 2 songs to add. 1 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name).",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 2,
+  "run_id": "20261125T235809Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 2,
+  "songs_attempted": 3841,
+  "songs_rejected": {
+    "held": 11,
+    "held_loose_title": 1,
+    "no_track": 164,
+    "not_roster": 3662,
+    "same_title": 1
+  },
+  "source": "uztext",
+  "started_utc": "2026-11-25T23:58:09Z",
+  "state": "complete"
+}

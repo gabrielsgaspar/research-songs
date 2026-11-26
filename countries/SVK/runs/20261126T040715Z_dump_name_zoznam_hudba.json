@@ -1,0 +1,43 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 60,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/zoznam_hudba/20261119/",
+  "campaign_id": "20261126T035219Z",
+  "code_commit": "ef7fb8aae1ccfc24974573170ba245dc4e33265a",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T04:08:42Z",
+  "iso3": "SVK",
+  "known_gaps": [
+    "close: 2 songs match a Discogs title by close spelling, but the numbers of the titles differ or a person rejected them"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 209 songs to add. 69 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name). 5 artists joined the roster by the Discogs home rule (country tag discogs_home_releases). 45 close matches added: the titles hold the same numbers, or resources/lyrics/reviewed_close_matches.csv accepts them.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 209,
+  "run_id": "20261126T040715Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 209,
+  "songs_attempted": 470763,
+  "songs_rejected": {
+    "already_linked": 56,
+    "artist_other_country": 30,
+    "close": 2,
+    "held": 3157,
+    "held_loose_title": 335,
+    "held_text": 11,
+    "no_title_key": 15,
+    "no_track": 857,
+    "not_roster": 464618,
+    "out_of_scope": 31,
+    "same_title": 1403,
+    "short_lyrics": 36,
+    "track_taken": 3
+  },
+  "source": "zoznam_hudba",
+  "started_utc": "2026-11-26T04:07:15Z",
+  "state": "complete"
+}
