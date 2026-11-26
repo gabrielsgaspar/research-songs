@@ -9,8 +9,8 @@ It answers one question: what fails when someone breaks a rule? A rule that is "
 | Status | Rules |
 | --- | --- |
 | Checked | 8 |
-| Partly checked | 22 |
-| Not checked | 25 |
+| Partly checked | 23 |
+| Not checked | 24 |
 
 When you add a rule to `AGENTS.md`, add a test for it and name the test in `resources/rules.toml`. If no test can check the rule, it stays not checked.
 
@@ -22,7 +22,7 @@ When you add a rule to `AGENTS.md`, add a test for it and name the test in `reso
 | Code finds the local data folder through the environment variable `SONGS_DATA_ROOT`, never through a hard-coded path. | `tests/test_code_rules.py::test_the_code_follows_the_rule`<br>`tests/test_common.py::test_data_root_follows_the_environment_variable` |
 | Raw data is write-once. Never write code that overwrites or deletes raw data. A new download goes to a new dated path. | Partly: the shared writers refuse to write over a file; code that deletes a file by another way is not found<br>`tests/test_schemas.py::test_a_writer_checks_before_it_writes_and_never_writes_over_a_file`<br>`tests/test_storage.py::test_an_object_with_other_bytes_is_an_error_and_is_kept`<br>`tests/test_countries_panel.py::test_build_stops_on_absent_inputs_and_never_writes_over_a_panel` |
 | Fixtures are small text files (under 200 KB) made for tests. | Partly: the size is checked; that a fixture is text is not<br>`tests/test_repo_rules.py::test_fixtures_are_small` |
-| Tests never call the network, cloud storage or a model. A test that reads local data carries the `needs_data` marker and is skipped when the data is absent. | not checked |
+| Tests never call the network, cloud storage or a model. A test that reads local data carries the `needs_data` marker and is skipped when the data is absent. | Partly: every test refuses a connection or a name lookup outside this computer and has no proxy settings; a call through a subprocess, and the `needs_data` marker, are not checked<br>`tests/test_no_network.py::test_a_connection_to_a_remote_host_is_refused`<br>`tests/test_no_network.py::test_a_connection_on_this_computer_still_works` |
 | Every text read, write and `open()` names its encoding (`encoding="utf-8"`). Windows defaults to cp1252. A test checks this. | `tests/test_repo_rules.py::test_text_io_names_its_encoding` |
 
 ## This repository is public
