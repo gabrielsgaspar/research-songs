@@ -38,7 +38,7 @@ A run record may name only a source on this page. To use a new source, add its e
 | `giitaayan` | Giitaayan | Countries: IND | local_source | not_applicable | - | yes | A pinned copy of a public file collection, dated 2026-07-07. Never sent requests. |
 | `tamilcorpus` | Tamil songs corpus | Countries: IND | local_source | not_applicable | - | yes | A pinned copy of a public file, dated 2026-09-08. Songs in Tamil. |
 | `wikisource` | [Wikisource, songs of India](https://en.wikisource.org) | Countries: IND | local_source | not_applicable | - | yes | - |
-| `kugeci` | KuGeci | Countries: CHN, HKG, TWN | dump_name | not_applicable | - | yes | A clean copy dated 2026-10-12 exists, with about 258,000 song rows. No pages were downloaded. |
+| `kugeci` | [KuGeci](https://www.kugeci.com) | Countries: CHN, HKG, TWN | dump_name | not_applicable | - | yes | A clean copy dated 2026-10-12 exists, with about 258,000 song rows. No pages were downloaded. |
 | `nlb_sg` | [National Library Board, Singapore](https://data.gov.sg) | Countries: MYS, SGP | dump_name | not_applicable | - | yes | - |
 | `geniusru` | [Russian Genius dataset](https://huggingface.co/datasets/sevenreasons/genius-lyrics-russian) | Countries: ARM, AZE, BLR, EST, GEO, KAZ, KGZ, LTU, LVA, MDA, RUS, TJK, TKM, UKR, UZB | dump_name | not_applicable | - | yes | A copy dated 2026-09-24 exists. On hold: rows carry no song link. |
 
@@ -91,7 +91,9 @@ A run record may name only a source on this page. To use a new source, add its e
 | `joinmyjam` | [JoinMyJam](https://joinmyjam.com) | Countries: ISR | archive | unknown | - | yes | On hold: no rows were published. |
 | `sarkisozum` | [Sarki Sozum](https://sarkisozum.gen.tr) | Countries: TUR | archive | unknown | - | yes | - |
 | `repertukul` | [Repertukul](https://repertukul.com) | Countries: BGR, TUR | archive | unknown | - | yes | - |
+| `lidicity` | [Lidicity](https://ip.lidicity.com) | Countries: CHN, HKG | archive | unknown | - | yes | A site archive dated 2026-11-06 exists, with Chinese songs, most of them from the 1930s and 1940s. Most artists are Shanghai singers; some sang later in Hong Kong. The songs have no year and no language. |
 | `pmdb_taipei` | [Pop Music Database Taipei](https://pmdb.taipei) | Countries: TWN | archive | unknown | - | yes | - |
+| `deungdutjai` | [Deungdutjai](https://deungdutjai.com) | Countries: THA | archive | unknown | - | yes | A site archive dated 2026-11-11 exists. The songs have no year and no language. Many artist names have a Thai and a Latin form. |
 | `tkaraoke` | [TKaraoke](https://lyric.tkaraoke.com) | Countries: VNM | archive | unknown | - | yes | - |
 | `nhaccuatui` | [NhacCuaTui](https://www.nhaccuatui.com) | Countries: VNM | archive | unknown | - | yes | - |
 | `nhac_vn` | [Nhac.vn](https://nhac.vn) | Countries: VNM | archive | unknown | - | yes | - |
@@ -103,7 +105,7 @@ A run record may name only a source on this page. To use a new source, add its e
 | `guitarparty` | [Guitarparty](https://www.guitarparty.com) | Countries: ISL | archive | unknown | - | yes | - |
 | `musik_is` | [Musik.is](https://www.musik.is) | Countries: ISL | archive | unknown | - | yes | - |
 | `local_file` | Compiled file of Greek songs | Countries: GRC | local_source | not_applicable | - | yes | A file that a researcher gave to the project. Songs carry no page link. |
-| `stixoi` | [Stixoi](https://stixoi.info) | Countries: GRC | archive, live, roster_update, recover | allowed, 1 s between requests | - | yes | A site archive dated 2026-09-25 exists. |
+| `stixoi` | [Stixoi](https://stixoi.info) | Countries: CYP, GRC | archive, live, roster_update, recover | allowed, 1 s between requests | - | yes | A site archive dated 2026-09-25 exists. It also serves Cyprus, because Cypriot artists sing in Greek. |
 | `karaoketexty` | [KaraokeTexty](https://www.karaoketexty.cz) | Countries: CZE, SVK | archive | unknown | - | yes | About 1.0 million songs. Up to 5 requests per second were approved for the archive run. |
 | `zoznam_hudba` | [Zoznam Hudba](https://hudba.zoznam.sk) | Countries: SVK | archive | unknown | - | yes | About 568,000 lyrics. Up to 5 requests per second were approved for the archive run. |
 | `sergiudo` | [Sergiudo](https://sergiudo.com) | Countries: MDA | archive | unknown | - | yes | - |
@@ -248,7 +250,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | CAN | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | CHE | `lacoccinelle`, `paroles2chansons`, `parolesnet`, `songtexte` |
 | CHL | `buenamusica`, `letras`, `musica` |
-| CHN | `kugeci`, `kugou`, `lyricsasia`, `mulanci`, `qqmusic` |
+| CHN | `kugeci`, `kugou`, `lidicity`, `lyricsasia`, `mulanci`, `qqmusic` |
 | CIV | `afrikalyrics`, `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | CMR | `afrikalyrics`, `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | COD | `afrikalyrics`, `lacoccinelle`, `lingala_cd`, `ndombolo`, `paroles2chansons`, `parolesnet` |
@@ -258,6 +260,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | CPV | `letras` |
 | CRI | `buenamusica`, `letras`, `musica` |
 | CUB | `buenamusica`, `letras`, `musica` |
+| CYP | `stixoi` |
 | CZE | `karaoketexty`, `supermusic` |
 | DEU | `deutscheslied`, `lieder_net`, `songtexte` |
 | DJI | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
@@ -281,7 +284,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | GRD | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | GTM | `buenamusica`, `letras`, `musica` |
 | GUY | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
-| HKG | `kugeci`, `kugou`, `lyricsasia`, `mulanci`, `qqmusic` |
+| HKG | `kugeci`, `kugou`, `lidicity`, `lyricsasia`, `mulanci`, `qqmusic` |
 | HND | `buenamusica`, `letras`, `musica` |
 | HRV | `cuspajz`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
 | HTI | `lacoccinelle`, `paroles2chansons`, `parolesnet`, `solfegebohio`, `wikimizik` |
@@ -353,7 +356,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | SYR | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | TCD | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | TGO | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
-| THA | `siamzone` |
+| THA | `deungdutjai`, `siamzone` |
 | TJK | `geniusru`, `mustext`, `tekstpesni`, `textpesenok`, `uzmatn`, `uztext` |
 | TKM | `geniusru`, `tekstpesni`, `textpesenok`, `uzmatn`, `uztext` |
 | TLS | `letras` |
