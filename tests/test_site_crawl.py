@@ -154,3 +154,25 @@ def test_one_bad_url_does_not_stop_the_crawl(tmp_path, monkeypatch):
     assert result["state"] == "complete"
     assert result["songs_written"] == 1
     assert result["songs_left_out"]["http_error"] >= 1
+
+
+def test_selected_song_pages_do_not_follow_other_links(tmp_path):
+    asked = []
+
+    def fetch(url):
+        asked.append(url)
+        if url.endswith("/robots.txt"):
+            return 200, {}, b"User-agent: *\nAllow: /"
+        return 200, {}, _song("Invented Title") + _home()
+
+    result = site_crawl.collect(
+        tmp_path / "data",
+        "hopamviet",
+        "VNM",
+        seed_urls=[SONG_A, SONG_A],
+        fetch=fetch,
+        sleep=lambda seconds: None,
+        countries=tmp_path / "countries",
+    )
+    assert asked == [HOME + "robots.txt", SONG_A]
+    assert result["songs_written"] == 1

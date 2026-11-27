@@ -211,7 +211,8 @@ A run record may name only a source on this page. To use a new source, add its e
 | `pesmi` | [Pesmi.si](https://pesmi.si) | Countries: SVN | live, roster_update, recover | allowed, 1 s between requests | - | no | The address of the site is inferred. |
 | `dainutekstai` | [Dainu tekstai](https://www.dainutekstai.lt) | Countries: LTU | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `pisniua` | [Pisni.ua](https://pisni.ua) | Countries: UKR | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
-| `tekstpesnionline` | [Tekst-pesni.online](https://tekst-pesni.online) | Languages: Russian | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
+| `pesninet` | [Pesni.net](https://www.pesni.net) | Countries: UZB | live | allowed, 2 s between requests | - | yes | The Uzbekistan pilot uses selected public song pages. The robots file allows these paths. |
+| `tekstpesnionline` | [Tekst-pesni.online](https://naizust.com) | Languages: Russian | live, roster_update, recover | allowed, 1 s between requests | - | yes | Tekst-pesni.online redirects to Naizust.com. Collect selected public song pages on the current host. |
 | `ilyrics` | [iLyrics](https://ru.ilyrics.net) | Languages: Russian | live, roster_update, recover | allowed, 1 s between requests | - | yes | Earlier runs also used it for ARM and IRN. |
 | `armlyric` | [ArmLyric](https://armlyric.do.am) | Countries: ARM | live, roster_update, recover | allowed, 1 s between requests | - | yes | Allowed on 2026-10-19 for catalog and song pages only. Do not use the search of the site. Text from this source is for local scoring only. |
 | `gitar` | [Gitar.az](https://gitar.az) | Countries: AZE | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
@@ -374,7 +375,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | UKR | `geniusru`, `nashe_com_ua`, `pisni_org_ua`, `pisniua`, `tekstpesni`, `textpesenok` |
 | URY | `buenamusica`, `hmpu_uy`, `jaimeroos`, `letras`, `musica`, `todotango` |
 | USA | `cuspajz`, `pesmarica` |
-| UZB | `geniusru`, `tekstpesni`, `textpesenok`, `uzmatn`, `uztext` |
+| UZB | `geniusru`, `pesninet`, `tekstpesni`, `textpesenok`, `uzmatn`, `uztext` |
 | VCT | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | VEN | `buenamusica`, `letras`, `musica` |
 | VNM | `amnhacmiennam`, `hopamchuan`, `hopamviet`, `loibaihat`, `lyricsvn`, `lyricvn`, `nhac_vn`, `nhaccuatui`, `tkaraoke` |

@@ -2194,18 +2194,32 @@ checked = false
 notes = "A site archive exists. The address of the site is not confirmed."
 
 [[source]]
+id = "pesninet"
+name = "Pesni.net"
+kind = "live_site"
+scope = "countries"
+countries = ["UZB"]
+url = "https://www.pesni.net"
+stored_path = ""
+routes = ["live"]
+access = "allowed"
+request_delay_seconds = 2.0
+checked = true
+notes = "The Uzbekistan pilot uses selected public song pages. The robots file allows these paths."
+
+[[source]]
 id = "tekstpesnionline"
 name = "Tekst-pesni.online"
 kind = "live_site"
 scope = "languages"
 languages = ["ru"]
-url = "https://tekst-pesni.online"
+url = "https://naizust.com"
 stored_path = ""
 routes = ["live", "roster_update", "recover"]
 access = "allowed"
 request_delay_seconds = 1.0
 checked = true
-notes = ""
+notes = "Tekst-pesni.online redirects to Naizust.com. Collect selected public song pages on the current host."
 
 [[source]]
 id = "textpesenok"

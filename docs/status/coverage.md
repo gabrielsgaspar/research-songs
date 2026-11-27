@@ -76,7 +76,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [FSM](../../countries/FSM/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [GAB](../../countries/GAB/) | 2 | 2026-11-21 | old_layout | old_pipeline | 259 |
 | [GBR](../../countries/GBR/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 469836 |
-| [GEO](../../countries/GEO/) | 11 | 2026-11-26 | dump_name, old_layout | genius, geniusru, geolyrics, georgianlyrics, lrclib, old_pipeline, textpesenok | 289 |
+| [GEO](../../countries/GEO/) | 13 | 2026-11-27 | dump_name, old_layout | genius, geniusru, geolyrics, georgianlyrics, lrclib, old_pipeline, textpesenok | 305 |
 | [GGY](../../countries/GGY/) | 2 | 2026-11-21 | old_layout | old_pipeline | 21 |
 | [GHA](../../countries/GHA/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 3531 |
 | [GIB](../../countries/GIB/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
@@ -111,7 +111,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [JPN](../../countries/JPN/) | 5 | 2026-11-27 | dump_name, manual_review, old_layout | genius, lrclib, old_pipeline | 213010 |
 | [KAZ](../../countries/KAZ/) | 14 | 2026-11-26 | dump_name, old_layout | genius, geniusru, lrclib, matinder, mediastar, old_pipeline, textpesenok | 1523 |
 | [KEN](../../countries/KEN/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 4854 |
-| [KGZ](../../countries/KGZ/) | 4 | 2026-11-26 | dump_name, old_layout | kyrgyzaudio, lrclib, old_pipeline | 124 |
+| [KGZ](../../countries/KGZ/) | 6 | 2026-11-27 | dump_name, live, old_layout | kyrgyzaudio, lrclib, old_pipeline, tekstpesnionline | 127 |
 | [KHM](../../countries/KHM/) | 2 | 2026-11-21 | old_layout | old_pipeline | 91 |
 | [KIR](../../countries/KIR/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [KNA](../../countries/KNA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 1 |
@@ -215,7 +215,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [UKR](../../countries/UKR/) | 18 | 2026-11-26 | dump_name, old_layout | genius, geniusru, lrclib, nashe_com_ua, old_pipeline, pisni_org_ua, tekstpesni, textpesenok | 22406 |
 | [URY](../../countries/URY/) | 17 | 2026-11-26 | dump_name, old_layout | genius, letras, lrclib, musica, old_pipeline, todotango | 8974 |
 | [USA](../../countries/USA/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 1527432 |
-| [UZB](../../countries/UZB/) | 7 | 2026-11-25 | dump_name, old_layout | genius, lrclib, old_pipeline, uztext | 365 |
+| [UZB](../../countries/UZB/) | 10 | 2026-11-27 | dump_name, live, old_layout | genius, lrclib, old_pipeline, pesninet, uztext | 366 |
 | [VAT](../../countries/VAT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [VCT](../../countries/VCT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 100 |
 | [VEN](../../countries/VEN/) | 14 | 2026-11-26 | dump_name, old_layout | genius, letras, lrclib, musica, old_pipeline | 13165 |

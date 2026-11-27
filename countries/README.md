@@ -247,6 +247,14 @@ uv run songs dumps parse textpesenok raw/textpesenok/20261004/
 
 The command prints the `songs dumps build` command that follows it.
 
+## Russian-language sites for other countries
+
+Use the artist's country evidence to choose the country folder. Search the artist's local name and the names on their Discogs profile. On GeoLyrics, read both the Georgian song title and the Russian title on the artist index. Confirm the performer on the Discogs track. A sole release artist can supply the credit when the track has no separate performer. Keep a duet under review if its performers or country assignment are unclear.
+
+For Naizust and Pesni.net, give the collector one `--seed-url` per selected song. It checks the site's robots file and reads only those song pages. Use the current Naizust host for the source key `tekstpesnionline`. Keep the original performed text. Compare the source URL, credited track, local title variants and normalized text against existing holdings. A later issue can verify a recording without establishing its first release year.
+
+On 2026-11-27, six priority artists yielded 3 songs for Kyrgyzstan, 1 for Uzbekistan and 5 for Georgia. A second review of 64 GeoLyrics pages for Mgzavrebi and Nino Katamadze yielded 11 songs. The country already held 44 songs, and 9 pages still needed review.
+
 ## Run records
 
 A collection command writes one record when it ends, also when it fails. Nobody writes or edits a record by hand, and a record is never overwritten. The file name is `<run id>_<route>_<source>.json`.

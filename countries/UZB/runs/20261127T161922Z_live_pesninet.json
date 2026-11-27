@@ -1,0 +1,31 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 0,
+  "backfilled": false,
+  "bulk_file": null,
+  "campaign_id": "20261127T161654Z",
+  "code_commit": "712164646a14501c2648f0b51352c304c61977a0",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T16:19:26Z",
+  "iso3": "UZB",
+  "known_gaps": [
+    "The run stopped: AttributeError."
+  ],
+  "limits_hit": {
+    "stopped": "AttributeError"
+  },
+  "notes": "Wrote raw/pesninet/20261127/ Stopped by AttributeError.",
+  "request_delay_seconds": 2.0,
+  "requests_sent": 2,
+  "route": "live",
+  "rows_added": 0,
+  "run_id": "20261127T161922Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 1,
+  "songs_attempted": 1,
+  "songs_rejected": {},
+  "source": "pesninet",
+  "started_utc": "2026-11-27T16:19:22Z",
+  "state": "failed"
+}
