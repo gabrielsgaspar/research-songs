@@ -1220,3 +1220,21 @@ def test_variant_keys_add_the_dump_names_that_spell_a_roster_artist_another_way(
 def test_an_apostrophe_letter_is_an_apostrophe_in_a_key():
     names = ["Sherali Joʻrayev", "Sherali Jo'rayev", "Sherali Jo’rayev", "Sherali Joʼrayev"]
     assert {dump_match.name_key(name) for name in names} == {"sherali jo rayev"}
+
+
+def test_the_only_discogs_artist_of_a_long_name_gets_the_id_with_no_home_release(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS,
+        country,
+        [artist("a1", "Hanna Gunnarsdottir"), artist("a2", "Hanna"), artist("a3", "Gunnhildur")],
+    )
+    # No release in Iceland credits one of the three Discogs artists.
+    write_named_discogs(
+        tmp_path / "discogs", "(81, 'Hanna Gunnarsdottir'), (82, 'Hanna'), (83, 'Gunnhildur (2)')"
+    )
+
+    found = dump_match.discogs_ids(country, tmp_path / "discogs", "ISL")
+
+    assert found["by_name"] == {"a1": (81, "Hanna Gunnarsdottir"), "a3": (83, "Gunnhildur (2)")}
+    assert (found["by_only_name"], found["no_home_release"]) == (2, 1)
