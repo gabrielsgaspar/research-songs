@@ -184,8 +184,14 @@ def home_artists(
     return found
 
 
-def _rosters(data: Path, root: Path | None = None) -> dict[str, list[tuple[str, str | None]]]:
+def _rosters(
+    data: Path, root: Path | None = None, discogs: Path | None = None
+) -> dict[str, list[tuple[str, str | None]]]:
     """Return the name and the Discogs id of each roster artist, for each country.
+
+    With the Discogs folder `discogs`, a roster name with a homonym mark and no id, such
+    as "WizKid (4)", has the id of the Discogs artist with that full name
+    (`dump_match.discogs_ids`), so no rule adds that Discogs artist a second time.
 
     An artist that `dump_match.ARTIST_COUNTRIES_FILE` gives another country is on no
     roster here: the roster that holds it imports none of its songs, and the country
@@ -213,6 +219,30 @@ def _rosters(data: Path, root: Path | None = None) -> dict[str, list[tuple[str, 
                     for artist, name, number in rows
                     if named.get(artist, parent.name) == parent.name
                 ]
+        marked = sorted(
+            {
+                name
+                for roster in rosters.values()
+                for name, number in roster
+                if not number and re.search(dump_match._HOMONYM, name)
+            }
+        )
+        if marked and discogs is not None and (discogs / "artists.parquet").is_file():
+            dump_match._table(connection, "marked", "str", marked)
+            artists = dump_match._quoted(discogs / "artists.parquet")
+            ids = dict(
+                connection.sql(
+                    f"SELECT name, artist_id FROM {artists} "
+                    "WHERE name IN (SELECT value FROM marked)"
+                ).fetchall()
+            )
+            rosters = {
+                code: [
+                    (name, number or (str(ids[name]) if name in ids else None))
+                    for name, number in roster
+                ]
+                for code, roster in rosters.items()
+            }
     return rosters
 
 
@@ -429,7 +459,7 @@ def new_artists(
     """
     iso3 = paths.check_iso3(iso3)
     found = home_artists(discogs.resolve(), iso3, min_releases, min_share)
-    rosters = _rosters(data) if found or dump is not None else {}
+    rosters = _rosters(data, discogs=discogs) if found or dump is not None else {}
     taken_ids, taken_keys = set(), set()
     for code, roster in rosters.items():
         keyed = [(dump_match.name_key(name), number) for name, number in roster]

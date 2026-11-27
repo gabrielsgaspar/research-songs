@@ -33,7 +33,6 @@ import pandas as pd
 from songs.common import manifests, paths, schemas
 from songs.common.schemas import MERGED_ARTIST_ID, NO_CREDIT
 from songs.stage_00_ingest import dump_match
-from songs.stage_00_ingest.dump_match import name_key
 
 ROUTE = dump_match.ROUTE
 REASONS = (MERGED_ARTIST_ID, NO_CREDIT)
@@ -104,7 +103,11 @@ def check_credits(data: Path, *, write: bool = False, today: date | None = None)
             inputs.append(paths.data_relative(data, dump))
         for iso3, song_id, source_song_id, roster_name in songs:
             credit = credits.get(source_song_id)
-            reason = "not_in_dump" if credit is None else _class(name_key(roster_name), credit)
+            reason = (
+                "not_in_dump"
+                if credit is None
+                else _class(dump_match.roster_key(roster_name), credit)
+            )
             counts[reason] += 1
             if reason in REASONS:
                 rows.append((iso3, song_id, reason))
