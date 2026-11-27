@@ -4,10 +4,11 @@ A song page is `/Artist/Lyrics/<id>/<slug>`. It has two panels. `div.dari-text` 
 the title, the singer and the lyric in Persian script. `div.en-text` holds the same in
 Latin letters. In each panel the `h1` is the title, then `small`, then a link
 `/Artist/Albums/<artist id>/<slug>` with the name of the singer, and `div.lyric` is
-the text. The reader takes the title and the singer from the Latin panel, because the
-roster and Discogs write Afghan names in Latin letters. It takes the lyric from the
-Persian-script panel, and from the Latin panel when the first one is empty. The page
-prints no year and no album.
+the text. The reader takes the title from the Latin panel, because Discogs writes
+Afghan titles in Latin letters. It gives the singer two credits with one artist id:
+the Latin name first, then the name in Persian script, because the roster holds names
+in both scripts. It takes the lyric from the Persian-script panel, and from the Latin
+panel when the first one is empty. The page prints no year and no album.
 
 `/Home/Browse` is the index of the singers, and `/Artist/All-Lyrics/<artist id>/<slug>`
 lists the songs of one singer.
@@ -51,7 +52,7 @@ class _Page(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.title = {"native": "", "latin": ""}
         self.lyric = {"native": "", "latin": ""}
-        self.artists: list[tuple[str, str]] = []
+        self.singer: dict[str, tuple[str, str]] = {}
         self._depth = 0
         self._panel = ""
         self._panel_depth = 0
@@ -109,8 +110,8 @@ class _Page(HTMLParser):
         found = _ARTIST.search(self._href)
         name = " ".join(self._text.split())
         self._href = ""
-        if found and name and self._panel == "latin" and not self.artists:
-            self.artists.append((found.group(1), name))
+        if found and name and self._panel not in self.singer:
+            self.singer[self._panel] = (found.group(1), name)
 
 
 def song_id(url: str) -> str | None:
@@ -139,4 +140,6 @@ def parse_song(html: str, url: str) -> tuple[dict | None, list[tuple[str, str]],
     if not lyric:
         return None, [], "no_lyric_block"
     title = page.title["latin"].strip() or page.title["native"]
-    return song_row(sys.modules[__name__], url, title, page.artists, lyric.splitlines())
+    found = [page.singer[panel] for panel in ("latin", "native") if panel in page.singer]
+    artists = [(found[0][0], name) for _artist_id, name in found]
+    return song_row(sys.modules[__name__], url, title, artists, lyric.splitlines())

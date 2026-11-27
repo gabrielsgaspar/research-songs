@@ -32,7 +32,7 @@ def _page(native: str = "<p>خط یک ساختگی<br />خط دو</p>\n<p>خط �
 def test_a_song_page_gives_the_latin_title_and_singer_and_the_native_text():
     row, artists, reason = afghansonglyrics.parse_song(_page(), URL)
     assert reason == ""
-    assert artists == [("9/Invented-Singer", "Invented Singer")]
+    assert artists == [("9/Invented-Singer", "Invented Singer"), ("9/Invented-Singer", "خواننده")]
     assert row["provider_song_id"] == "77"
     assert row["song_name"] == "Invented Title"
     assert row["artist_name"] == "Invented Singer"
