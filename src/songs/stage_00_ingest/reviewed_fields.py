@@ -32,7 +32,7 @@ def write_reviewed_table(
         "SELECT count(p.song_id) FROM reviewed_values r LEFT JOIN review_parent p USING(song_id) "
         "GROUP BY r.song_id HAVING count(p.song_id) <> 1"
     )
-    if matches.fetchone():
+    if matches.limit(1).fetchall():
         raise ValueError("A reviewed song is missing or has multiple parent rows.")
     replacements = ", ".join(
         f"CASE WHEN r.song_id IS NULL THEN p.{f} ELSE r.{f} END AS {f}" for f in fields
@@ -47,5 +47,5 @@ def write_reviewed_table(
     # Group full-row digests to check untouched fields and repeated rows within bounded memory.
     digests = "SELECT sha256(to_json(t)) h, count(*) n FROM {} t GROUP BY h"
     a, b = (digests.format(name) for name in ("review_expected", "review_written"))
-    if db.sql(f"({a} EXCEPT {b}) UNION ALL ({b} EXCEPT {a}) LIMIT 1").fetchone():
+    if db.sql(f"({a} EXCEPT {b}) UNION ALL ({b} EXCEPT {a}) LIMIT 1").limit(1).fetchall():
         raise ValueError("Written rows differ from the reviewed result.")
