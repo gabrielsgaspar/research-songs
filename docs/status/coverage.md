@@ -76,7 +76,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [FSM](../../countries/FSM/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [GAB](../../countries/GAB/) | 2 | 2026-11-21 | old_layout | old_pipeline | 259 |
 | [GBR](../../countries/GBR/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 469836 |
-| [GEO](../../countries/GEO/) | 13 | 2026-11-27 | dump_name, old_layout | genius, geniusru, geolyrics, georgianlyrics, lrclib, old_pipeline, textpesenok | 305 |
+| [GEO](../../countries/GEO/) | 14 | 2026-11-27 | dump_name, old_layout | genius, geniusru, geolyrics, georgianlyrics, lrclib, old_pipeline, textpesenok | 318 |
 | [GGY](../../countries/GGY/) | 2 | 2026-11-21 | old_layout | old_pipeline | 21 |
 | [GHA](../../countries/GHA/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 3531 |
 | [GIB](../../countries/GIB/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
