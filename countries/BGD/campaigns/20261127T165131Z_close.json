@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261127T165131Z",
+  "closed_utc": "2026-11-27T16:57:30Z",
+  "iso3": "BGD",
+  "next_time": "Do not start a full run of gitimala at 2 s: the site refuses that rate. Gabriel decides whether to try again with a much longer delay (10 s or more; 2,722 lyric pages take about 8 hours at 10 s). The 57 pilot songs are one block of the songbook Geetabitan and the site names Rabindranath Tagore, the writer, as the artist of all 57: 0 are on the BGD roster, would_add is 0. A new pilot must read pages from all 3 lyric sitemaps, not one block, to measure the roster share. Titles, artist names and lyric text of the pilot are in Latin letters.",
+  "outcome": "stopped",
+  "reason": "The site answered with HTTP 429 after 61 requests of the collector at 2 s between requests (68 requests in total with 7 by hand). The pilot wanted 185 songs and read 57.",
+  "schema_version": 1,
+  "songs_after": 213
+}

@@ -22,7 +22,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [BEN](../../countries/BEN/) | 5 | 2026-11-24 | dump_name, old_layout | genius, lacoccinelle, lrclib, old_pipeline | 1031 |
 | [BES](../../countries/BES/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [BFA](../../countries/BFA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 86 |
-| [BGD](../../countries/BGD/) | 2 | 2026-11-21 | old_layout | old_pipeline | 213 |
+| [BGD](../../countries/BGD/) | 3 | 2026-11-27 | live, old_layout | gitimala, old_pipeline | 213 |
 | [BGR](../../countries/BGR/) | 13 | 2026-11-26 | dump_name, old_layout | bgtekstove, genius, lrclib, old_pipeline, pevcheskipodsetnik, textovenapesni | 22174 |
 | [BHR](../../countries/BHR/) | 2 | 2026-11-21 | old_layout | old_pipeline | 760 |
 | [BHS](../../countries/BHS/) | 2 | 2026-11-21 | old_layout | old_pipeline | 406 |
