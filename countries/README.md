@@ -304,6 +304,14 @@ Records of schema version 1 do not have the fields from `campaign_id` to `limits
 | `manual_review` | Import of the songs that a person added to a country review workbook |
 | `old_layout` | Import of the state of a country from the files of the old pipeline. The old files do not record how each song was first collected |
 
+## Reviewer-selected songs
+
+The November 27, 2026 campaign checked 13 country workbooks and added 7,374 songs in 12 countries. Benin had no additions. Each new song has `route=manual_review`. Its run record has `source=review_workbook` and names the frozen workbook in `bulk_file`. The song keeps the lyric provider and source URL. Its ID is derived from the URL. A local dump can supply or verify lyrics for a song that a reviewer selected.
+
+The private crosswalk records the country, workbook hash, sheet row, song ID, artist ID, Discogs ID and run ID. The private review tables keep country disagreements and uncertain song matches out of the import. The campaign checked source IDs, artist and title, text hashes, and the first 300 normalized lyric characters against the stored songs. A matching prefix calls for review. It does not establish that two recordings are identical.
+
+The checked selection writer in `songs.stage_00_ingest.review_selection` verifies the new country tables before it writes the manifest. It checks that the parent songs survive and that replay adds zero rows. An approved country in `resources/lyrics/eligibility_exceptions.csv` admits eligible reviewer selections by exception. A workbook run preserves any earlier hold on dump songs.
+
 ## Coverage page
 
 [`docs/status/coverage.md`](../docs/status/coverage.md) has one row per country. It is generated from the records. Each collection run writes it again, and a test fails when it is out of date. After you merge `main` into a branch with new records, the page can conflict. Then write it again:
