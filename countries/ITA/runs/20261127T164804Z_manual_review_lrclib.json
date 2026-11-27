@@ -1,0 +1,31 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "raw/arthemis_recording_review/20261127/correction.json",
+  "campaign_id": "20261127T164804Z",
+  "code_commit": "dee73ad17e86234e325377181f9ddda56596feaa",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T16:48:40Z",
+  "iso3": "ITA",
+  "known_gaps": [
+    "A verified source transcription is needed for this Arthemis recording."
+  ],
+  "limits_hit": null,
+  "notes": "Quarantined one existing song after comparison with both label recordings. Parent 20261127T135838Z. Evidence SHA-256 f76cf9e54249b1b7a2e3c43bddbd8cfdcf2f98d47c1eb0dd9bc19d65a3a0ace5.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "manual_review",
+  "rows_added": 0,
+  "run_id": "20261127T164804Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 0,
+  "songs_attempted": 1,
+  "songs_rejected": {
+    "wrong_recording_text": 1
+  },
+  "source": "lrclib",
+  "started_utc": "2026-11-27T16:48:04Z",
+  "state": "complete"
+}

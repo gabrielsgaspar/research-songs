@@ -104,7 +104,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [IRQ](../../countries/IRQ/) | 2 | 2026-11-21 | old_layout | old_pipeline | 4687 |
 | [ISL](../../countries/ISL/) | 6 | 2026-11-25 | dump_name, old_layout | genius, lrclib, old_pipeline | 6149 |
 | [ISR](../../countries/ISR/) | 13 | 2026-11-27 | dump_name, old_layout | genius, hebrew_lyrics_hf, hngn, jyrics, lrclib, old_pipeline, zemereshet | 27562 |
-| [ITA](../../countries/ITA/) | 6 | 2026-11-27 | dump_name, old_layout | genius, lrclib, old_pipeline | 164182 |
+| [ITA](../../countries/ITA/) | 7 | 2026-11-27 | dump_name, manual_review, old_layout | genius, lrclib, old_pipeline | 164182 |
 | [JAM](../../countries/JAM/) | 5 | 2026-11-27 | dump_name, manual_review, old_layout | genius, lrclib, old_pipeline | 37654 |
 | [JEY](../../countries/JEY/) | 2 | 2026-11-21 | old_layout | old_pipeline | 24 |
 | [JOR](../../countries/JOR/) | 5 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline, songnu | 820 |
