@@ -43,7 +43,15 @@ MAX_ERRORS_IN_A_ROW = 3
 RETRY_WAITS = (60, 300, 900)
 STOP_FILE = "STOP"
 ROUTE = "live"
-SOURCES = ("aama", "afghansonglyrics", "gitimala", "hopamviet", "loibaihat", "lyricslk", "musiburma")
+SOURCES = (
+    "aama",
+    "afghansonglyrics",
+    "gitimala",
+    "hopamviet",
+    "loibaihat",
+    "lyricslk",
+    "musiburma",
+)
 PAGE_CAP = 5_000
 OFFSET_CAP = 20_000
 _NEXT_HREF = re.compile(r"""(?:rel="next"[^>]*href="([^"]+)"|href="([^"]+)"[^>]*rel="next")""")
