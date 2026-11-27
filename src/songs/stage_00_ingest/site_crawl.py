@@ -43,7 +43,7 @@ MAX_ERRORS_IN_A_ROW = 3
 RETRY_WAITS = (60, 300, 900)
 STOP_FILE = "STOP"
 ROUTE = "live"
-SOURCES = ("afghansonglyrics", "hopamviet", "loibaihat", "lyricslk", "musiburma")
+SOURCES = ("aama", "afghansonglyrics", "hopamviet", "loibaihat", "lyricslk", "musiburma")
 PAGE_CAP = 5_000
 OFFSET_CAP = 20_000
 _NEXT_HREF = re.compile(r"""(?:rel="next"[^>]*href="([^"]+)"|href="([^"]+)"[^>]*rel="next")""")
@@ -532,7 +532,7 @@ def collect(
     listed = next(item for item in lyric_sources.load_lyric_sources() if item.id == source)
     if listed.access != "allowed":
         raise CollectError(f"requests to {source} are {listed.access} in the source file")
-    if iso3 not in listed.countries:
+    if all(item.id != source for item in lyric_sources.sources_for(iso3)):
         raise CollectError(f"{source} does not serve {iso3} in the source file")
     staging = data / "staging" / "site_crawl" / source
     _lock(staging)
