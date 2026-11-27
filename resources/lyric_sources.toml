@@ -828,13 +828,13 @@ name = "Afghan Song Lyrics"
 kind = "live_site"
 scope = "countries"
 countries = ["AFG"]
-url = "https://afghansonglyrics.com"
+url = "https://www.afghansonglyrics.com"
 stored_path = ""
 routes = ["live", "roster_update", "recover"]
 access = "allowed"
 request_delay_seconds = 1.0
-checked = false
-notes = "The country is inferred from the name."
+checked = true
+notes = "Dari and Pashto songs, by singer. Each song has the text in Persian script and in Latin letters. The pages print no year. robots.txt has comments only and no rule. The pilot of 2026-11-27 used 4 s between requests."
 
 [[source]]
 id = "afghanlyric"

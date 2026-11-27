@@ -153,7 +153,7 @@ A run record may name only a source on this page. To use a new source, add its e
 | `socarecords` | [Soca Records](https://socarecords.com) | Countries: ATG, BHS, BRB, DMA, GRD, GUY, JAM, KNA, LCA, TTO, VCT | live, roster_update, recover | allowed, 0.75 s between requests | - | no | The list of Caribbean countries is not confirmed. |
 | `lyricsarabic` | [Lyrics-Arabic](https://lyrics-arabic.com) | Languages: Arabic | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `ganjoor` | [Ganjoor](https://ganjoor.net) | Countries: IRN | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
-| `afghansonglyrics` | [Afghan Song Lyrics](https://afghansonglyrics.com) | Countries: AFG | live, roster_update, recover | allowed, 1 s between requests | - | no | The country is inferred from the name. |
+| `afghansonglyrics` | [Afghan Song Lyrics](https://www.afghansonglyrics.com) | Countries: AFG | live, roster_update, recover | allowed, 1 s between requests | - | yes | Dari and Pashto songs, by singer. Each song has the text in Persian script and in Latin letters. The pages print no year. robots.txt has comments only and no rule. The pilot of 2026-11-27 used 4 s between requests. |
 | `afghanlyric` | [Afghan Lyric](https://afghanlyric.com) | Countries: AFG | live, roster_update, recover | allowed, 1 s between requests | - | no | The country is inferred from the name. |
 | `hebrewsongs` | [HebrewSongs](https://www.hebrewsongs.com) | Countries: ISR | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `shironet` | [Shironet](https://shironet.mako.co.il) | Countries: ISR | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
