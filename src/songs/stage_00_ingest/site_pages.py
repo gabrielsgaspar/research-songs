@@ -52,6 +52,7 @@ SITES = (
     "hopamviet",
     "kyrgyzaudio",
     "loibaihat",
+    "lyricslk",
     "matinder",
     "mediastar",
     "musiburma",
