@@ -44,7 +44,15 @@ RETRY_WAITS = (60, 300, 900)
 STOP_FILE = "STOP"
 ROUTE = "live"
 SOURCES = (
-SOURCES = ("aama", "afghansonglyrics", "gitimala", "hopamviet", "loibaihat", "lyricslk", "musiburma", "pesninet", "tekstpesnionline")
+    "aama",
+    "afghansonglyrics",
+    "gitimala",
+    "hopamviet",
+    "loibaihat",
+    "lyricslk",
+    "musiburma",
+    "pesninet",
+    "tekstpesnionline",
 )
 PAGE_CAP = 5_000
 OFFSET_CAP = 20_000
@@ -535,7 +543,7 @@ def collect(
     listed = next(item for item in lyric_sources.load_lyric_sources() if item.id == source)
     if listed.access != "allowed":
         raise CollectError(f"requests to {source} are {listed.access} in the source file")
-SOURCES = ()
+    if all(item.id != source for item in lyric_sources.sources_for(iso3)):
         raise CollectError(f"{source} does not serve {iso3} in the source file")
     if seed_urls:
         seeds = []
