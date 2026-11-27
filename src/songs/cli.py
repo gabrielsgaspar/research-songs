@@ -331,25 +331,40 @@ def lyrics_collect(
     the dump and import it with the two commands that it prints.
     """
     from songs.common.paths import data_root
-    from songs.stage_00_ingest import dainutekstai
+    from songs.stage_00_ingest import dainutekstai, site_crawl
 
     code = _country(iso3)
-    if source != dainutekstai.SOURCE:
+    known = (dainutekstai.SOURCE, *site_crawl.SOURCES)
+    if source not in known:
         typer.echo(
-            f"error: no collector for {source}; one exists for {dainutekstai.SOURCE}", err=True
+            f"error: no collector for {source}; one exists for {', '.join(known)}",
+            err=True,
         )
         raise typer.Exit(1)
     typer.echo(run_records.format_history(run_records.read_run_records(code)))
     data = data_root()
     try:
-        result = dainutekstai.collect(
-            data,
-            code,
-            delay=delay,
-            artist_limit=artist_limit,
-            song_limit=song_limit,
-            reason=reason,
-        )
+        if source == dainutekstai.SOURCE:
+            result = dainutekstai.collect(
+                data,
+                code,
+                delay=delay,
+                artist_limit=artist_limit,
+                song_limit=song_limit,
+                reason=reason,
+            )
+        else:
+            result = site_crawl.collect(
+                data,
+                source,
+                code,
+                delay=delay,
+                artist_limit=artist_limit,
+                song_limit=song_limit,
+                reason=reason,
+            )
+    except UnicodeError:
+        raise
     except (FileExistsError, ValueError) as error:
         typer.echo(f"error: {error}", err=True)
         raise typer.Exit(1) from error
@@ -361,10 +376,13 @@ def lyrics_collect(
         typer.echo(f"left out, {name}: {number}")
     for gap in result["known_gaps"]:
         typer.echo(f"note: {gap}")
-    if result["path"]:
+    if result["path"] and source == dainutekstai.SOURCE:
         typer.echo(f"wrote {result['path']}. Next:")
         typer.echo(f'uv run songs dumps build {source} "{data / result["path"]}" {result["path"]}')
         typer.echo(f"uv run songs lyrics import-dump {source} {code}")
+    elif result["path"]:
+        typer.echo(f"wrote {result['path']}. Next:")
+        typer.echo(f"uv run songs dumps parse {source} {result['path']}")
 
 
 @lyrics_app.command("import-scores")
@@ -575,6 +593,12 @@ def dumps_parse(
         str,
         typer.Argument(help="raw/<source>/<YYYYMMDD>/ of the saved pages, relative to the data."),
     ],
+    day: Annotated[
+        str | None,
+        typer.Option(
+            "--day", help="Date of the new folder, YYYYMMDD. The default is today in UTC."
+        ),
+    ] = None,
 ) -> None:
     """Read the saved pages of a site into a lyric table in a new raw/<source>/<YYYYMMDD>/.
 
@@ -585,7 +609,7 @@ def dumps_parse(
 
     data = data_root()
     try:
-        result = site_pages.parse_folder(data, source, raw_input)
+        result = site_pages.parse_folder(data, source, raw_input, day=day)
     except (FileExistsError, ValueError) as error:
         typer.echo(f"error: {error}", err=True)
         raise typer.Exit(1) from error

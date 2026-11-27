@@ -138,7 +138,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [MKD](../../countries/MKD/) | 15 | 2026-11-26 | dump_name, old_layout | cuspajz, genius, lrclib, old_pipeline, pesmarica, tekstomanija, tekstovi, tekstovipesama, tekstovipjesama | 1734 |
 | [MLI](../../countries/MLI/) | 5 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline, paroles2chansons | 1174 |
 | [MLT](../../countries/MLT/) | 4 | 2026-11-23 | dump_name, old_layout | genius, lrclib, old_pipeline | 433 |
-| [MMR](../../countries/MMR/) | 2 | 2026-11-21 | old_layout | old_pipeline | 16 |
+| [MMR](../../countries/MMR/) | 3 | 2026-11-27 | live, old_layout | musiburma, old_pipeline | 16 |
 | [MNE](../../countries/MNE/) | 12 | 2026-11-26 | dump_name, old_layout | cuspajz, genius, lrclib, old_pipeline, pesmarica, tekstomanija, tekstovi, tekstovipesama | 1382 |
 | [MNG](../../countries/MNG/) | 2 | 2026-11-21 | old_layout | old_pipeline | 181 |
 | [MOZ](../../countries/MOZ/) | 7 | 2026-11-26 | dump_name, old_layout | genius, letras, lrclib, old_pipeline | 258 |
@@ -221,7 +221,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [VEN](../../countries/VEN/) | 14 | 2026-11-26 | dump_name, old_layout | genius, letras, lrclib, musica, old_pipeline | 13165 |
 | [VGB](../../countries/VGB/) | 2 | 2026-11-21 | old_layout | old_pipeline | 2 |
 | [VIR](../../countries/VIR/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
-| [VNM](../../countries/VNM/) | 11 | 2026-11-25 | dump_name, old_layout | genius, lrclib, nhac_vn, nhaccuatui, old_pipeline, tkaraoke | 7872 |
+| [VNM](../../countries/VNM/) | 12 | 2026-11-26 | dump_name, live, old_layout | genius, loibaihat, lrclib, nhac_vn, nhaccuatui, old_pipeline, tkaraoke | 7872 |
 | [VUT](../../countries/VUT/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [WSM](../../countries/WSM/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [XKX](../../countries/XKX/) | 4 | 2026-11-25 | dump_name, old_layout | genius, lrclib, old_pipeline | 263 |

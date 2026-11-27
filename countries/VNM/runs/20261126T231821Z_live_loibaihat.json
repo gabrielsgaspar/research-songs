@@ -1,0 +1,33 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 0,
+  "backfilled": false,
+  "bulk_file": null,
+  "campaign_id": "20261126T231803Z",
+  "code_commit": "55a5d385bb8fcdbfab2fbc8f1d3523dfcb84f508",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-26T23:40:36Z",
+  "iso3": "VNM",
+  "known_gaps": [
+    "The run stopped: UnicodeEncodeError."
+  ],
+  "limits_hit": {
+    "stopped": "UnicodeEncodeError"
+  },
+  "notes": "Wrote raw/loibaihat/20261126/ Stopped by UnicodeEncodeError.",
+  "request_delay_seconds": 2.0,
+  "requests_sent": 304,
+  "route": "live",
+  "rows_added": 0,
+  "run_id": "20261126T231821Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 289,
+  "songs_attempted": 299,
+  "songs_rejected": {
+    "no_artist": 10
+  },
+  "source": "loibaihat",
+  "started_utc": "2026-11-26T23:18:21Z",
+  "state": "failed"
+}

@@ -182,6 +182,10 @@ A run record may name only a source on this page. To use a new source, add its e
 | `lirikid` | [Lirik.id](https://lirik.id) | Countries: IDN | live, roster_update, recover | allowed, 1 s between requests | - | no | The address and the country are inferred. |
 | `lyricvn` | [LyricVN](https://lyricvn.com) | Countries: VNM | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `lyricsvn` | [Lyrics.vn](https://lyrics.vn) | Countries: VNM | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
+| `hopamviet` | [Hop Am Viet](https://hopamviet.vn) | Countries: VNM | live | allowed, 2 s between requests | - | yes | Gabriel authorized the crawl on 2026-11-26. robots.txt allows /. Skip /chord/printsong/, /chord/search, /auth/, /user/, and /sheet/download/. |
+| `loibaihat` | [Loi bai hat](https://loibaihat.biz) | Countries: VNM | live | allowed, 2 s between requests | - | yes | Gabriel authorized the crawl on 2026-11-26. robots.txt allows /. |
+| `hopamchuan` | [Hop Am Chuan](https://hopamchuan.com) | Countries: VNM | live | blocked, 2 s between requests | - | yes | Do not crawl. Every HTML page says a crawl affects guitar players who are using the site, and asks for an API request instead. robots.txt has no Allow or Disallow rule. Gabriel stopped the crawl on 2026-11-26. |
+| `musiburma` | [MusiBurma](https://www.musiburma.com) | Countries: MMR | live | allowed, 2 s between requests | - | yes | Gabriel authorized the crawl on 2026-11-26. robots.txt allows /. Skip /api/. |
 | `pinoysonghits` | [PinoySongHits](https://www.pinoysonghits.com) | Countries: PHL | live, roster_update, recover | allowed, 60 s between requests | - | yes | The site asks for 60 seconds between requests. |
 | `songtexte` | [Songtexte](https://www.songtexte.com) | Languages: German | live, roster_update, recover | allowed, 1 s between requests | - | yes | An index of the site was started and is not complete. |
 | `songteksten` | [Songteksten](https://songteksten.net) | Languages: Dutch | live, roster_update, recover | allowed, 1 s between requests | - | no | The address of the site is inferred. |
@@ -321,6 +325,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | MEX | `buenamusica`, `letras`, `musica` |
 | MKD | `cuspajz`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
 | MLI | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
+| MMR | `musiburma` |
 | MNE | `cuspajz`, `hitovi`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
 | MOZ | `letras` |
 | MRT | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
@@ -372,7 +377,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | UZB | `geniusru`, `tekstpesni`, `textpesenok`, `uzmatn`, `uztext` |
 | VCT | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | VEN | `buenamusica`, `letras`, `musica` |
-| VNM | `amnhacmiennam`, `lyricsvn`, `lyricvn`, `nhac_vn`, `nhaccuatui`, `tkaraoke` |
+| VNM | `amnhacmiennam`, `hopamchuan`, `hopamviet`, `loibaihat`, `lyricsvn`, `lyricvn`, `nhac_vn`, `nhaccuatui`, `tkaraoke` |
 | YEM | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | ZAF | `kasilyrics` |
 | ZMB | `zedlyric` |

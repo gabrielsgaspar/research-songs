@@ -39,6 +39,10 @@ _TEXT = re.compile(r'<pre id="song-text"[^>]*>(.*?)</pre>', re.S)
 _WITHHELD = "autorskim pravima"
 # A chord in letter names (`F#m7`, `Bb/D`), German names (`Fis`, `Cism`, `Es`) or a
 # lowercase name (`dm`, `e`).
+_UPPER_CHORD = (
+    r"[A-H](?:[#b♭♯])?(?:m|maj|min|dim|aug|sus|add|M|\+)?\d*"
+    r"(?:(?:sus|add|maj|[#b+-])\d+)*(?:/[A-H][#b♭♯]?)?"
+)
 _CHORD = re.compile(
     r"[(\[{]?(?:[A-H](?:[#b♭♯]|is|es|s)?(?:m|maj|min|mol|dim|aug|sus|add|M|\+)?|[a-h]#?m?)\d*"
     r"(?:(?:sus|add|maj|[#b+-])\d+)*(?:/[A-H][#b♭♯]?)?[)\]}]?[*!]?"
@@ -61,11 +65,19 @@ _CREDIT = re.compile(
 )
 # A section label: the word with a number, then a bracket, a colon, a dot or the line end.
 _LABEL = re.compile(
-    rf"^\s*[\[(]?\s*{_SECTION}\s*\d*\s*(?:[\])]\s*[.:]?|[.:]|(?=\s*$))\s*", re.IGNORECASE
+    rf"^\s*[\[(\{{]?\s*{_SECTION}\s*\d*\s*(?:[\])\}}\]]\s*[.:]?|[.:]|(?=\s*$))\s*",
+    re.IGNORECASE,
 )
 _LABEL_WORD = re.compile(rf"{_SECTION}\d*", re.IGNORECASE)
-# A chord written in the lyric line (`[G]Bilo je`).
-_INLINE = re.compile(r"\[[A-Ha-h][^\]\s]{0,8}\]")
+# A chord written in the lyric line (`[G]Bilo je`), including broken brackets (`[D}`, `{G7]`,
+# `[Am7[`, `[G;`, unclosed `[Dm`, unopened `Bm]`) and slash-bass fragments (`/G#`).
+_INLINE = re.compile(
+    rf"\[[A-Ha-h][^\]\s]{{0,8}}\]"
+    rf"|[\[\{{]{_UPPER_CHORD}[\]\}}\[;]"
+    rf"|\[{_UPPER_CHORD}(?![A-Za-z0-9#b/])"
+    rf"|/(?:[A-H][#b♭♯])(?![A-Za-z])"
+)
+_UNOPENED_INLINE = re.compile(rf"(?<![A-Za-z]){_UPPER_CHORD}\]")
 _LETTER = re.compile(r"[^\W\d_]")
 _TAB = re.compile(r"\s*[A-Ha-h]?\s*\|?[-\d|hpbrx/\\~^ ]+")
 # Whole texts that stand for no words, as `name_key` values.
@@ -101,7 +113,19 @@ def is_chord_line(line: str) -> bool:
 
 def _tokens(text: str) -> list[str]:
     """Return the words of a line, split at spaces, bars, slashes, commas and dashes."""
-    return [token.strip(".;:") for token in re.split(r"[\s|/,\-–]+", text) if token.strip(".;:")]
+    return [
+        token.strip(".;:()[]{}")
+        for token in re.split(r"[\s|/,\-–]+", text)
+        if token.strip(".;:()[]{}")
+    ]
+
+
+def _strip_inline(line: str) -> str:
+    """Remove inline chord tokens, including broken brackets, while keeping bracketed text."""
+    cleaned = _INLINE.sub("", line)
+    if "[" not in cleaned:
+        cleaned = _UNOPENED_INLINE.sub("", cleaned)
+    return cleaned
 
 
 def _count(text: str) -> tuple[int, int]:
@@ -119,7 +143,7 @@ def lyric_lines(sheet: str, *heading: str) -> list[str]:
     (`Cu___jem`). Lines at the start that only repeat the `heading` (the title or the
     artist) go too.
     """
-    lines = [_INLINE.sub("", line) for line in sheet.replace("\r", "").split("\n")]
+    lines = [_strip_inline(line) for line in sheet.replace("\r", "").split("\n")]
     lines = [re.sub(r"_+", "", _LABEL.sub("", line)) for line in lines if not is_chord_line(line)]
     keys = [name_key(name) for name in heading if name_key(name)]
     while lines and _is_heading(name_key(lines[0]), keys):
