@@ -412,14 +412,14 @@ id = "afrikalyrics"
 name = "AfrikaLyrics"
 kind = "site_archive"
 scope = "countries"
-countries = ["CIV", "CMR", "COD", "ERI", "NGA"]
+countries = ["CIV", "CMR", "COD", "ERI", "GHA", "KEN", "MLI", "NGA", "SEN", "TZA", "UGA"]
 url = "https://afrikalyrics.com"
 stored_path = ""
 routes = ["archive", "live", "roster_update", "recover"]
 access = "allowed"
 request_delay_seconds = 1.0
 checked = true
-notes = "A site archive dated 2026-10-19 exists. The site holds more African countries than this list."
+notes = "A site archive dated 2026-10-19 exists. The site has a page for each of 52 African countries. The earlier pipeline already took most of its songs for GHA, KEN, MLI, SEN, TZA and UGA: on 2026-11-27 a survey gave 20 songs for GHA and 0 to 2 for the others."
 
 [[source]]
 id = "ethiozeima"
@@ -557,13 +557,13 @@ id = "kasilyrics"
 name = "Kasi Lyrics"
 kind = "site_archive"
 scope = "countries"
-countries = ["ZAF"]
+countries = ["KEN", "ZAF"]
 url = "https://kasilyrics.co.za"
 stored_path = ""
 routes = ["archive", "dump_name"]
 access = "unknown"
 checked = true
-notes = ""
+notes = "The site also holds Kenyan songs. On 2026-11-27 a survey gave 39 songs for KEN."
 
 [[source]]
 id = "zedlyric"
@@ -693,26 +693,26 @@ id = "arabiclyrics_net"
 name = "ArabicLyrics.net"
 kind = "site_archive"
 scope = "countries"
-countries = ["EGY"]
+countries = ["EGY", "LBN", "SYR"]
 url = "http://arabiclyrics.net"
 stored_path = ""
 routes = ["archive"]
 access = "unknown"
 checked = true
-notes = ""
+notes = "Titles and names are in Latin letters. On 2026-11-27 a survey gave 26 songs for LBN and 8 for SYR."
 
 [[source]]
 id = "aghanilyrics"
 name = "Aghani Lyrics"
 kind = "site_archive"
-scope = "countries"
-countries = ["DZA", "MAR", "TUN"]
+scope = "languages"
+languages = ["ar"]
 url = "https://aghanilyrics.com"
 stored_path = ""
 routes = ["archive"]
 access = "unknown"
 checked = true
-notes = ""
+notes = "The dump holds songs of artists of the whole Arab world, not only of the Maghreb. On 2026-11-27 a survey gave 484 songs for 13 countries outside DZA, MAR and TUN; most are in LBN (164) and EGY (149)."
 
 [[source]]
 id = "lyricstn"
@@ -755,7 +755,7 @@ stored_path = ""
 routes = ["archive"]
 access = "unknown"
 checked = true
-notes = ""
+notes = "On 2026-11-27 the site gave no answer."
 
 [[source]]
 id = "ritmahang"
@@ -828,13 +828,13 @@ name = "Afghan Song Lyrics"
 kind = "live_site"
 scope = "countries"
 countries = ["AFG"]
-url = "https://afghansonglyrics.com"
+url = "https://www.afghansonglyrics.com"
 stored_path = ""
 routes = ["live", "roster_update", "recover"]
 access = "allowed"
 request_delay_seconds = 1.0
-checked = false
-notes = "The country is inferred from the name."
+checked = true
+notes = "Dari and Pashto songs, by singer. Each song has the text in Persian script and in Latin letters. The pages print no year. robots.txt has comments only and no rule. The pilot of 2026-11-27 used 4 s between requests."
 
 [[source]]
 id = "afghanlyric"
@@ -1175,7 +1175,7 @@ routes = ["live", "roster_update", "recover"]
 access = "allowed"
 request_delay_seconds = 1.0
 checked = false
-notes = "The country is inferred from the name."
+notes = "The country is inferred from the name. On 2026-11-27 the address answered with a parked page."
 
 
 # --- East and Southeast Asia ---------------------------------------------------
@@ -1939,7 +1939,7 @@ id = "textovenapesni"
 name = "Textove na pesni"
 kind = "site_archive"
 scope = "countries"
-countries = ["BGR"]
+countries = ["BGR", "MKD"]
 url = "https://textovenapesni.com"
 stored_path = ""
 routes = ["archive"]
@@ -1952,13 +1952,13 @@ id = "pevcheskipodsetnik"
 name = "Pevcheski Podsetnik"
 kind = "site_archive"
 scope = "countries"
-countries = ["BGR"]
+countries = ["BGR", "MKD"]
 url = "https://pevcheskipodsetnik.com"
 stored_path = ""
 routes = ["archive"]
 access = "unknown"
 checked = true
-notes = ""
+notes = "The site also holds Macedonian folk songs. On 2026-11-27 a survey gave 117 songs for MKD."
 
 [[source]]
 id = "bgtekstove"

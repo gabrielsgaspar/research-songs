@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261127T114729Z",
+  "closed_utc": "2026-11-27T12:23:46Z",
+  "iso3": "USA",
+  "next_time": "Run lrclib and genius again with the match rules of pull requests 108, 109, 111, 127 and 135. The estimate of all USA dumps takes about 2 h 45 min before the first import starts, so start it when the computer has a free half day.",
+  "outcome": "stopped",
+  "reason": "Gabriel asked to skip the USA in this pass, because its estimate step alone took 2 h 45 min. The stream stopped before the first import; no songs folder and no run record were written.",
+  "schema_version": 1,
+  "songs_after": null
+}

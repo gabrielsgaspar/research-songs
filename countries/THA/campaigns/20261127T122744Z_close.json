@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261127T122744Z",
+  "closed_utc": "2026-11-27T14:06:21Z",
+  "iso3": "THA",
+  "next_time": "Songs added by source: lrclib 613, deungdutjai 40, genius 8. Dump songs of roster artists with no Discogs track of their title: up to 10186; songs of artists on no roster: up to 29178257. The deungdutjai titles are in Thai script, and the Discogs tracks of Thai artists often have Latin titles, so most dump songs of roster artists find no track. Before the next campaign, match Thai titles to Discogs titles through a transliteration, or build siamzone.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 19823
+}
