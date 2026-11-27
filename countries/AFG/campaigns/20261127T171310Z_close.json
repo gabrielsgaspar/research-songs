@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261127T171310Z",
+  "closed_utc": "2026-11-27T17:31:40Z",
+  "iso3": "AFG",
+  "next_time": "Do not run a full crawl of afghansonglyrics for the Discogs rule: the pilot read 140 songs of 21 singers with 171 requests and would add 0 songs (127 not on the roster, 13 of roster singers with no Discogs track). The site has 2,725 songs of 346 singers; 23 singers are on the roster (20 with a Discogs id) and hold 1,023 songs. The pages print no year. A full crawl is about 2,800 requests, 3.1 hours at 4 s, and is useful only when a song with no Discogs track can enter. Then test a match on the Persian-script title, which the page also prints.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 59
+}
