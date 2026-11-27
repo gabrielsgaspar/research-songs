@@ -5,7 +5,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | Country | Runs | Last run | Routes | Sources | Rows added |
 | --- | --- | --- | --- | --- | --- |
 | [ABW](../../countries/ABW/) | 2 | 2026-11-21 | old_layout | old_pipeline | 20 |
-| [AFG](../../countries/AFG/) | 2 | 2026-11-21 | old_layout | old_pipeline | 59 |
+| [AFG](../../countries/AFG/) | 3 | 2026-11-27 | live, old_layout | afghansonglyrics, old_pipeline | 59 |
 | [AGO](../../countries/AGO/) | 9 | 2026-11-25 | dump_name, old_layout | genius, letras, lrclib, old_pipeline | 2036 |
 | [AIA](../../countries/AIA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 1 |
 | [ALB](../../countries/ALB/) | 2 | 2026-11-21 | old_layout | old_pipeline | 779 |

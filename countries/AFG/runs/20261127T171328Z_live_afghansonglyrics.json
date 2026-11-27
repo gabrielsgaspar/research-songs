@@ -1,0 +1,31 @@
+{
+  "artist_limit": 20,
+  "artists_attempted": 11,
+  "backfilled": false,
+  "bulk_file": null,
+  "campaign_id": "20261127T171310Z",
+  "code_commit": "cfdfd95cfeffd4b910a326f8a14348fe882eed84",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T17:24:43Z",
+  "iso3": "AFG",
+  "known_gaps": [
+    "The run reached the song limit of 140."
+  ],
+  "limits_hit": {
+    "song_limit": 140
+  },
+  "notes": "Wrote raw/afghansonglyrics/20261127/",
+  "request_delay_seconds": 4.0,
+  "requests_sent": 154,
+  "route": "live",
+  "rows_added": 0,
+  "run_id": "20261127T171328Z",
+  "schema_version": 2,
+  "song_limit": 140,
+  "songs_accepted": 140,
+  "songs_attempted": 140,
+  "songs_rejected": {},
+  "source": "afghansonglyrics",
+  "started_utc": "2026-11-27T17:13:28Z",
+  "state": "complete"
+}
