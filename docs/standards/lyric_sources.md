@@ -56,7 +56,7 @@ A run record may name only a source on this page. To use a new source, add its e
 | `paroles2chansons` | Paroles2Chansons | Languages: French | archive, live, roster_update, recover | allowed, 1 s between requests | - | no | A site archive exists. The address of the site is not confirmed. |
 | `wikimizik` | [Wikimizik](https://wikimizik.com) | Countries: HTI | archive | unknown | - | yes | - |
 | `mentomusic` | [Mento Music](https://www.mentomusic.com) | Countries: JAM | archive | unknown | - | yes | - |
-| `afrikalyrics` | [AfrikaLyrics](https://afrikalyrics.com) | Countries: CIV, CMR, COD, ERI, NGA | archive, live, roster_update, recover | allowed, 1 s between requests | - | yes | A site archive dated 2026-10-19 exists. The site holds more African countries than this list. |
+| `afrikalyrics` | [AfrikaLyrics](https://afrikalyrics.com) | Countries: CIV, CMR, COD, ERI, GHA, KEN, MLI, NGA, SEN, TZA, UGA | archive, live, roster_update, recover | allowed, 1 s between requests | - | yes | A site archive dated 2026-10-19 exists. The site has a page for each of 52 African countries. The earlier pipeline already took most of its songs for GHA, KEN, MLI, SEN, TZA and UGA: on 2026-11-27 a survey gave 20 songs for GHA and 0 to 2 for the others. |
 | `ethiozeima` | [EthioZeima](https://www.ethiozeima.com) | Countries: ETH | local_source | allowed, 1 s between requests | - | yes | A site archive dated 2026-09-13 exists. Text is in Ethiopic script and in Latin letters. |
 | `oromolyrics` | [Oromo Lyrics](https://oromolyrics.wordpress.com) | Countries: ETH | archive | unknown | - | yes | - |
 | `tewle` | [Tewle](https://tewle.com) | Countries: ERI | local_source | unknown | - | yes | A site archive dated 2026-09-13 exists. Text is in Tigrinya. |
@@ -67,7 +67,7 @@ A run record may name only a source on this page. To use a new source, add its e
 | `lingala_cd` | [Lingala.cd](https://lingala.cd) | Countries: COD, COG | archive | unknown | - | yes | - |
 | `ndombolo` | [Ndombolo](https://ndombolo.co) | Countries: COD, COG | archive | unknown | - | yes | - |
 | `howwe` | [Howwe](https://howwe.ug) | Countries: UGA | archive | unknown | - | yes | - |
-| `kasilyrics` | [Kasi Lyrics](https://kasilyrics.co.za) | Countries: ZAF | archive, dump_name | unknown | - | yes | - |
+| `kasilyrics` | [Kasi Lyrics](https://kasilyrics.co.za) | Countries: KEN, ZAF | archive, dump_name | unknown | - | yes | The site also holds Kenyan songs. On 2026-11-27 a survey gave 39 songs for KEN. |
 | `zedlyric` | [Zed Lyric](https://zedlyric.com) | Countries: ZMB | archive | unknown | - | yes | - |
 | `aama` | [AAMA](https://www.aama.sa) | Languages: Arabic | local_source | allowed, 1 s between requests | - | yes | A site archive dated 2026-09-13 exists. |
 | `fnanen` | [Fnanen](https://fnanen.com) | Languages: Arabic | archive, live, roster_update, recover | allowed, 1 s between requests | - | yes | A site archive dated 2026-09-13 exists. |
@@ -75,10 +75,10 @@ A run record may name only a source on this page. To use a new source, add its e
 | `aghanylyrics` | [Aghany Lyrics](https://aghanylyrics.com) | Languages: Arabic | archive | unknown | - | yes | - |
 | `songnu` | [Song.nu](https://song.nu) | Languages: Arabic | archive | unknown | - | yes | - |
 | `altkia` | [Altkia](https://altkia.com) | Languages: Arabic | archive | unknown | - | yes | - |
-| `arabiclyrics_net` | [ArabicLyrics.net](http://arabiclyrics.net) | Countries: EGY | archive | unknown | - | yes | - |
-| `aghanilyrics` | [Aghani Lyrics](https://aghanilyrics.com) | Countries: DZA, MAR, TUN | archive | unknown | - | yes | - |
+| `arabiclyrics_net` | [ArabicLyrics.net](http://arabiclyrics.net) | Countries: EGY, LBN, SYR | archive | unknown | - | yes | Titles and names are in Latin letters. On 2026-11-27 a survey gave 26 songs for LBN and 8 for SYR. |
+| `aghanilyrics` | [Aghani Lyrics](https://aghanilyrics.com) | Languages: Arabic | archive | unknown | - | yes | The dump holds songs of artists of the whole Arab world, not only of the Maghreb. On 2026-11-27 a survey gave 484 songs for 13 countries outside DZA, MAR and TUN; most are in LBN (164) and EGY (149). |
 | `lyricstn` | [LyricsTN](https://lyricstn.tn) | Countries: TUN | archive | unknown | - | yes | - |
-| `mustext` | [Mustext](https://mustext.net) | Countries: AFG, IRN, TJK | archive | unknown | - | yes | - |
+| `mustext` | [Mustext](https://mustext.net) | Countries: AFG, IRN, TJK | archive | unknown | - | yes | On 2026-11-27 the site gave no answer. |
 | `ritmahang` | [Ritm Ahang](https://ritmahang.com) | Countries: IRN | archive | unknown | - | yes | - |
 | `zibamatn` | [Ziba Matn](https://zibamatn.ir) | Countries: IRN | archive | unknown | - | yes | - |
 | `musicdel` | [MusicDel](https://musicdel.ir) | Countries: IRN | archive | unknown | - | yes | - |
@@ -109,8 +109,8 @@ A run record may name only a source on this page. To use a new source, add its e
 | `karaoketexty` | [KaraokeTexty](https://www.karaoketexty.cz) | Countries: CZE, SVK | archive | unknown | - | yes | About 1.0 million songs. Up to 5 requests per second were approved for the archive run. |
 | `zoznam_hudba` | [Zoznam Hudba](https://hudba.zoznam.sk) | Countries: SVK | archive | unknown | - | yes | About 568,000 lyrics. Up to 5 requests per second were approved for the archive run. |
 | `sergiudo` | [Sergiudo](https://sergiudo.com) | Countries: MDA | archive | unknown | - | yes | - |
-| `textovenapesni` | [Textove na pesni](https://textovenapesni.com) | Countries: BGR | archive | unknown | - | yes | - |
-| `pevcheskipodsetnik` | [Pevcheski Podsetnik](https://pevcheskipodsetnik.com) | Countries: BGR | archive | unknown | - | yes | - |
+| `textovenapesni` | [Textove na pesni](https://textovenapesni.com) | Countries: BGR, MKD | archive | unknown | - | yes | - |
+| `pevcheskipodsetnik` | [Pevcheski Podsetnik](https://pevcheskipodsetnik.com) | Countries: BGR, MKD | archive | unknown | - | yes | The site also holds Macedonian folk songs. On 2026-11-27 a survey gave 117 songs for MKD. |
 | `bgtekstove` | [BG Tekstove](https://bgtekstove.start.bg) | Countries: BGR | archive | unknown | - | yes | - |
 | `tekstomanija` | Tekstomanija | Countries: BIH, HRV, MKD, MNE, SRB, SVN | archive | unknown | - | no | A site archive dated 2026-09-25 exists. The address and the countries are not confirmed. |
 | `cuspajz` | [Cuspajz](https://cuspajz.com) | Countries: BIH, GBR, HRV, MKD, MNE, SRB, SVN, USA | archive | unknown | - | yes | Site archive crawled 2026-09-25, packed as raw/cuspajz/20261002/. Parsed and built 2026-11-25: raw/cuspajz/20261125/ and clean/dumps/cuspajz/20261125/ (29,519 songs, 2,646 artists, no years). The countries are those with at least 0.5 % of songs by artists that match the roster of one country only. The site also holds poems by poets; 839 traditional songs with no artist are left out. |
@@ -153,7 +153,7 @@ A run record may name only a source on this page. To use a new source, add its e
 | `socarecords` | [Soca Records](https://socarecords.com) | Countries: ATG, BHS, BRB, DMA, GRD, GUY, JAM, KNA, LCA, TTO, VCT | live, roster_update, recover | allowed, 0.75 s between requests | - | no | The list of Caribbean countries is not confirmed. |
 | `lyricsarabic` | [Lyrics-Arabic](https://lyrics-arabic.com) | Languages: Arabic | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `ganjoor` | [Ganjoor](https://ganjoor.net) | Countries: IRN | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
-| `afghansonglyrics` | [Afghan Song Lyrics](https://afghansonglyrics.com) | Countries: AFG | live, roster_update, recover | allowed, 1 s between requests | - | no | The country is inferred from the name. |
+| `afghansonglyrics` | [Afghan Song Lyrics](https://www.afghansonglyrics.com) | Countries: AFG | live, roster_update, recover | allowed, 1 s between requests | - | yes | Dari and Pashto songs, by singer. Each song has the text in Persian script and in Latin letters. The pages print no year. robots.txt has comments only and no rule. The pilot of 2026-11-27 used 4 s between requests. |
 | `afghanlyric` | [Afghan Lyric](https://afghanlyric.com) | Countries: AFG | live, roster_update, recover | allowed, 1 s between requests | - | no | The country is inferred from the name. |
 | `hebrewsongs` | [HebrewSongs](https://www.hebrewsongs.com) | Countries: ISR | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `shironet` | [Shironet](https://shironet.mako.co.il) | Countries: ISR | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
@@ -166,7 +166,7 @@ A run record may name only a source on this page. To use a new source, add its e
 | `musiccafenepal` | [Music Cafe Nepal](https://lyrics.musiccafenepal.com) | Countries: NPL | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `nepalilyrics` | [Nepali Lyrics](https://nepalilyrics.net) | Countries: NPL | live, roster_update, recover | allowed, 1 s between requests | - | yes | Public artist pages only. Do not use the search or the API of the site. |
 | `lyricslk` | [Lyrics.lk](https://lyrics-lk.com) | Countries: LKA | live, roster_update, recover | allowed, 1 s between requests | - | yes | robots.txt allows / and disallows /api/ and /search. The sitemap lists about 9,200 song pages. A song page names the singer, the lyricist and the composer, and no year. The page reader takes the singer as the artist. |
-| `lankawebsites` | [Lanka Websites](https://lankawebsites.com) | Countries: LKA | live, roster_update, recover | allowed, 1 s between requests | - | no | The country is inferred from the name. |
+| `lankawebsites` | [Lanka Websites](https://lankawebsites.com) | Countries: LKA | live, roster_update, recover | allowed, 1 s between requests | - | no | The country is inferred from the name. On 2026-11-27 the address answered with a parked page. |
 | `mulanci` | [Mulanci](https://www.mulanci.org) | Languages: Chinese | live, roster_update, recover | allowed, 1 s between requests | - | yes | - |
 | `qqmusic` | [QQ Music](https://y.qq.com) | Languages: Chinese | live, roster_update, recover | allowed, 1 s between requests | - | yes | Reads the data routes of the site, not its pages. |
 | `kugou` | [KuGou](https://www.kugou.com) | Languages: Chinese | live, roster_update, recover | allowed, 1 s between requests | - | yes | Reads the data routes of the site, not its pages. |
@@ -231,7 +231,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | AFG | `afghanlyric`, `afghansonglyrics`, `mustext` |
 | AGO | `letras` |
 | AND | `catorze` |
-| ARE | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| ARE | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | ARG | `buenamusica`, `letras`, `musica`, `todotango` |
 | ARM | `armlyric`, `geniusru`, `tekstpesni`, `textpesenok` |
 | ATG | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
@@ -243,7 +243,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | BFA | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | BGD | `bengalisonglyrics4u`, `gitimala`, `tagoreweb` |
 | BGR | `akordite`, `bgtekstove`, `pevcheskipodsetnik`, `repertukul`, `textove`, `textovenapesni` |
-| BHR | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| BHR | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | BHS | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | BIH | `cuspajz`, `hitovi`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
 | BLR | `geniusru`, `ilyrics`, `tekstpesni`, `tekstpesnionline`, `textpesenok` |
@@ -272,7 +272,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | DOM | `buenamusica`, `letras`, `mangulina`, `musica` |
 | DZA | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | ECU | `buenamusica`, `letras`, `musica` |
-| EGY | `aama`, `aghanylyrics`, `altkia`, `arabiclyrics_net`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| EGY | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `arabiclyrics_net`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | ERI | `afrikalyrics`, `tewle` |
 | ESP | `buenamusica`, `catorze`, `letras`, `musica` |
 | EST | `geniusru`, `tekstpesni`, `textpesenok` |
@@ -281,6 +281,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | GAB | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | GBR | `cuspajz`, `pesmarica` |
 | GEO | `geniusru`, `geolyrics`, `georgianlyrics`, `tekstpesni`, `textpesenok` |
+| GHA | `afrikalyrics` |
 | GIN | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | GNB | `letras` |
 | GNQ | `buenamusica`, `letras`, `musica` |
@@ -297,21 +298,21 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | IND | `bengalisonglyrics4u`, `bharatlyrics`, `giitaayan`, `gitimala`, `hindigeetmala`, `tagoreweb`, `tamilcorpus`, `wikisource` |
 | IRL | `bellsirishlyrics` |
 | IRN | `ganjoor`, `lyric_erfan`, `musicdel`, `mustext`, `ritmahang`, `satext`, `zibamatn` |
-| IRQ | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| IRQ | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | ISL | `glatkistan`, `guitarparty`, `musik_is` |
 | ISR | `hebrew_lyrics_hf`, `hebrewsongs`, `hngn`, `joinmyjam`, `jyrics`, `shironet`, `tab4u`, `zemereshet` |
 | ITA | `angolotesti`, `infinititesti`, `lyricsmania` |
 | JAM | `gutenberg_jamaica`, `jahlyrics`, `lyricsaz`, `mentomusic`, `reggaetranslate`, `socarecords` |
-| JOR | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| JOR | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | JPN | `utanet`, `utaten` |
 | KAZ | `geniusru`, `ilyrics`, `matinder`, `mediastar`, `tekstpesni`, `tekstpesnionline`, `textpesenok`, `uzmatn`, `uztext` |
-| KEN | `bongolyrics` |
+| KEN | `afrikalyrics`, `bongolyrics`, `kasilyrics` |
 | KGZ | `geniusru`, `ilyrics`, `kyrgyzaudio`, `tekstpesni`, `tekstpesnionline`, `textpesenok`, `uzmatn`, `uztext` |
 | KNA | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | KOR | `bugs`, `genie`, `kpoplyrics`, `lyricscokr` |
-| KWT | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
-| LBN | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
-| LBY | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| KWT | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| LBN | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `arabiclyrics_net`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| LBY | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | LCA | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | LKA | `lankawebsites`, `lyricslk` |
 | LTU | `dainutekstai`, `dainuzodziai`, `geniusru`, `tekstpesni`, `textpesenok` |
@@ -323,19 +324,19 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | MDA | `geniusru`, `sergiudo`, `tekstpesni`, `textpesenok` |
 | MDG | `lacoccinelle`, `paroles2chansons`, `parolesnet`, `tononkira` |
 | MEX | `buenamusica`, `letras`, `musica` |
-| MKD | `cuspajz`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
-| MLI | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
+| MKD | `cuspajz`, `pesmarica`, `pevcheskipodsetnik`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama`, `textovenapesni` |
+| MLI | `afrikalyrics`, `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | MMR | `musiburma` |
 | MNE | `cuspajz`, `hitovi`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
 | MOZ | `letras` |
-| MRT | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| MRT | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | MYS | `kapanlagi`, `nlb_sg` |
 | NER | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | NGA | `afrikalyrics`, `ninejalyrics`, `tooxclusive` |
 | NIC | `buenamusica`, `letras`, `musica` |
 | NLD | `songteksten` |
 | NPL | `musiccafenepal`, `nepalilyrics` |
-| OMN | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| OMN | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | PAN | `buenamusica`, `letras`, `musica` |
 | PER | `buenamusica`, `letras`, `musica` |
 | PHL | `opmtunes`, `pinoysonghits` |
@@ -343,14 +344,14 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | PRI | `buenamusica`, `letras`, `musica` |
 | PRT | `letras` |
 | PRY | `buenamusica`, `letras`, `musica` |
-| PSE | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
-| QAT | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| PSE | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| QAT | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | ROU | `versurius` |
 | RUS | `geniusru`, `ilyrics`, `tekstpesni`, `tekstpesnionline`, `textpesenok` |
 | RWA | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
-| SAU | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
-| SDN | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
-| SEN | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
+| SAU | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| SDN | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| SEN | `afrikalyrics`, `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | SGP | `nlb_sg` |
 | SLV | `buenamusica`, `letras`, `musica` |
 | SRB | `cuspajz`, `pesmarica`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
@@ -358,7 +359,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | SUR | `songteksten` |
 | SVK | `karaoketexty`, `supermusic`, `zoznam_hudba` |
 | SVN | `besedilo`, `cuspajz`, `pesmi`, `slolyrics`, `tekstomanija`, `tekstovi`, `tekstovipesama`, `tekstovipjesama` |
-| SYR | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| SYR | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `arabiclyrics_net`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | TCD | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | TGO | `lacoccinelle`, `paroles2chansons`, `parolesnet` |
 | THA | `deungdutjai`, `siamzone` |
@@ -369,8 +370,8 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | TUN | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `lyricstn`, `songnu`, `tarab_hf` |
 | TUR | `alternatifim`, `repertukul`, `sarkisozum`, `turkish_folk_kaggle` |
 | TWN | `kugeci`, `kugou`, `lyricsasia`, `mulanci`, `pmdb_taipei`, `qqmusic` |
-| TZA | `bongolyrics` |
-| UGA | `howwe` |
+| TZA | `afrikalyrics`, `bongolyrics` |
+| UGA | `afrikalyrics`, `howwe` |
 | UKR | `geniusru`, `nashe_com_ua`, `pisni_org_ua`, `pisniua`, `tekstpesni`, `textpesenok` |
 | URY | `buenamusica`, `hmpu_uy`, `jaimeroos`, `letras`, `musica`, `todotango` |
 | USA | `cuspajz`, `pesmarica` |
@@ -378,7 +379,7 @@ These sources serve every country: `review_workbook`, `old_pipeline`, `genius`, 
 | VCT | `jahlyrics`, `lyricsaz`, `reggaetranslate`, `socarecords` |
 | VEN | `buenamusica`, `letras`, `musica` |
 | VNM | `amnhacmiennam`, `hopamchuan`, `hopamviet`, `loibaihat`, `lyricsvn`, `lyricvn`, `nhac_vn`, `nhaccuatui`, `tkaraoke` |
-| YEM | `aama`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
+| YEM | `aama`, `aghanilyrics`, `aghanylyrics`, `altkia`, `fnanen`, `kalimat_anghami`, `lyricsarabic`, `songnu`, `tarab_hf` |
 | ZAF | `kasilyrics` |
 | ZMB | `zedlyric` |
 
