@@ -50,6 +50,7 @@ SITES = (
     "cuspajz",
     "geolyrics",
     "georgianlyrics",
+    "gitimala",
     "hopamchuan",
     "hopamviet",
     "kyrgyzaudio",
