@@ -96,6 +96,15 @@ class RunRecord:
             raise ValueError("; ".join(problems))
 
     @property
+    def corrects_existing_songs(self) -> bool:
+        """Identify a review manifest applied to existing rows with no new songs."""
+        return (
+            self.route == "manual_review"
+            and self.rows_added == 0
+            and (self.bulk_file or "").startswith("raw/reviewed_corrections/")
+        )
+
+    @property
     def file_name(self) -> str:
         """The file name of this record inside `countries/<ISO3>/runs/`."""
         return f"{self.run_id}_{self.route}_{self.source}.json"
