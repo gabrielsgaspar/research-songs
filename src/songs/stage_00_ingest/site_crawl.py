@@ -532,7 +532,7 @@ def collect(
     listed = next(item for item in lyric_sources.load_lyric_sources() if item.id == source)
     if listed.access != "allowed":
         raise CollectError(f"requests to {source} are {listed.access} in the source file")
-    if iso3 not in listed.countries:
+    if all(item.id != source for item in lyric_sources.sources_for(iso3)):
         raise CollectError(f"{source} does not serve {iso3} in the source file")
     staging = data / "staging" / "site_crawl" / source
     _lock(staging)

@@ -54,3 +54,13 @@ def test_the_crawl_asks_for_the_lyrics_address_of_each_song_link():
         aama.BASE + "/lyrics/other-invented-title",
         aama.BASE + "/lyrics/third-invented-title",
     ]
+
+
+def test_the_collector_takes_a_country_of_the_language_of_the_source(tmp_path):
+    def fetch(url: str) -> tuple[int, dict[str, str], bytes]:
+        return 403, {}, b""
+
+    result = site_crawl.collect(
+        tmp_path / "data", "aama", "SAU", fetch=fetch, countries=tmp_path / "countries"
+    )
+    assert result["requests_sent"] == 1 and result["state"] == "partial"
