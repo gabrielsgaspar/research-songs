@@ -1,0 +1,33 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "raw/manual_review/BDI/20261127/BDI_Burundi_reviewed.xlsx",
+  "campaign_id": "20261127T164418Z",
+  "code_commit": "a07fe9a56d27c2a75285e1cdbc1c6f43bd3e57de",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T17:18:44Z",
+  "iso3": "BDI",
+  "known_gaps": [],
+  "limits_hit": null,
+  "notes": "",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "manual_review",
+  "rows_added": 5,
+  "run_id": "20261127T171843Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 5,
+  "songs_attempted": 160,
+  "songs_rejected": {
+    "artist_unresolved": 3,
+    "existing_lyric_or_recording": 1,
+    "present_home": 110,
+    "present_other_country": 37,
+    "workbook_discogs_id_mismatch": 4
+  },
+  "source": "review_workbook",
+  "started_utc": "2026-11-27T17:18:43Z",
+  "state": "complete"
+}
