@@ -45,14 +45,17 @@ from songs.stage_00_ingest.dumps import check_raw_input
 
 # The sources that have a page reader: a module of the same name in this package.
 SITES = (
+    "aama",
     "afghansonglyrics",
     "cuspajz",
     "geolyrics",
     "georgianlyrics",
+    "gitimala",
     "hopamchuan",
     "hopamviet",
     "kyrgyzaudio",
     "loibaihat",
+    "lyricslk",
     "matinder",
     "mediastar",
     "musiburma",

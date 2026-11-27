@@ -1,0 +1,31 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 0,
+  "backfilled": false,
+  "bulk_file": null,
+  "campaign_id": "20261127T165131Z",
+  "code_commit": "ac5d47e975f2295492c5168809d3de392fdb5383",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T16:55:23Z",
+  "iso3": "BGD",
+  "known_gaps": [
+    "The run stopped: the site answered with HTTP 429."
+  ],
+  "limits_hit": {
+    "stopped": "the site answered with HTTP 429"
+  },
+  "notes": "Wrote raw/gitimala/20261127/",
+  "request_delay_seconds": 2.0,
+  "requests_sent": 61,
+  "route": "live",
+  "rows_added": 0,
+  "run_id": "20261127T165156Z",
+  "schema_version": 2,
+  "song_limit": 185,
+  "songs_accepted": 57,
+  "songs_attempted": 57,
+  "songs_rejected": {},
+  "source": "gitimala",
+  "started_utc": "2026-11-27T16:51:56Z",
+  "state": "partial"
+}

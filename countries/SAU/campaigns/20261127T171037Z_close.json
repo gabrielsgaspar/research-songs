@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261127T171037Z",
+  "closed_utc": "2026-11-27T17:22:06Z",
+  "iso3": "SAU",
+  "next_time": "Do not crawl aama for a release year. The pilot read 160 song pages of 20 singers with 187 requests. 56 pages (35.0 percent, 7 of 20 singers) print a year, but the year is one value for each singer: all 8 songs of a singer have the same year, and on 40 of the 56 pages it is the career start that the page prints for the singer. It is not a release year, so it must not replace a Discogs track year. 128 pages (80.0 percent, 16 of 20 singers) print the country of origin of the singer. The lyric columns have no place for it. To get the country of each singer, read one song page for each singer: about 2,500 requests, about 2 hours. All 160 pilot pages (100 percent) are in the dump clean/dumps/aama/20261121/, and the 20 artist pages list the same 3,894 songs that the dump holds, so a full crawl (about 60,000 requests, about 46 hours at 2.7 seconds for each request) adds no song text.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 7151
+}
