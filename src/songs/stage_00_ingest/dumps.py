@@ -915,6 +915,24 @@ def _credits_from_lists(connection, ids: str, labels: str) -> None:
     )
 
 
+# "A (B)" with one part in Latin letters and the other in another script gives A and B as
+# other names; "Band (3)" and "Band (UK)" give none.
+_TWO_SCRIPT_ALIASES = r"""
+    SELECT source_artist_id, part AS artist_name, 'alias' AS name_type, artist_url
+    FROM (
+      SELECT source_artist_id, artist_url,
+        trim(regexp_extract(artist_name, '^(.+?)\s*\((.+)\)\s*$', 1)) AS a,
+        trim(regexp_extract(artist_name, '^(.+?)\s*\((.+)\)\s*$', 2)) AS b
+      FROM songs_ready
+    ) split, unnest([a, b]) AS parts(part)
+    WHERE a <> '' AND b <> ''
+      AND ((regexp_matches(a, '[A-Za-z]') AND NOT regexp_matches(b, '[A-Za-z]')
+            AND regexp_matches(b, '[^\x00-\x7F]'))
+        OR (regexp_matches(b, '[A-Za-z]') AND NOT regexp_matches(a, '[A-Za-z]')
+            AND regexp_matches(a, '[^\x00-\x7F]')))
+"""
+
+
 def _create_artist_rows(connection, folder: Path, source: str) -> None:
     names = _side(folder, source, "artist_names")
     parts = [
@@ -933,6 +951,7 @@ def _create_artist_rows(connection, folder: Path, source: str) -> None:
             WHERE artist_id IS NOT NULL AND artist_name IS NOT NULL
             """
         )
+    parts.append(_TWO_SCRIPT_ALIASES)
     union = " UNION ALL ".join(parts)
     quoted = "'" + source + "'"
     connection.execute(

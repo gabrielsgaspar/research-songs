@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261127T115238Z",
+  "closed_utc": "2026-11-27T14:06:19Z",
+  "iso3": "DEU",
+  "next_time": "Songs added by source: lrclib 23716, genius 13276, lieder_net 33. Dump songs of roster artists with no Discogs track of their title: up to 510985; songs of artists on no roster: up to 27405246. The dumps on this disk are used with the match rules of pull requests 108 to 136. Before the next campaign, build a site archive of a lyric site of this country (see the list of live sites in resources/lyric_sources.toml), because lrclib and genius now add few songs before 1990.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 294172
+}

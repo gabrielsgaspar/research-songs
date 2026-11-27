@@ -698,6 +698,47 @@ def test_deungdutjai_uses_the_printed_artist_and_the_url(tmp_path):
     assert result["dropped"] == {"no_song_name": 1}
 
 
+def test_a_name_in_two_scripts_gives_each_part_as_another_name(tmp_path):
+    folder = tmp_path / "in"
+    rows = [
+        ("d1", "Deung Singer (เดือน นักร้อง)"),
+        ("d2", "Band Three (3)"),
+        ("d3", "Band West (UK)"),
+        ("d4", "เพลง วง (Song Band)"),
+    ]
+    write_parquet(
+        folder / "deungdutjai_lyrics.parquet",
+        [
+            {
+                "provider": "deungdutjai",
+                "song_id": song_id,
+                "url": f"https://songs.example/{song_id}",
+                "title": f"Song {song_id}",
+                "artist_text": artist,
+                "artist_ids": artist,
+                "lyrics_text": f"invented line {song_id}",
+                "has_lyrics": True,
+                "parse_state": "partial",
+            }
+            for song_id, artist in rows
+        ],
+    )
+    data = tmp_path / "data"
+    build(data, "deungdutjai", folder)
+    names = table(schemas.DUMP_ARTIST_NAMES, _out(data, "deungdutjai"), "artist_name")
+    aliases = {
+        (row["source_artist_id"], row["artist_name"])
+        for row in names
+        if row["name_type"] == "alias"
+    }
+    assert aliases == {
+        ("Deung Singer (เดือน นักร้อง)", "Deung Singer"),
+        ("Deung Singer (เดือน นักร้อง)", "เดือน นักร้อง"),
+        ("เพลง วง (Song Band)", "เพลง วง"),
+        ("เพลง วง (Song Band)", "Song Band"),
+    }
+
+
 def test_the_new_families_leave_appleofmyeye_in_kugeci():
     appleofmyeye = {"lyrics_text", "provider_title", "site_artist_labels_json", "site_artist_label"}
     assert dumps.detect_family(appleofmyeye) == "kugeci"

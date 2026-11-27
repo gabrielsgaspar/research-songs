@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261127T130055Z",
+  "closed_utc": "2026-11-27T14:06:19Z",
+  "iso3": "ISR",
+  "next_time": "Songs added by source: hebrew_lyrics_hf 6265, lrclib 595, genius 253, zemereshet 175, jyrics 6, hngn 1. Dump songs of roster artists with no Discogs track of their title: up to 20986; songs of artists on no roster: up to 29155228. The dumps on this disk are used with the match rules of pull requests 108 to 136. Before the next campaign, build a site archive of a lyric site of this country (see the list of live sites in resources/lyric_sources.toml), because lrclib and genius now add few songs before 1990.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 27562
+}
