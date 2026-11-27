@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, fields
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from songs.common import lyric_sources
 from songs.common.paths import ISO3, RUN_ID, SOURCE, project_paths, resolve_project_root
@@ -98,10 +98,14 @@ class RunRecord:
     @property
     def corrects_existing_songs(self) -> bool:
         """Identify a review manifest applied to existing rows with no new songs."""
+        bulk = self.bulk_file or ""
         return (
             self.route == "manual_review"
             and self.rows_added == 0
-            and (self.bulk_file or "").startswith("raw/reviewed_corrections/")
+            and (
+                bulk.startswith("raw/reviewed_corrections/")
+                or PurePosixPath(bulk).full_match("raw/*_recording_review/*/correction.json")
+            )
         )
 
     @property
