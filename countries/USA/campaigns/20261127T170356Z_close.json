@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261127T170356Z",
+  "closed_utc": "2026-11-27T17:03:56Z",
+  "iso3": "USA",
+  "next_time": "Run lrclib and genius again with the match rules of pull requests 108, 109, 111, 127 and 135. The estimate of all USA dumps takes about 2 h 45 min before the first import starts, so start it when the computer has a free half day.",
+  "outcome": "complete",
+  "reason": "Campaign 20261127T114729Z stopped before import. It has no runs. Snapshot 20261124T104152Z contains 1,527,432 songs before and after that campaign.",
+  "schema_version": 1,
+  "songs_after": 1527432
+}
