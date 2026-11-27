@@ -1469,6 +1469,62 @@ checked = true
 notes = ""
 
 [[source]]
+id = "hopamviet"
+name = "Hop Am Viet"
+kind = "live_site"
+scope = "countries"
+countries = ["VNM"]
+url = "https://hopamviet.vn"
+stored_path = ""
+routes = ["live"]
+access = "allowed"
+request_delay_seconds = 2.0
+checked = true
+notes = "Gabriel authorized the crawl on 2026-11-26. robots.txt allows /. Skip /chord/printsong/, /chord/search, /auth/, /user/, and /sheet/download/."
+
+[[source]]
+id = "loibaihat"
+name = "Loi bai hat"
+kind = "live_site"
+scope = "countries"
+countries = ["VNM"]
+url = "https://loibaihat.biz"
+stored_path = ""
+routes = ["live"]
+access = "allowed"
+request_delay_seconds = 2.0
+checked = true
+notes = "Gabriel authorized the crawl on 2026-11-26. robots.txt allows /."
+
+[[source]]
+id = "hopamchuan"
+name = "Hop Am Chuan"
+kind = "live_site"
+scope = "countries"
+countries = ["VNM"]
+url = "https://hopamchuan.com"
+stored_path = ""
+routes = ["live"]
+access = "blocked"
+request_delay_seconds = 2.0
+checked = true
+notes = "Do not crawl. Every HTML page says a crawl affects guitar players who are using the site, and asks for an API request instead. robots.txt has no Allow or Disallow rule. Gabriel stopped the crawl on 2026-11-26."
+
+[[source]]
+id = "musiburma"
+name = "MusiBurma"
+kind = "live_site"
+scope = "countries"
+countries = ["MMR"]
+url = "https://www.musiburma.com"
+stored_path = ""
+routes = ["live"]
+access = "allowed"
+request_delay_seconds = 2.0
+checked = true
+notes = "Gabriel authorized the crawl on 2026-11-26. robots.txt allows /. Skip /api/."
+
+[[source]]
 id = "pinoysonghits"
 name = "PinoySongHits"
 kind = "live_site"

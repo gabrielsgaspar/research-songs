@@ -53,8 +53,11 @@ def test_a_chord_sheet_gives_its_lyric_lines_only():
         "Kapo na II polju",
         "Akorde pisao: neko",
         "Hm,F#.........",
+        "G7.... D7....)",
         "Svira se ovako: Dm H Gm",
         "Verse Intro:",
+        "{INSTRUMENTAL]",
+        "{VERSE",
     ],
 )
 def test_lines_with_no_lyric_are_chord_lines(line):
@@ -90,3 +93,30 @@ def test_song_ids_come_from_song_urls_only():
 def test_chords_in_a_lyric_line_go_and_the_words_stay():
     sheet = "[G]Prvi iz[D7]misljeni [G]stih\n[G][G] [Am]\nA ti [ne] znas"
     assert site.lyric_lines(sheet) == ["Prvi izmisljeni stih", " ", "A ti [ne] znas"]
+
+
+def test_broken_bracket_and_slash_bass_chords_go_and_lyrics_stay():
+    sheet = "\n".join(
+        [
+            "ကခ[D}ဂဃ",
+            "{G7]ကခ[Am7[ဂဃ",
+            "ကခ[Dmဂဃ",
+            "A]ကခ Bm]ဂဃ C7]",
+            "ကခ[G;ဂဃ[F#}ငစ",
+            "ကခ/G#ဂဃ",
+            "Invented words [E}here",
+            "G7.... D7....)",
+            "{INSTRUMENTAL]",
+            "Am I wrong [real phrase]",
+        ]
+    )
+    assert site.lyric_lines(sheet) == [
+        "ကခဂဃ",
+        "ကခဂဃ",
+        "ကခဂဃ",
+        "ကခ ဂဃ ",
+        "ကခဂဃငစ",
+        "ကခဂဃ",
+        "Invented words here",
+        "Am I wrong [real phrase]",
+    ]

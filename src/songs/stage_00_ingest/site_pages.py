@@ -31,8 +31,10 @@ import re
 import tarfile
 from collections import Counter
 from datetime import UTC, datetime
+from html.parser import HTMLParser
 from pathlib import Path
 from types import ModuleType
+from urllib.parse import urljoin, urlsplit
 
 import duckdb
 import pandas as pd
@@ -46,9 +48,13 @@ SITES = (
     "cuspajz",
     "geolyrics",
     "georgianlyrics",
+    "hopamchuan",
+    "hopamviet",
     "kyrgyzaudio",
+    "loibaihat",
     "matinder",
     "mediastar",
+    "musiburma",
     "pesmarica",
     "textpesenok",
 )
@@ -136,6 +142,83 @@ def song_row(
     )
     row.update(columns)
     return row, artists, ""
+
+
+def site_path(base: str, url: str) -> str | None:
+    """Return the path of `url` when it is on the host of `base`, or None.
+
+    `www` is ignored. The path has no trailing slash, except the root `/`.
+    """
+    parts = urlsplit(urljoin(base + "/", url))
+    host = (parts.hostname or "").casefold().removeprefix("www.")
+    expected = (urlsplit(base).hostname or "").casefold().removeprefix("www.")
+    if not host or host != expected or parts.scheme not in ("http", "https"):
+        return None
+    path = parts.path or "/"
+    return path if path == "/" else path.rstrip("/")
+
+
+class _Anchors(HTMLParser):
+    """The href and the text of each anchor, in page order."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.found: list[tuple[str, str]] = []
+        self._href: str | None = None
+        self._text = ""
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "a":
+            self._href = dict(attrs).get("href") or ""
+            self._text = ""
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self._href is not None:
+            self.found.append((self._href, " ".join(self._text.split())))
+            self._href = None
+
+    def handle_data(self, data: str) -> None:
+        if self._href is not None:
+            self._text += data
+
+
+def page_links(html: str) -> list[tuple[str, str]]:
+    """Return (href, text) of each anchor. The href is the raw value of the attribute."""
+    parser = _Anchors()
+    parser.feed(html)
+    parser.close()
+    return parser.found
+
+
+class _Plain(HTMLParser):
+    """The visible text of a page, without script or style."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self._skip = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in ("script", "style"):
+            self._skip += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in ("script", "style") and self._skip:
+            self._skip -= 1
+        if tag in ("br", "p", "div", "tr", "h1", "h2", "li"):
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip:
+            self.parts.append(data)
+
+
+def plain_text(html: str) -> str:
+    """Return the visible text of a page, one block per line."""
+    parser = _Plain()
+    parser.feed(html)
+    parser.close()
+    return "\n".join(" ".join(line.split()) for line in "".join(parser.parts).splitlines())
 
 
 def _member_kind(name: str) -> tuple[str, str]:
