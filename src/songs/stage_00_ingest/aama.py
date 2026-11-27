@@ -5,11 +5,14 @@ A song page is `/lyrics/<slug>`. An artist page (`/artist/<slug>`) links each so
 reader asks for the `/lyrics/` address, so each song costs one request. The index is
 `/artists/<letter>`.
 
-The title, the singer and the year come from the `MusicComposition` schema of the
-page: `name`, `recordedAs.byArtist` and `datePublished`. The lyricist and the composer
-of the schema are not performers. The text is `div.lyrics-text`, one line per `br`.
-The page also prints the country of origin of the singer. The lyric columns have no
-place for a country, so the reader does not keep it.
+The title and the singer come from the `MusicComposition` schema of the page: `name`
+and `recordedAs.byArtist`. The lyricist and the composer of the schema are not
+performers. The text is `div.lyrics-text`, one line per `br`.
+
+The reader does not keep two values that the page prints. `datePublished` (the
+"release year" of the page) is one year for each singer, the same on all the songs of
+the singer and most often the start of the career, so it is not a release year. The
+country of origin of the singer has no lyric column.
 """
 
 import html as html_text
@@ -101,7 +104,6 @@ def parse_song(html: str, url: str) -> tuple[dict | None, list[tuple[str, str]],
     name = " ".join(str(performer.get("name") or "").split())
     artists = [(artist[1], name)] if artist and name else []
     lines = [html_text.unescape(_TAG.sub("", line)) for line in _BREAK.split(text[1])]
-    year = str(song.get("datePublished") or "").strip()
     return song_row(
         sys.modules[__name__],
         url,
@@ -109,5 +111,4 @@ def parse_song(html: str, url: str) -> tuple[dict | None, list[tuple[str, str]],
         artists,
         lines,
         language_label=song.get("inLanguage") or None,
-        release_year_raw=year or None,
     )

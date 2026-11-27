@@ -13,22 +13,20 @@ def test_the_reader_is_a_site_and_a_live_source():
     assert "aama" in site_crawl.SOURCES
 
 
-def test_a_song_page_gives_the_singer_the_year_and_the_lines():
+def test_a_song_page_gives_the_singer_and_the_lines_and_no_year():
     row, artists, reason = aama.parse_song(PAGE, URL)
     assert reason == ""
     assert artists == [("invented-singer", "Invented Singer")]
     assert row["provider_song_id"] == "invented-title"
     assert row["song_name"] == "Invented Title"
     assert row["artist_url"] == aama.BASE + "/artist/invented-singer"
-    assert row["release_year_raw"] == "1987 م"
+    assert "datePublished" in PAGE and row["release_year_raw"] is None
     assert row["language_label"] == "ar"
     assert row["lyrics"] == ("First invented line\nSecond & invented line\n\nكلمة مخترعة أولى")
     assert set(row) == set(aama.COLUMNS)
 
 
-def test_a_page_without_a_year_or_without_a_part_gives_none_for_it():
-    row, _artists, _reason = aama.parse_song(PAGE.replace(',"datePublished":"1987 م"', ""), URL)
-    assert row["release_year_raw"] is None
+def test_a_page_without_a_part_gives_the_reason():
     assert aama.parse_song(PAGE.replace("MusicComposition", "Thing"), URL)[2] == "no_song_schema"
     assert aama.parse_song(PAGE.replace("lyrics-text", "other"), URL)[2] == "no_lyric_block"
     assert aama.parse_song(PAGE.replace('"recordedAs"', '"other"'), URL)[2] == "no_artist"
