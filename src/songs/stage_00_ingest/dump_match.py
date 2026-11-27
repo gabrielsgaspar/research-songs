@@ -49,7 +49,8 @@ Of the releases that hold the track, the one with the earliest year wins, then t
 lowest release id. The year is the earlier of the release date and the year of
 its master.
 
-`import_dump` adds the `exact` and `loose` songs to the country, with the route
+A reviewed rejection blocks its exact catalog link even when the titles match.
+`import_dump` adds the remaining `exact` and `loose` songs to the country, with the route
 `dump_name`. It also adds a `close` song when both titles hold the same numbers in the
 same order (`same_numbers`), unless `REVIEWED_FILE` rejects it for that track, and when
 `REVIEWED_FILE` accepts it:
@@ -1353,7 +1354,7 @@ def same_numbers(title: str, other: str) -> bool:
 
 
 def load_reviewed_matches(root: Path | None = None) -> dict[tuple[str, ...], str]:
-    """Return the decision on each reviewed close match.
+    """Return the decision on each reviewed catalog track.
 
     The key is source, country, source song id, Discogs release id and track index,
     so a decision holds only for the track that the person saw.
@@ -1495,9 +1496,12 @@ def would_add(
 
     titles = {song["source_song_id"]: song["song_name"] for song in result["songs"]}
 
-    def accepted(row: dict) -> bool:
+    def track_decision(row: dict) -> str | None:
         key = (source, iso3, row["source_song_id"], row.get("discogs_release_id", ""))
-        decision = reviewed.get((*key, row.get("discogs_track_index", "")))
+        return reviewed.get((*key, row.get("discogs_track_index", "")))
+
+    def accepted(row: dict) -> bool:
+        decision = track_decision(row)
         if decision is not None:
             return decision == "accept"
         return same_numbers(titles[row["source_song_id"]], row.get("discogs_title", ""))
@@ -1506,7 +1510,9 @@ def would_add(
         return row["discogs_class"] in ADDED or (row["discogs_class"] == "close" and accepted(row))
 
     for row in found:
-        if row.get("roster_artist_id") in other_country and adds(row):
+        if row["discogs_class"] in ADDED and track_decision(row) == "reject":
+            row["discogs_class"] = "review_rejected"
+        elif row.get("roster_artist_id") in other_country and adds(row):
             row["discogs_class"] = ARTIST_OTHER_COUNTRY
     copies = held_text(
         dump,
@@ -1537,6 +1543,7 @@ def would_add(
             **{name: result["counts"][name] for name in CLASSES if name != "roster_new"},
             **result["left_out"],
             **{name: discogs_counts[name] for name in DISCOGS_CLASSES if name not in ADDED},
+            "review_rejected": discogs_counts["review_rejected"],
             ARTIST_OTHER_COUNTRY: discogs_counts[ARTIST_OTHER_COUNTRY],
             HELD_TEXT: discogs_counts[HELD_TEXT],
         },

@@ -520,6 +520,13 @@ def import_with_review(root: Path, reviewed: dict, close_title: str = "Another N
     )
 
 
+def test_reviewed_wrong_artist_blocks_an_exact_track(tmp_path):
+    result = import_with_review(tmp_path, {("kasilyrics", "ISL", "d3", "200", "3"): "reject"})
+    counts = manifests.read_manifest(result["path"]).counts
+    assert counts["songs_added"] == 1
+    assert counts["dump_songs_review_rejected"] == 1
+
+
 def test_import_dump_adds_a_close_match_only_for_the_reviewed_track(tmp_path):
     other_track = import_with_review(
         tmp_path / "a", {("kasilyrics", "ISL", "d4", "200", "3"): "accept"}

@@ -435,7 +435,7 @@ def test_every_country_with_a_manual_review_run_has_an_exception_group():
     by_hand = {
         record.iso3
         for record in run_records.read_run_records()
-        if record.route == eligible_songs.MANUAL_ROUTE
+        if record.route == eligible_songs.MANUAL_ROUTE and not record.corrects_existing_songs
     }
     assert by_hand <= named, f"add a row to the exceptions file for {sorted(by_hand - named)}"
 

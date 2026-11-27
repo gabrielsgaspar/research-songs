@@ -1,0 +1,33 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 78,
+  "backfilled": false,
+  "bulk_file": "raw/phl_roster_review/20261127/decisions.csv",
+  "campaign_id": "20261127T133947Z",
+  "code_commit": "d91c100da15034baa2ed5bae9a8151a8813f9d1f",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T13:39:50Z",
+  "iso3": "PHL",
+  "known_gaps": [
+    "Review unresolved recording, date and country evidence in the preserved decision file."
+  ],
+  "limits_hit": {},
+  "notes": "Rechecked existing matches from the November 23 campaign against historical parent 20261123T222918Z. Preserved 320 song IDs. Applied 162 individual holds. Decision file SHA-256 800f6ac297b185249a59ec3e63462395880fce944a7a9bac3ac9044a42b2b129.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "roster_update",
+  "rows_added": 0,
+  "run_id": "20261127T133949Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 43,
+  "songs_attempted": 320,
+  "songs_rejected": {
+    "existing_exclusion": 106,
+    "keep_on_hold": 162,
+    "roster_exclusion": 9
+  },
+  "source": "genius",
+  "started_utc": "2026-11-27T13:39:49Z",
+  "state": "complete"
+}
