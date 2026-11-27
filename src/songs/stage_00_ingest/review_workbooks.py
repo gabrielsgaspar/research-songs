@@ -178,6 +178,8 @@ def write_country_songs(
     collected_utc: str,
     links: pd.DataFrame | None = None,
     discogs_ids: dict[str, str] | None = None,
+    *,
+    preserve_parent_hashes: bool = False,
 ) -> dict[str, int]:
     """Write the three tables of a country after the import to `out`. Return the counts.
 
@@ -191,7 +193,15 @@ def write_country_songs(
     """
     with duckdb.connect() as connection:
         return _write_country_songs(
-            connection, reviewed, earlier, out, run_id, collected_utc, links, discogs_ids or {}
+            connection,
+            reviewed,
+            earlier,
+            out,
+            run_id,
+            collected_utc,
+            links,
+            discogs_ids or {},
+            preserve_parent_hashes,
         )
 
 
@@ -204,6 +214,7 @@ def _write_country_songs(
     collected_utc: str,
     links: pd.DataFrame | None,
     discogs_ids: dict[str, str],
+    preserve_parent_hashes: bool,
 ) -> dict[str, int]:
     filled = pd.DataFrame(
         {"artist_id": list(discogs_ids), "discogs_artist_id": list(discogs_ids.values())},
@@ -271,7 +282,9 @@ def _write_country_songs(
     )
     schemas.write_table(
         schemas.COUNTRY_SONGS,
-        lyric_hash.fill_text_hash(connection, connection.table("new_songs")),
+        connection.table("new_songs")
+        if preserve_parent_hashes
+        else lyric_hash.fill_text_hash(connection, connection.table("new_songs")),
         out,
     )
     added_links = (
