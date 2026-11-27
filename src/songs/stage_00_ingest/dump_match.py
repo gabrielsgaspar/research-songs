@@ -136,6 +136,9 @@ MIN_HOME_SHARE = 0.005
 # Of several Discogs artists with one key, one with this many times the home releases of
 # the next is taken. Of 50 such or `_stated_artists` ids, 48 were right (2026-11-25).
 DOMINANCE = 5
+# The only Discogs artist of a name with no home release is taken when the name has two
+# words or this many letters: a short name of one word is the name of many people.
+MIN_ONLY_NAME_LETTERS = 8
 # Discogs marks the second artist of one name as "Name (2)".
 _HOMONYM = r"\s\(\d+\)$"
 # The order in which the result of one roster artist wins over that of another.
@@ -907,6 +910,10 @@ def _pick_by_name(
     if len(named) == 1:
         return named[0], "by_stated"
     if len(hits) == 1:
+        number, name = next(iter(hits.items()))
+        key = name_key(re.sub(_HOMONYM, "", name))
+        if " " in key or len(key) >= MIN_ONLY_NAME_LETTERS:
+            return number, "by_only_name"
         return None, "no_home_release"
     return None, "more_than_one"
 
@@ -931,6 +938,10 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
        itself (`_stated_artists`, `by_stated`), with or without a home release. The
        profile of a Puerto Rican artist often names the United States, so the rule
        compares the stated country with `iso3`, not with its home codes.
+    4. Exactly one Discogs artist has the key, no release of a home country credits it,
+       and the key has two words or `MIN_ONLY_NAME_LETTERS` letters (`by_only_name`). The
+       roster gives the country, and the name gives the artist. Many such artists work
+       abroad, so `songs lyrics roster-check` must run after an import with this rule.
 
     Two or more roster artists of the country with the same key all get the chosen id
     (`by_same_key` counts them when one Discogs artist has the key). No other roster
@@ -988,7 +999,7 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
     at_home = _home_releases(discogs, wanted, home)
     stated = _stated_artists(discogs, wanted, iso3)
     found_now: dict[str, tuple[int, str]] = {}
-    for name in ("by_home_release", "by_dominance", "by_same_key", "by_stated"):
+    for name in ("by_home_release", "by_dominance", "by_same_key", "by_stated", "by_only_name"):
         result[name] = 0
     result["no_home_release"] = 0
     for key, artists in rows_of.items():
