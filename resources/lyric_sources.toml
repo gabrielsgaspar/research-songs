@@ -589,7 +589,7 @@ scope = "languages"
 languages = ["ar"]
 url = "https://www.aama.sa"
 stored_path = ""
-routes = ["local_source"]
+routes = ["local_source", "live"]
 access = "allowed"
 request_delay_seconds = 1.0
 checked = true
@@ -1160,8 +1160,8 @@ stored_path = ""
 routes = ["live", "roster_update", "recover"]
 access = "allowed"
 request_delay_seconds = 1.0
-checked = false
-notes = "The country is inferred from the name."
+checked = true
+notes = "robots.txt allows / and disallows /api/ and /search. The sitemap lists about 9,200 song pages. A song page names the singer, the lyricist and the composer, and no year. The page reader takes the singer as the artist."
 
 [[source]]
 id = "lankawebsites"
