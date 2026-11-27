@@ -1,0 +1,8 @@
+{
+  "campaign_id": "20261127T131952Z",
+  "goal": "Import lrclib, genius and the local dumps again with the match rules of pull requests 108, 109, 111, 127 and 135, and the new dumps of pull request 136.",
+  "iso3": "NLD",
+  "opened_utc": "2026-11-27T13:19:52Z",
+  "schema_version": 1,
+  "songs_before": 78166
+}
