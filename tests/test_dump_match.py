@@ -1220,3 +1220,72 @@ def test_variant_keys_add_the_dump_names_that_spell_a_roster_artist_another_way(
 def test_an_apostrophe_letter_is_an_apostrophe_in_a_key():
     names = ["Sherali Joʻrayev", "Sherali Jo'rayev", "Sherali Jo’rayev", "Sherali Joʼrayev"]
     assert {dump_match.name_key(name) for name in names} == {"sherali jo rayev"}
+
+
+def test_a_title_meets_its_track_in_another_script_or_spelling(tmp_path):
+    country = tmp_path / "country"
+    write(
+        schemas.COUNTRY_ARTISTS, country, [artist("a1", "Anna Jóns") | {"discogs_artist_id": "11"}]
+    )
+    write(schemas.COUNTRY_LINKS, country, [])
+    write(schemas.COUNTRY_SONGS, country, [])
+    write_discogs(tmp_path / "discogs")
+    # Invented words. Tracks 3 and 4 have one skeleton, so that skeleton names no track.
+    titles = [
+        "دالم كتابن ساراف",
+        "Bolam Kitar Sunaf",
+        "Tamir Kolan Dasuf",
+        "Tamer Kulan Dasef",
+        "مدرسة كبيرى",
+        "กขคง",
+        "Gamal",
+    ]
+    values = ", ".join(f"(100, {index}, '{title}')" for index, title in enumerate(titles, 1))
+    duckdb.sql(
+        f"SELECT * FROM (VALUES {values}) AS t(release_id, track_index, title)"
+    ).write_parquet(str(tmp_path / "discogs" / "release_tracklist.parquet"))
+    songs = [
+        {
+            "source_song_id": key,
+            "class": "roster_new",
+            "song_name": title,
+            "roster_artist_ids": ["a1"],
+        }
+        for key, title in {
+            "latin_to_arabic": "Dalam Kitaban Saraf",
+            "arabic_to_latin": "بولم كتار سناف",
+            "two_tracks": "تامر كولان داسف",
+            "same_script": "Bulem Ketor Sonif",
+            "fold": "مدرسه كبيري",
+            "part": "กขคง / Ko Kho (Invented)",
+            "short": "جمل",
+        }.items()
+    ]
+
+    rows = {
+        row["source_song_id"]: row
+        for row in match_discogs(songs, country, tmp_path / "discogs", "ISL")
+    }
+
+    assert {key: row["discogs_class"] for key, row in rows.items()} == {
+        "latin_to_arabic": "bridge",
+        "arabic_to_latin": "bridge",
+        "two_tracks": "no_track",
+        "same_script": "no_track",
+        "fold": "bridge",
+        "part": "bridge",
+        "short": "no_track",
+    }
+    assert rows["latin_to_arabic"]["discogs_title"] == "دالم كتابن ساراف"
+    assert rows["part"]["discogs_title"] == "กขคง"
+    assert rows["fold"]["match_method"] == "dump_discogs_bridge_title"
+    assert rows["fold"]["match_score"] == 90.0
+
+
+def test_skeleton_key_joins_a_title_in_two_scripts():
+    key = dump_match.skeleton_key
+    assert key("দালম কিতাবন") == ("BENGALI", key("Dalam Kitaban")[1])
+    assert key("ዳላም ኪታባን") == ("ETHIOPIC", key("Dalam Kitaban")[1])
+    assert key("දලම් කිතබන්") == ("SINHALA", key("Dalam Kitaban")[1])
+    # Too short, two scripts in one title, and a script that the key does not read.
+    assert key("Gamal") == key("Dalam دالم كتابن") == key("Далам Китабан") == ("", "")

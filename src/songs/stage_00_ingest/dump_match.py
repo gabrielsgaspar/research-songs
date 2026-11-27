@@ -110,6 +110,7 @@ MIN_LYRICS_CHARS = 30
 DISCOGS_CLASSES = (
     "exact",
     "loose",
+    "bridge",
     "close",
     "held_loose_title",
     "already_linked",
@@ -121,6 +122,7 @@ DISCOGS_CLASSES = (
 DISCOGS_METHODS = {
     "exact": ("dump_discogs_exact_title", 100.0),
     "loose": ("dump_discogs_loose_title", 95.0),
+    "bridge": ("dump_discogs_bridge_title", 90.0),
 }
 CLOSE_CUTOFF = 0.9
 # Added to the match method of a song whose artist got its Discogs id by name.
@@ -139,9 +141,17 @@ DOMINANCE = 5
 # Discogs marks the second artist of one name as "Name (2)".
 _HOMONYM = r"\s\(\d+\)$"
 # The order in which the result of one roster artist wins over that of another.
-_ARTIST_ORDER = ("held_loose_title", "already_linked", "exact", "loose", "close", "no_track")
+_ARTIST_ORDER = (
+    "held_loose_title",
+    "already_linked",
+    "exact",
+    "loose",
+    "bridge",
+    "close",
+    "no_track",
+)
 # The Discogs classes that the import adds, and the route of its run.
-ADDED = ("exact", "loose")
+ADDED = ("exact", "loose", "bridge")
 # The class of a song that the import would add, of a roster artist of another country.
 ARTIST_OTHER_COUNTRY = "artist_other_country"
 # The class of a song that the import would add, whose text the country holds or the import adds.
@@ -723,6 +733,89 @@ def loose_key(title: str | None) -> str:
     return name_key(text) or name_key(title)
 
 
+# Arabic letters that two spellings of one word exchange.
+_ARABIC_FOLD = str.maketrans({"ة": "ه", "ى": "ي", "ی": "ي", "ک": "ك", "ـ": ""})
+# The scripts that `skeleton_key` reads next to Latin, as the first word of a Unicode name.
+BRIDGE_SCRIPTS = ("ARABIC", "BENGALI", "DEVANAGARI", "SINHALA", "ETHIOPIC")
+# A skeleton key with fewer letters names too many titles.
+MIN_SKELETON_CHARS = 4
+_DIGRAPHS = (("kh", "h"), ("gh", "k"), ("sh", "s"), ("ch", "s"), ("th", "t"), ("dh", "t"))
+_DIGRAPHS += (("ph", "f"), ("ng", "n"), ("ts", "s"), ("tz", "s"))
+# One letter for each group of consonants that transliterations exchange. A vowel and
+# "w", "y" and "v" have no letter: Arabic script does not write most of them.
+_SOUNDS = dict(zip("bpfvtdszckqgjhxlmnr", "bbf.ttssskkkkhhlmnr", strict=True))
+_SILENT = frozenset({"ALEF", "WAW", "YEH", "AIN", "HAMZA", "MARBUTA"})
+_QUALIFIERS = frozenset({"FARSI", "FINAL", "SMALL", "GLOTTAL", "PHARYNGEAL", "KHANDA"})
+
+
+def fold_key(title: str | None) -> str:
+    """Return `loose_key` with no spaces and with one letter for each pair of `_ARABIC_FOLD`."""
+    return loose_key(title).translate(_ARABIC_FOLD).replace(" ", "")
+
+
+def _sound(word: str) -> str:
+    """Return the letter of `_SOUNDS` for the first consonants of a letter name or a word."""
+    start = re.match(r"[^aeiou]+", word)
+    cluster = start.group(0) if start else ""
+    for pair, letter in _DIGRAPHS:
+        cluster = cluster.replace(pair, letter)
+    return _SOUNDS.get(cluster[:1], "").replace(".", "")
+
+
+@functools.cache
+def _letter_sound(char: str) -> str | None:
+    """Return the letter of `_SOUNDS` for a character, '' for none, None for another script."""
+    if char.isdigit():
+        return str(unicodedata.digit(char, 0))
+    if "a" <= char <= "z":
+        return _SOUNDS.get(char, "").replace(".", "")
+    words = unicodedata.name(char, "").split()
+    if not words or words[0] not in BRIDGE_SCRIPTS:
+        return None
+    if words[-1] in ("ANUSVARA", "ANUSVARAYA", "CANDRABINDU"):
+        return "n"
+    if not {"LETTER", "SYLLABLE"} & set(words) or _SILENT & set(words):
+        return ""
+    rest = [word for word in words[2:] if word not in _QUALIFIERS]
+    if not rest:
+        return ""
+    return _sound((rest[-1] if words[0] == "SINHALA" else rest[0]).lower())
+
+
+def skeleton_key(title: str | None) -> tuple[str, str]:
+    """Return the script and the consonant skeleton of a title, or two empty texts.
+
+    The skeleton joins a title in Latin letters and the same title in a script of
+    `BRIDGE_SCRIPTS`: it keeps one letter of `_SOUNDS` for each consonant, drops the
+    vowels, and writes a double letter one time. The script is "LATIN" or the script of
+    `BRIDGE_SCRIPTS`. A title in two scripts, in another script, or with fewer than
+    `MIN_SKELETON_CHARS` letters has no skeleton.
+    """
+    text = loose_key(title)
+    for pair, letter in _DIGRAPHS:
+        text = text.replace(pair, letter)
+    scripts, letters = set(), []
+    for char in text.replace(" ", ""):
+        sound = _letter_sound(char)
+        if sound is None:
+            return "", ""
+        if not char.isdigit():
+            scripts.add("LATIN" if "a" <= char <= "z" else unicodedata.name(char).split()[0])
+        if sound and (not letters or letters[-1] != sound):
+            letters.append(sound)
+    if len(scripts) != 1 or len(letters) < MIN_SKELETON_CHARS:
+        return "", ""
+    return scripts.pop(), "".join(letters)
+
+
+def _script(text: str) -> str:
+    """Return "LATIN" for a text with only Latin letters, "" for no letter, else "OTHER"."""
+    letters = [char for char in name_key(text) if char.isalpha()]
+    if not letters:
+        return ""
+    return "LATIN" if all("a" <= char <= "z" for char in letters) else "OTHER"
+
+
 def _discogs_tracks(discogs: Path, artist_ids: list[int]) -> dict[int, list[tuple]]:
     """Return, for each Discogs artist id, its tracks: (title, release id, track index, year)."""
     missing = [name for name in DISCOGS_TABLES if not (discogs / f"{name}.parquet").is_file()]
@@ -1167,18 +1260,47 @@ def match_discogs(
     }
     tracks = _discogs_tracks(discogs, sorted(wanted))
     taken: set[tuple] = set()
-    indexes: dict[int, tuple[dict, dict, list[str]]] = {}
+    indexes: dict[int, tuple[dict, dict, list[str], dict]] = {}
 
-    def tracks_of(artist: int) -> tuple[dict, dict, list[str]]:
-        """Return the tracks of an artist by exact key and by loose key, and the loose keys."""
+    def tracks_of(artist: int) -> tuple[dict, dict, list[str], dict]:
+        """Return the tracks of an artist by exact key, by loose key and by bridge key."""
         if artist not in indexes:
             by_exact: dict[str, list[tuple]] = {}
             by_loose: dict[str, list[tuple]] = {}
+            bridges: dict[tuple, set[str]] = {}
             for hit in tracks.get(artist, []):
+                loose = loose_key(hit[0])
                 by_exact.setdefault(name_key(hit[0]), []).append(hit)
-                by_loose.setdefault(loose_key(hit[0]), []).append(hit)
-            indexes[artist] = (by_exact, by_loose, sorted(by_loose))
+                by_loose.setdefault(loose, []).append(hit)
+                bridges.setdefault(("fold", fold_key(hit[0])), set()).add(loose)
+                bridges.setdefault(skeleton_key(hit[0]), set()).add(loose)
+            # A bridge key names a track only when one title of the artist has it.
+            by_bridge = {
+                key: by_loose[next(iter(titles))]
+                for key, titles in bridges.items()
+                if key[1] and len(titles) == 1
+            }
+            indexes[artist] = (by_exact, by_loose, sorted(by_loose), by_bridge)
         return indexes[artist]
+
+    def bridge(title: str, by_exact: dict, by_loose: dict, by_bridge: dict) -> list[tuple]:
+        """Return the tracks that a title meets in another spelling or script (`bridge` class)."""
+        parts = [part for part in title.split(" / ") if _script(part)]
+        if len(parts) > 1 and len({_script(part) for part in parts}) > 1:
+            for part in parts:
+                hits = by_exact.get(name_key(part)) or by_loose.get(loose_key(part))
+                if hits:
+                    return hits
+        hits = by_bridge.get(("fold", fold_key(title)), [])
+        script, skeleton = skeleton_key(title)
+        if not hits and skeleton:
+            others = [
+                found
+                for (other, key), found in by_bridge.items()
+                if key == skeleton and other not in ("fold", script)
+            ]
+            hits = others[0] if len(others) == 1 else []
+        return hits
 
     rows = [
         {"source_song_id": song["source_song_id"], "discogs_class": "out_of_scope"}
@@ -1189,13 +1311,15 @@ def match_discogs(
 
     def look(song: dict, artist_id: str) -> tuple:
         """Return the class, the hits and the close score of a song for one roster artist."""
-        by_exact, by_loose, keys = tracks_of(int(discogs_of[artist_id]))
+        by_exact, by_loose, keys, by_bridge = tracks_of(int(discogs_of[artist_id]))
         exact, loose = name_key(song["song_name"]), loose_key(song["song_name"])
         if (artist_id, loose) in held_loose:
             return "held_loose_title", [], None
         kind, hits, score = "exact", by_exact.get(exact, []), None
         if not hits:
             kind, hits = "loose", by_loose.get(loose, [])
+        if not hits:
+            kind, hits = "bridge", bridge(song["song_name"], by_exact, by_loose, by_bridge)
         if not hits:
             close = difflib.get_close_matches(loose, keys, n=1, cutoff=CLOSE_CUTOFF)
             kind, hits = "close", by_loose[close[0]] if close else []

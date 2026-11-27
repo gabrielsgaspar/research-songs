@@ -169,6 +169,16 @@ A kept text of fewer than 30 characters has no key and is never a copy. Of two c
 
 A dump song can match a Discogs track of its artist only by close spelling: the loose title keys are 90% similar or more (`CLOSE_CUTOFF`), for example "Tu Tenias Razón" and "Tu Tenia Razon". An import adds such a song when both titles hold the same numbers in the same order (`dump_match.same_numbers`). A song whose numbers differ, such as "Saludo 2010 (En Vivo)" and "Saludo 2004", stays out with the class `close`. A decision in `resources/lyrics/reviewed_close_matches.csv` wins over the rule for its track: `reject` keeps a song out, and `accept` adds it. The link of such a song has the match method `dump_discogs_close_title` and its similarity as the score. On 2026-11-25, a sample of 130 close matches of the `musica` dump (70, in DOM, URY, ECU, PAN, CRI, NIC, PRY and SLV) and the `lrclib` dump (60, in ECU and URY) gave these counts: the rule added 126 songs, of which 2 were another song ("No hice nada" and "No dice nada") and 4 were doubtful. It kept out 4 songs, of which 2 were wrong and 2 were right with a track number in the dump title.
 
+### Titles in two scripts or two spellings
+
+A dump title and a Discogs title of one song can differ in script or in spelling: an Arabic title against its Latin transliteration, or two Arabic spellings of one word. When no exact or loose title key matches, an import looks for a track of the same artist in three steps (`bridge` in `dump_match.match_discogs`):
+
+1. A dump title with two scripts around " / ", such as a Thai title and its Latin form, matches a track by one of its parts.
+2. The fold key (`dump_match.fold_key`) is the loose key with no spaces and with one letter for each pair of Arabic letters that spellings exchange (ة and ه, ى and ي).
+3. The skeleton key (`dump_match.skeleton_key`) joins a Latin title and a title in Arabic, Bengali, Devanagari, Sinhala or Ethiopic script. It keeps one letter for each group of consonants and drops the vowels. It needs 4 letters or more, and the two titles must be in different scripts.
+
+A fold key or a skeleton key names a track only when one title of the artist has it. The link of such a song has the match method `dump_discogs_bridge_title` and the score 90. On 2026-11-28, a sample of 139 such songs (70 with an Arabic title, 12 Thai, 57 Latin to Ethiopic, Sinhala, Bengali or Devanagari) gave 135 right, 1 wrong and 3 doubtful. The wrong song had a skeleton of 4 letters. The key does not join artist names: in a test of 2026-11-27, 4 of 45 Arabic name pairs were right.
+
 ### Limits of a campaign
 
 An audit on 2026-11-24 read the 978,744 songs that campaigns added to 74 countries. It found these limits. Read them before you report the result of a campaign.
