@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261127T165112Z",
+  "closed_utc": "2026-11-27T17:04:08Z",
+  "iso3": "LKA",
+  "next_time": "The pilot of lyricslk sent 187 requests and parsed 155 songs; 30 pages were redirects to a song under another singer. The pilot read the end of the sitemap, which is mostly hymns: 31 of 155 songs had a roster artist, none had a Discogs track, and the survey adds 0 songs. An offline match of the 9,244 sitemap URLs (singer name and title slug, no text) adds about 136 songs: 7,178 are not on the roster and 1,733 have no Discogs track. A full run needs about 12,600 requests and 9 hours at 2.5 seconds for each request. Run it only when a larger roster or another song catalog for LKA exists; the roster has 144 artists.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 465
+}

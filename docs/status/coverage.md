@@ -123,7 +123,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [LBY](../../countries/LBY/) | 2 | 2026-11-21 | old_layout | old_pipeline | 175 |
 | [LCA](../../countries/LCA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 15 |
 | [LIE](../../countries/LIE/) | 2 | 2026-11-21 | old_layout | old_pipeline | 84 |
-| [LKA](../../countries/LKA/) | 4 | 2026-11-25 | dump_name, old_layout | genius, lrclib, old_pipeline | 465 |
+| [LKA](../../countries/LKA/) | 5 | 2026-11-27 | dump_name, live, old_layout | genius, lrclib, lyricslk, old_pipeline | 465 |
 | [LSO](../../countries/LSO/) | 2 | 2026-11-21 | old_layout | old_pipeline | 45 |
 | [LTU](../../countries/LTU/) | 19 | 2026-11-26 | dump_name, live, old_layout | dainutekstai, dainuzodziai, genius, geniusru, lrclib, old_pipeline, textpesenok | 5818 |
 | [LUX](../../countries/LUX/) | 4 | 2026-11-25 | dump_name, old_layout | genius, lrclib, old_pipeline | 307 |

@@ -1,0 +1,33 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 0,
+  "backfilled": false,
+  "bulk_file": null,
+  "campaign_id": "20261127T165112Z",
+  "code_commit": "460e331f98346dc1c272d0da67bd8449d45fcdf5",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T16:59:32Z",
+  "iso3": "LKA",
+  "known_gaps": [
+    "The run reached the song limit of 185."
+  ],
+  "limits_hit": {
+    "song_limit": 185
+  },
+  "notes": "Wrote raw/lyricslk/20261127/",
+  "request_delay_seconds": 2.0,
+  "requests_sent": 187,
+  "route": "live",
+  "rows_added": 0,
+  "run_id": "20261127T165141Z",
+  "schema_version": 2,
+  "song_limit": 185,
+  "songs_accepted": 155,
+  "songs_attempted": 185,
+  "songs_rejected": {
+    "no_lyric_block": 30
+  },
+  "source": "lyricslk",
+  "started_utc": "2026-11-27T16:51:41Z",
+  "state": "complete"
+}
