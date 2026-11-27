@@ -114,7 +114,7 @@ def held_countries(countries: Path | None = None) -> list[str]:
         newest = None
         for campaign in reversed(found):
             members = [r for r in runs if r.campaign_id == campaign.campaign_id]
-            if members and all(r.corrects_existing_songs for r in members):
+            if members and all(r.route == "manual_review" for r in members):
                 continue
             newest = campaign
             break
