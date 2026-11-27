@@ -226,6 +226,11 @@ def name_key(text: str | None) -> str:
     return " ".join(kept.split())
 
 
+def roster_key(name: str | None) -> str:
+    """Return `name_key` of a roster name without its homonym mark: "wizkid" for "WizKid (4)"."""
+    return name_key(re.sub(_HOMONYM, "", name or ""))
+
+
 # Cyrillic letters as the Latin letters of `spelling_key`.
 _CYRILLIC = str.maketrans(
     {
@@ -529,13 +534,15 @@ def match_dump(
         roster_ids: dict[str, set[str]] = {}
         roster_name: dict[str, str] = {}
         for artist_id, name in roster:
-            roster_ids.setdefault(name_key(name), set()).add(artist_id)
+            for key in {name_key(name), roster_key(name)}:
+                roster_ids.setdefault(key, set()).add(artist_id)
             roster_name[artist_id] = name
         for key, artist_id in (variants or {}).items():
             roster_ids.setdefault(key, set()).add(artist_id)
         held_pairs = set()
         for artist_id, artist, title in held:
-            for key in (name_key(artist), name_key(roster_name.get(artist_id))):
+            named = roster_name.get(artist_id)
+            for key in (name_key(artist), name_key(named), roster_key(artist), roster_key(named)):
                 held_pairs.add((key, name_key(title)))
         wanted = sorted(({*roster_ids} | {key for key, _ in held_pairs}) - {""})
         _table(connection, "wanted", "str", wanted)
@@ -922,6 +929,8 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
     1. Exactly one Discogs artist has the key, and a release of a home country of
        `iso3` credits it (`load_home_countries`). This keeps out an artist of another
        country with the same name.
+    0. The roster name has a homonym mark, such as "WizKid (4)", and is the full name of a
+       Discogs artist: the roster names that artist itself (`by_mark`).
     2. Several Discogs artists have the key. The one with the most home releases is
        taken when it has `MIN_HOME_RELEASES` or more, these are at least
        `MIN_HOME_SHARE` of its releases, and no other of them has a home release
@@ -967,13 +976,26 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
             if number and artist_id in named_before
         }
         missing = {artist_id: name_key(name) for artist_id, name, number in roster if not number}
+        marked = {
+            artist_id: name
+            for artist_id, name, number in roster
+            if not number and re.search(_HOMONYM, name)
+        }
         keys = sorted(set(missing.values()) - {""})
         found: dict[str, dict[int, str]] = {}
+        exact: dict[str, int] = {}
         if keys and (discogs / "artists.parquet").is_file():
             _table(connection, "names", "str", keys)
+            _table(connection, "marked", "str", sorted(set(marked.values())))
+            keyed = _discogs_keys(connection, discogs)
+            exact = {
+                name: number
+                for number, name in connection.sql(
+                    f"SELECT artist_id, name FROM {keyed} WHERE name IN (SELECT value FROM marked)"
+                ).fetchall()
+            }
             for number, name, key in connection.sql(
-                f"SELECT artist_id, name, key FROM {_discogs_keys(connection, discogs)} "
-                "WHERE key IN (SELECT value FROM names)"
+                f"SELECT artist_id, name, key FROM {keyed} WHERE key IN (SELECT value FROM names)"
             ).fetchall():
                 found.setdefault(key, {})[number] = name
     result = {"none_found": 0, "more_than_one": 0, "id_taken": 0}
@@ -983,11 +1005,19 @@ def discogs_ids(country: Path, discogs: Path, iso3: str) -> dict:
         if key:
             rows_of.setdefault(key, []).append(artist_id)
     taken = set(ids.values())
+    found_now: dict[str, tuple[int, str]] = {}
+    result["by_mark"] = 0
+    for artist_id, name in marked.items():
+        if exact.get(name) is not None and exact[name] not in taken:
+            found_now[artist_id] = (exact[name], name)
+            rows_of[missing[artist_id]].remove(artist_id)
+            result["by_mark"] += 1
+    rows_of = {key: artists for key, artists in rows_of.items() if artists}
+    taken |= {number for number, _ in found_now.values()}
     home = load_home_countries().get(iso3, frozenset())
     wanted = sorted({number for key in rows_of for number in found.get(key, {})})
     at_home = _home_releases(discogs, wanted, home)
     stated = _stated_artists(discogs, wanted, iso3)
-    found_now: dict[str, tuple[int, str]] = {}
     for name in ("by_home_release", "by_dominance", "by_same_key", "by_stated"):
         result[name] = 0
     result["no_home_release"] = 0
@@ -1048,7 +1078,7 @@ def variant_keys(
             "artist_id, artist_name",
         )
     ids = discogs_ids(country, discogs, iso3)["ids"]
-    own = {name_key(name) for _, name in roster}
+    own = {key for _, name in roster for key in (name_key(name), roster_key(name))}
     first: dict[int, str] = {}
     found: dict[str, set[int]] = {}
     for artist_id, name in sorted(roster):

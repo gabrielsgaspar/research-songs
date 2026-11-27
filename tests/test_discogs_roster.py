@@ -394,3 +394,13 @@ def test_an_artist_that_the_tracked_list_gives_another_country_is_on_no_roster(t
         "artist_id,country_iso3\nCZE0,SVK\n", encoding="utf-8"
     )
     assert discogs_roster._rosters(data, root) == {"CZE": [("Other", None)]}
+
+
+def test_a_marked_roster_name_with_no_id_has_the_id_of_that_discogs_artist(tmp_path):
+    data, discogs = tmp_path / "data", tmp_path / "discogs"
+    roster(data, "ISL", [("Stated (2)", None), ("Other (3)", None), ("Plain", None)])
+    write_discogs(discogs, [(5, "Stated (2)", None, "Pop"), (6, "Plain", None, "Pop")], {5: ["US"]})
+
+    assert discogs_roster._rosters(data, discogs=discogs) == {
+        "ISL": [("Stated (2)", "5"), ("Other (3)", None), ("Plain", None)]
+    }

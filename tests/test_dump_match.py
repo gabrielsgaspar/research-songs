@@ -1220,3 +1220,31 @@ def test_variant_keys_add_the_dump_names_that_spell_a_roster_artist_another_way(
 def test_an_apostrophe_letter_is_an_apostrophe_in_a_key():
     names = ["Sherali Joʻrayev", "Sherali Jo'rayev", "Sherali Jo’rayev", "Sherali Joʼrayev"]
     assert {dump_match.name_key(name) for name in names} == {"sherali jo rayev"}
+
+
+def test_a_roster_name_with_a_homonym_mark_is_that_discogs_artist(tmp_path):
+    dump, country = make_folders(tmp_path / "data")
+    write(
+        schemas.COUNTRY_ARTISTS,
+        tmp_path / "marked",
+        [artist("a1", "Anna Jons (2)"), artist("a2", "Bára (3)"), artist("a3", "Dísa (4)")],
+    )
+    write(schemas.COUNTRY_SONGS, tmp_path / "marked", [held("s1", "a1", "Anna Jons", "Old", "h9")])
+    write(schemas.COUNTRY_LINKS, tmp_path / "marked", [])
+    # 81 has no release in Iceland, and 21 is one of two artists with the key: the full
+    # name still names each of them. No Discogs artist has the full name of a3.
+    write_named_discogs(
+        tmp_path / "discogs", "(81, 'Anna Jons (2)'), (82, 'Anna Jons'), (21, 'Bára (3)')"
+    )
+
+    found = dump_match.discogs_ids(tmp_path / "marked", tmp_path / "discogs", "ISL")
+
+    assert found["by_name"] == {"a1": (81, "Anna Jons (2)"), "a2": (21, "Bára (3)")}
+    assert (found["by_mark"], found["none_found"]) == (2, 1)
+    assert dump_match.roster_key("Anna Jons (2)") == "anna jons"
+    # A dump credit without the mark is a credit of the roster artist.
+    rows = {
+        row["source_song_id"]: row
+        for row in dump_match.match_dump(dump, tmp_path / "marked")["songs"]
+    }
+    assert rows["d3"]["roster_artist_ids"] == ["a1"]
