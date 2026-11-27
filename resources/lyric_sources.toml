@@ -1242,12 +1242,25 @@ name = "KuGeci"
 kind = "bulk_dump"
 scope = "countries"
 countries = ["CHN", "HKG", "TWN"]
-url = ""
+url = "https://www.kugeci.com"
 stored_path = ""
 routes = ["dump_name"]
 access = "not_applicable"
 checked = true
 notes = "A clean copy dated 2026-10-12 exists, with about 258,000 song rows. No pages were downloaded."
+
+[[source]]
+id = "lidicity"
+name = "Lidicity"
+kind = "site_archive"
+scope = "countries"
+countries = ["CHN", "HKG"]
+url = "https://ip.lidicity.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = "A site archive dated 2026-11-06 exists, with Chinese songs, most of them from the 1930s and 1940s. Most artists are Shanghai singers; some sang later in Hong Kong. The songs have no year and no language."
 
 [[source]]
 id = "pmdb_taipei"
@@ -1359,6 +1372,19 @@ access = "allowed"
 request_delay_seconds = 1.0
 checked = true
 notes = ""
+
+[[source]]
+id = "deungdutjai"
+name = "Deungdutjai"
+kind = "site_archive"
+scope = "countries"
+countries = ["THA"]
+url = "https://deungdutjai.com"
+stored_path = ""
+routes = ["archive"]
+access = "unknown"
+checked = true
+notes = "A site archive dated 2026-11-11 exists. The songs have no year and no language. Many artist names have a Thai and a Latin form."
 
 [[source]]
 id = "kapanlagi"
@@ -1693,14 +1719,14 @@ id = "stixoi"
 name = "Stixoi"
 kind = "site_archive"
 scope = "countries"
-countries = ["GRC"]
+countries = ["CYP", "GRC"]
 url = "https://stixoi.info"
 stored_path = ""
 routes = ["archive", "live", "roster_update", "recover"]
 access = "allowed"
 request_delay_seconds = 1.0
 checked = true
-notes = "A site archive dated 2026-09-25 exists."
+notes = "A site archive dated 2026-09-25 exists. It also serves Cyprus, because Cypriot artists sing in Greek."
 
 [[source]]
 id = "tekstowo"
