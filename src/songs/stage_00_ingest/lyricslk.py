@@ -7,6 +7,11 @@ so the reader does not take them. The page prints no release year. The text in S
 letters is `pre[data-lyrics-si]`, and the same text in Latin letters is
 `pre[data-lyrics-en]`. The reader keeps the Sinhala text, or the Latin text when the
 page has no Sinhala text. A `span` inside the `pre` is a site notice, not a lyric line.
+
+The sitemap lists a song of two singers under each singer. Only one of these URLs holds
+the song; the other is a page that sends the browser to it (`__next-page-redirect`).
+The sitemap lists the target as well, so the reader gives such a page the reason
+`redirect` and does not follow it.
 """
 
 import sys
@@ -35,6 +40,7 @@ TITLE_KINDS = ()
 SEEDS = (BASE + "/sitemap.xml", BASE + "/artists")
 SKIP_PREFIXES = ("/api/", "/search")
 _TEXTS = (("data-lyrics-si", "si"), ("data-lyrics-en", "si-Latn"))
+_REDIRECT = 'id="__next-page-redirect"'
 
 
 class _Page(HTMLParser):
@@ -98,6 +104,8 @@ def parse_song(html: str, url: str) -> tuple[dict | None, list[tuple[str, str]],
     page = _Page()
     page.feed(html)
     page.close()
+    if _REDIRECT in html:
+        return None, [], "redirect"
     label = next((label for _name, label in _TEXTS if page.texts.get(label, "").strip()), None)
     if label is None:
         return None, [], "no_lyric_block"

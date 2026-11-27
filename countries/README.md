@@ -234,7 +234,7 @@ The command prints the two commands that follow it. `songs dumps build` turns th
 
 ## Read a saved site
 
-Some sites are on this disk as saved pages, packed into `pages-*.tar.gz` parts. `songs dumps build` cannot read pages, so one command reads them first. `songs.stage_00_ingest.site_pages` reads the packed parts of every site, and one small module for each site reads its pages: `textpesenok`, `cuspajz`, `pesmarica`, `kyrgyzaudio`, `matinder`, `mediastar`, `georgianlyrics` and `geolyrics` (`site_pages.SITES`). For example:
+Some sites are on this disk as saved pages, packed into `pages-*.tar.gz` parts. `songs dumps build` cannot read pages, so one command reads them first. `songs.stage_00_ingest.site_pages` reads the packed parts of every site, and one small module for each site reads its pages: `textpesenok`, `cuspajz`, `pesmarica`, `kyrgyzaudio`, `matinder`, `mediastar`, `georgianlyrics`, `geolyrics` and `lyricslk` (`site_pages.SITES`). For example:
 
 ```bash
 uv run songs dumps parse textpesenok raw/textpesenok/20261004/

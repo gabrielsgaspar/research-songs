@@ -41,6 +41,11 @@ def test_a_page_with_no_text_or_no_singer_gives_no_song():
     assert lyricslk.parse_song(PAGE.replace("data-artist-en", "data-other"), URL)[2] == "no_artist"
 
 
+def test_a_page_that_sends_the_browser_to_another_url_gives_no_song():
+    html = '<html><head><meta id="__next-page-redirect" http-equiv="refresh"/></head></html>'
+    assert lyricslk.parse_song(html, URL) == (None, [], "redirect")
+
+
 def test_song_ids_and_listings_come_from_the_url():
     assert lyricslk.song_id(f"{lyricslk.BASE}/artist/invented-singer") is None
     assert lyricslk.is_artist_page(f"{lyricslk.BASE}/artist/invented-singer")
