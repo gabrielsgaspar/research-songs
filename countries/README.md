@@ -177,7 +177,7 @@ A dump title and a Discogs title of one song can differ in script or in spelling
 2. The fold key (`dump_match.fold_key`) is the loose key with no spaces and with one letter for each pair of Arabic letters that spellings exchange (ة and ه, ى and ي).
 3. The skeleton key (`dump_match.skeleton_key`) joins a Latin title and a title in Arabic, Bengali, Devanagari, Sinhala or Ethiopic script. It keeps one letter for each group of consonants and drops the vowels. It needs 4 letters or more, and the two titles must be in different scripts.
 
-A fold key or a skeleton key names a track only when one title of the artist has it. The link of such a song has the match method `dump_discogs_bridge_title` and the score 90. On 2026-11-28, a sample of 97 such songs (45 Arabic to Latin or Arabic, 25 Latin to Arabic, 12 Thai, 15 Latin to Ethiopic) gave 93 right, 1 wrong and 3 doubtful. The wrong song had a skeleton of 4 letters. The key does not join artist names: in a test of 2026-11-27, 4 of 45 Arabic name pairs were right.
+A fold key or a skeleton key names a track only when one title of the artist has it. The link of such a song has the match method `dump_discogs_bridge_title` and the score 90. On 2026-11-28, a sample of 139 such songs (70 with an Arabic title, 12 Thai, 57 Latin to Ethiopic, Sinhala, Bengali or Devanagari) gave 135 right, 1 wrong and 3 doubtful. The wrong song had a skeleton of 4 letters. The key does not join artist names: in a test of 2026-11-27, 4 of 45 Arabic name pairs were right.
 
 ### Limits of a campaign
 
