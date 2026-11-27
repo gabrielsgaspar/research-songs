@@ -249,7 +249,14 @@ def test_a_country_is_held_while_its_newest_campaign_stopped_after_it_added_song
     assert campaigns.held_countries(tmp_path) == ["BRA", "PER", "URY"]
 
 
-def test_review_of_existing_fields_preserves_collection_hold(tmp_path, clock):
+@pytest.mark.parametrize(
+    ("source", "bulk_file", "added"),
+    [
+        ("genius", "raw/reviewed_corrections/20261127/review.jsonl", 0),
+        ("review_workbook", "raw/manual_review/BRA/20261127/BRA_reviewed.xlsx", 1),
+    ],
+)
+def test_manual_review_preserves_collection_hold(tmp_path, clock, source, bulk_file, added):
     campaigns.open_campaign("BRA", "Collect songs", songs_before=2, countries=tmp_path)
     campaigns.close_campaign(
         "BRA",
@@ -263,13 +270,13 @@ def test_review_of_existing_fields_preserves_collection_hold(tmp_path, clock):
     with run_records.record_run(
         "BRA",
         "manual_review",
-        "genius",
+        source,
         countries=tmp_path,
-        bulk_file="raw/reviewed_corrections/20261127/review.jsonl",
-        rows_added=0,
+        bulk_file=bulk_file,
+        rows_added=added,
     ):
         pass
     campaigns.close_campaign(
-        "BRA", "complete", "Check the roster.", songs_after=3, countries=tmp_path
+        "BRA", "complete", "Check the roster.", songs_after=3 + added, countries=tmp_path
     )
     assert campaigns.held_countries(tmp_path) == ["BRA"]

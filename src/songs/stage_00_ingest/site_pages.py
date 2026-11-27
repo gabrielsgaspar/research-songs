@@ -60,6 +60,8 @@ SITES = (
     "mediastar",
     "musiburma",
     "pesmarica",
+    "pesninet",
+    "tekstpesnionline",
     "textpesenok",
 )
 CREDIT_COLUMNS = ("provider_song_id", "credit_position", "provider_artist_id", "artist_name")

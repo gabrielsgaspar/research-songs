@@ -256,6 +256,14 @@ uv run songs dumps parse textpesenok raw/textpesenok/20261004/
 
 The command prints the `songs dumps build` command that follows it.
 
+## Russian-language sites for other countries
+
+Use the artist's country evidence to choose the country folder. Search the artist's local name and the names on their Discogs profile. On GeoLyrics, read both the Georgian song title and the Russian title on the artist index. Confirm the performer on the Discogs track. A sole release artist can supply the credit when the track has no separate performer. Keep a duet under review if its performers or country assignment are unclear.
+
+For Naizust and Pesni.net, give the collector one `--seed-url` per selected song. It checks the site's robots file and reads only those song pages. Use the current Naizust host for the source key `tekstpesnionline`. Keep the original performed text. Compare the source URL, credited track, local title variants and normalized text against existing holdings. A later issue can verify a recording without establishing its first release year.
+
+On 2026-11-27, six priority artists yielded 3 songs for Kyrgyzstan, 1 for Uzbekistan and 5 for Georgia. A second review of 64 GeoLyrics pages for Mgzavrebi and Nino Katamadze yielded 11 songs. The country already held 44 songs, and 9 pages still needed review.
+
 ## Run records
 
 A collection command writes one record when it ends, also when it fails. Nobody writes or edits a record by hand, and a record is never overwritten. The file name is `<run id>_<route>_<source>.json`.
@@ -303,6 +311,14 @@ Records of schema version 1 do not have the fields from `campaign_id` to `limits
 | `local_source` | Import from a dataset that someone gave to the project |
 | `manual_review` | Import of the songs that a person added to a country review workbook |
 | `old_layout` | Import of the state of a country from the files of the old pipeline. The old files do not record how each song was first collected |
+
+## Reviewer-selected songs
+
+The November 27, 2026 campaign checked 13 country workbooks and added 7,374 songs in 12 countries. Benin had no additions. Each new song has `route=manual_review`. Its run record has `source=review_workbook` and names the frozen workbook in `bulk_file`. The song keeps the lyric provider and source URL. Its ID is derived from the URL. A local dump can supply or verify lyrics for a song that a reviewer selected.
+
+The private crosswalk records the country, workbook hash, sheet row, song ID, artist ID, Discogs ID and run ID. The private review tables keep country disagreements and uncertain song matches out of the import. The campaign checked source IDs, artist and title, text hashes, and the first 300 normalized lyric characters against the stored songs. A matching prefix calls for review. It does not establish that two recordings are identical.
+
+The checked selection writer in `songs.stage_00_ingest.review_selection` verifies the new country tables before it writes the manifest. It checks that the parent songs survive and that replay adds zero rows. An approved country in `resources/lyrics/eligibility_exceptions.csv` admits eligible reviewer selections by exception. A workbook run preserves any earlier hold on dump songs.
 
 ## Coverage page
 

@@ -1,0 +1,29 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/tekstpesnionline/20261127/",
+  "campaign_id": "20261127T161653Z",
+  "code_commit": "712164646a14501c2648f0b51352c304c61977a0",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T16:23:39Z",
+  "iso3": "KGZ",
+  "known_gaps": [],
+  "limits_hit": {},
+  "notes": "Review the four named singer pages. Artist and original-language title reviewed against the credited recording. Checked existing titles, URLs, track IDs and lyric text. Only selected artist pages were in scope.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 3,
+  "run_id": "20261127T162337Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 3,
+  "songs_attempted": 4,
+  "songs_rejected": {
+    "needs_review": 1
+  },
+  "source": "tekstpesnionline",
+  "started_utc": "2026-11-27T16:23:37Z",
+  "state": "complete"
+}

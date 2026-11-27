@@ -323,6 +323,10 @@ def lyrics_collect(
         str | None,
         typer.Option(help="Why the site is collected again. Needed to repeat a complete run."),
     ] = None,
+    seed_url: Annotated[
+        list[str] | None,
+        typer.Option("--seed-url", help="Collect only these song pages. Repeat for each URL."),
+    ] = None,
 ) -> None:
     """Collect the pages of a lyric site into a new folder raw/<source>/<YYYYMMDD>/.
 
@@ -345,6 +349,8 @@ def lyrics_collect(
     data = data_root()
     try:
         if source == dainutekstai.SOURCE:
+            if seed_url:
+                raise ValueError("this collector does not accept --seed-url")
             result = dainutekstai.collect(
                 data,
                 code,
@@ -358,6 +364,7 @@ def lyrics_collect(
                 data,
                 source,
                 code,
+                seed_urls=seed_url,
                 delay=delay,
                 artist_limit=artist_limit,
                 song_limit=song_limit,

@@ -51,6 +51,8 @@ SOURCES = (
     "loibaihat",
     "lyricslk",
     "musiburma",
+    "pesninet",
+    "tekstpesnionline",
 )
 PAGE_CAP = 5_000
 OFFSET_CAP = 20_000
@@ -523,6 +525,7 @@ def collect(
     artist_limit: int | None = None,
     song_limit: int | None = None,
     reason: str | None = None,
+    seed_urls: list[str] | None = None,
     fetch: Fetch | None = None,
     sleep: Callable[[float], None] = time.sleep,
     countries: Path | None = None,
@@ -542,6 +545,22 @@ def collect(
         raise CollectError(f"requests to {source} are {listed.access} in the source file")
     if all(item.id != source for item in lyric_sources.sources_for(iso3)):
         raise CollectError(f"{source} does not serve {iso3} in the source file")
+    if seed_urls:
+        seeds = []
+        for url in seed_urls:
+            parts = urlsplit(url)
+            if (
+                parts.netloc != urlsplit(site.BASE).netloc
+                or parts.scheme != "https"
+                or not site.song_id(url)
+            ):
+                raise CollectError(f"expected a song page on {site.BASE}: {url}")
+            if url not in seeds:
+                seeds.append(url)
+    else:
+        seeds = _seeds(site)
+        if not seeds:
+            raise CollectError(f"give --seed-url for each {source} song page")
     staging = data / "staging" / "site_crawl" / source
     _lock(staging)
     seen = _stored_urls(data, source, staging)
@@ -555,9 +574,10 @@ def collect(
     session = _Session(fetch or http_fetch, sleep, delay)
     number = _next_id(staging)
     counts: Counter = Counter()
-    queue: deque[str] = deque(url for url in _seeds(site) if url not in seen)
+    queue: deque[str] = deque(url for url in seeds if url not in seen)
     queued = set(queue) | seen
-    _replay(staging, site, seen, queue, queued)
+    if not seed_urls:
+        _replay(staging, site, seen, queue, queued)
     artists = 0
     stopped = ""
     limits: dict = {}
@@ -573,6 +593,8 @@ def collect(
             artist_limit=artist_limit,
             song_limit=song_limit,
         ) as record:
+            if seed_urls:
+                record.notes = (record.notes + f" Selected {len(seeds)} song URLs.").strip()
             try:
                 saved_robots = {"done": False}
 
@@ -640,7 +662,7 @@ def collect(
                     _outcome(site, url, html, counts)
                     if site.is_artist_page(url):
                         artists += 1
-                    for link in _linked(site, html, url):
+                    for link in () if seed_urls else _linked(site, html, url):
                         if link not in queued and session.allowed(link):
                             queued.add(link)
                             if site.song_id(link):

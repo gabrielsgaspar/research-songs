@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 from songs.cli import app
 from songs.common import manifests, paths, run_records, schemas
 from songs.common.paths import DATA_ROOT_ENV
+from songs.stage_00_ingest import review_selection
 from songs.stage_00_ingest import review_workbooks as r
 
 ADDED, OLD = "Added by review", r.ALREADY_IN_DATA
@@ -126,6 +127,23 @@ def make_earlier_folder(data, run_id=EARLIER_RUN):
         inputs=["raw/example_site/20200101/"],
     )
     return folder
+
+
+def test_append_a_selection_replays_without_replacing_a_song(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    monkeypatch.setattr(run_records, "countries_dir", lambda: tmp_path / "countries")
+    parent = make_earlier_folder(data)
+    book = make_workbook(data)
+    frame, _ = r.read_added_songs(book, "TGO")
+    selection = frame.iloc[:1].copy()
+    with pytest.raises(ValueError, match="conflict"):
+        review_selection.remaining(selection, parent)
+    selection["song_id"] = "mr_fresh"
+    selection["song_url"] = "https://a.example/fresh"
+    folder, count = review_selection.append(data, "TGO", book, parent, selection, {})
+    assert count == 1
+    assert review_selection.append(data, "TGO", book, folder, selection, {}) == (folder, 0)
+    assert len(run_records.read_run_records("TGO")) == 1
 
 
 def test_only_added_and_finished_songs_are_imported(tmp_path):
