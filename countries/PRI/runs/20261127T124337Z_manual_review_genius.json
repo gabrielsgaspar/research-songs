@@ -1,0 +1,29 @@
+{
+  "artist_limit": null,
+  "artists_attempted": null,
+  "backfilled": false,
+  "bulk_file": "raw/reviewed_corrections/20261127/correction_manifest.jsonl",
+  "campaign_id": "20261127T124337Z",
+  "code_commit": "4864a87d0fc65b9600b8bf697e9d5fb30f77e349",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T12:43:40Z",
+  "iso3": "PRI",
+  "known_gaps": [
+    "Unresolved and contradicted review rows remain excluded."
+  ],
+  "limits_hit": {},
+  "notes": "Applied 3 reviewed corrections to parent 20261126T113224Z. Manifest SHA-256 e0e4472e1faba45eaafaf6f368c862ea8ebf55c9256679b98e00883482f6fa62.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "manual_review",
+  "rows_added": 0,
+  "run_id": "20261127T124337Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 3,
+  "songs_attempted": 3,
+  "songs_rejected": {},
+  "source": "genius",
+  "started_utc": "2026-11-27T12:43:37Z",
+  "state": "complete"
+}

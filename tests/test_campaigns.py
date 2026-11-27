@@ -247,3 +247,29 @@ def test_a_country_is_held_while_its_newest_campaign_stopped_after_it_added_song
     campaign("BOL", "abandoned", 10, 12)
     campaigns.open_campaign("ECU", "An open campaign", countries=tmp_path)
     assert campaigns.held_countries(tmp_path) == ["BRA", "PER", "URY"]
+
+
+def test_review_of_existing_fields_preserves_collection_hold(tmp_path, clock):
+    campaigns.open_campaign("BRA", "Collect songs", songs_before=2, countries=tmp_path)
+    campaigns.close_campaign(
+        "BRA",
+        "stopped",
+        "Check the roster.",
+        reason="Roster review.",
+        songs_after=3,
+        countries=tmp_path,
+    )
+    campaigns.open_campaign("BRA", "Correct existing songs", songs_before=3, countries=tmp_path)
+    with run_records.record_run(
+        "BRA",
+        "manual_review",
+        "genius",
+        countries=tmp_path,
+        bulk_file="raw/reviewed_corrections/20261127/review.jsonl",
+        rows_added=0,
+    ):
+        pass
+    campaigns.close_campaign(
+        "BRA", "complete", "Check the roster.", songs_after=3, countries=tmp_path
+    )
+    assert campaigns.held_countries(tmp_path) == ["BRA"]

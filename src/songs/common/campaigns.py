@@ -96,7 +96,7 @@ def read_campaigns(iso3: str, countries: Path | None = None) -> list[Campaign]:
 
 
 def held_countries(countries: Path | None = None) -> list[str]:
-    """Return the countries whose newest campaign stopped after it added songs.
+    """Return the countries whose newest collection campaign stopped after it added songs.
 
     Such a campaign added songs and then failed a check, for example a roster
     check, so its songs wait for a later campaign. A stopped campaign that added
@@ -110,7 +110,14 @@ def held_countries(countries: Path | None = None) -> list[str]:
         if not ISO3.fullmatch(folder.parent.name):
             continue
         found = read_campaigns(folder.parent.name, root)
-        newest = found[-1] if found else None
+        runs = run_records.read_run_records(folder.parent.name, root)
+        newest = None
+        for campaign in reversed(found):
+            members = [r for r in runs if r.campaign_id == campaign.campaign_id]
+            if members and all(r.corrects_existing_songs for r in members):
+                continue
+            newest = campaign
+            break
         if newest is None or newest.outcome != "stopped":
             continue
         before, after = newest.songs_before, newest.songs_after

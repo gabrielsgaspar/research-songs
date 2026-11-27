@@ -57,9 +57,8 @@ how many such songs it leaves out.
 A song collected by hand whose country has a group in the exceptions file is
 eligible by exception (`by_exception` is true). The file is
 `resources/lyrics/eligibility_exceptions.csv`: one row per country, with the
-reason and the date of the decision. The file has no rows while no country has a
-`manual_review` run; a test fails when a run record names that route and the file
-has no row for its country.
+reason and the date of the decision. The file names countries with hand-collected songs.
+A review that only corrects existing fields preserves the collection route of every song.
 
 The two lists come from the old pipeline. They hold hashes, ids and the id of the
 check that put each row on the list, and no lyric text. The list of suspect texts is
