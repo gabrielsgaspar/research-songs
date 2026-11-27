@@ -1,0 +1,33 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 56,
+  "backfilled": false,
+  "bulk_file": "raw/phl_recording_review/20261127/decisions.csv",
+  "campaign_id": "20261127T160457Z",
+  "code_commit": "712164646a14501c2648f0b51352c304c61977a0",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T16:05:03Z",
+  "iso3": "PHL",
+  "known_gaps": [
+    "Consult the review ledger for earlier releases, conflicting sources and existing representatives."
+  ],
+  "limits_hit": {},
+  "notes": "Reviewed 63 existing held songs and cleared 30 verified recordings. Parent 20261127T160457Z. Decision SHA-256 85aa9ae9e4f42cb9b59af0f0129715d58f4a1ec0d3f4f6e9d986be7ed92fc39c.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "roster_update",
+  "rows_added": 0,
+  "run_id": "20261127T160501Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 30,
+  "songs_attempted": 63,
+  "songs_rejected": {
+    "contradicted": 8,
+    "existing_representative": 3,
+    "unresolved": 22
+  },
+  "source": "lrclib",
+  "started_utc": "2026-11-27T16:05:01Z",
+  "state": "complete"
+}
