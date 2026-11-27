@@ -22,7 +22,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [BEN](../../countries/BEN/) | 5 | 2026-11-24 | dump_name, old_layout | genius, lacoccinelle, lrclib, old_pipeline | 1031 |
 | [BES](../../countries/BES/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [BFA](../../countries/BFA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 86 |
-| [BGD](../../countries/BGD/) | 2 | 2026-11-21 | old_layout | old_pipeline | 213 |
+| [BGD](../../countries/BGD/) | 3 | 2026-11-27 | live, old_layout | gitimala, old_pipeline | 213 |
 | [BGR](../../countries/BGR/) | 13 | 2026-11-26 | dump_name, old_layout | bgtekstove, genius, lrclib, old_pipeline, pevcheskipodsetnik, textovenapesni | 22174 |
 | [BHR](../../countries/BHR/) | 2 | 2026-11-21 | old_layout | old_pipeline | 760 |
 | [BHS](../../countries/BHS/) | 2 | 2026-11-21 | old_layout | old_pipeline | 406 |
@@ -123,7 +123,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [LBY](../../countries/LBY/) | 2 | 2026-11-21 | old_layout | old_pipeline | 175 |
 | [LCA](../../countries/LCA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 15 |
 | [LIE](../../countries/LIE/) | 2 | 2026-11-21 | old_layout | old_pipeline | 84 |
-| [LKA](../../countries/LKA/) | 4 | 2026-11-25 | dump_name, old_layout | genius, lrclib, old_pipeline | 465 |
+| [LKA](../../countries/LKA/) | 5 | 2026-11-27 | dump_name, live, old_layout | genius, lrclib, lyricslk, old_pipeline | 465 |
 | [LSO](../../countries/LSO/) | 2 | 2026-11-21 | old_layout | old_pipeline | 45 |
 | [LTU](../../countries/LTU/) | 19 | 2026-11-26 | dump_name, live, old_layout | dainutekstai, dainuzodziai, genius, geniusru, lrclib, old_pipeline, textpesenok | 5818 |
 | [LUX](../../countries/LUX/) | 4 | 2026-11-25 | dump_name, old_layout | genius, lrclib, old_pipeline | 307 |
@@ -177,7 +177,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [ROU](../../countries/ROU/) | 6 | 2026-11-27 | dump_name, old_layout | genius, lrclib, old_pipeline | 20082 |
 | [RUS](../../countries/RUS/) | 15 | 2026-11-27 | dump_name, manual_review, old_layout | genius, geniusru, lrclib, old_pipeline, tekstpesni, textpesenok | 86509 |
 | [RWA](../../countries/RWA/) | 2 | 2026-11-21 | old_layout | old_pipeline | 2107 |
-| [SAU](../../countries/SAU/) | 2 | 2026-11-21 | old_layout | old_pipeline | 7151 |
+| [SAU](../../countries/SAU/) | 3 | 2026-11-27 | live, old_layout | aama, old_pipeline | 7151 |
 | [SDN](../../countries/SDN/) | 2 | 2026-11-21 | old_layout | old_pipeline | 1270 |
 | [SEN](../../countries/SEN/) | 5 | 2026-11-24 | dump_name, old_layout | genius, lacoccinelle, lrclib, old_pipeline | 1309 |
 | [SGP](../../countries/SGP/) | 6 | 2026-11-25 | dump_name, old_layout | genius, lrclib, old_pipeline | 2386 |
