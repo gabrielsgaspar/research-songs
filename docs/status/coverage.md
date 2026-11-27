@@ -163,7 +163,7 @@ Generated from `countries/*/runs/` by `uv run songs lyrics coverage --write`. Do
 | [PAK](../../countries/PAK/) | 4 | 2026-11-24 | dump_name, old_layout | genius, lrclib, old_pipeline | 1796 |
 | [PAN](../../countries/PAN/) | 13 | 2026-11-26 | dump_name, old_layout | genius, letras, lrclib, musica, old_pipeline | 3337 |
 | [PER](../../countries/PER/) | 13 | 2026-11-26 | dump_name, old_layout | genius, letras, lrclib, musica, old_pipeline | 13007 |
-| [PHL](../../countries/PHL/) | 9 | 2026-11-27 | dump_name, manual_review, old_layout, roster_update | genius, lrclib, old_pipeline | 14930 |
+| [PHL](../../countries/PHL/) | 10 | 2026-11-27 | dump_name, manual_review, old_layout, roster_update | genius, lrclib, old_pipeline | 14930 |
 | [PLW](../../countries/PLW/) | 2 | 2026-11-21 | old_layout | old_pipeline | 0 |
 | [PNG](../../countries/PNG/) | 2 | 2026-11-21 | old_layout | old_pipeline | 8 |
 | [POL](../../countries/POL/) | 5 | 2026-11-27 | dump_name, manual_review, old_layout | genius, lrclib, old_pipeline | 50207 |

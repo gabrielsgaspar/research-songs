@@ -1,0 +1,29 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 1,
+  "backfilled": false,
+  "bulk_file": "raw/phl_recording_review_supplement/20261127/decisions.csv",
+  "campaign_id": "20261127T160725Z",
+  "code_commit": "38b4c7a546f5b43249b9f78d18360df8cb0a78f2",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T16:07:27Z",
+  "iso3": "PHL",
+  "known_gaps": [
+    "Other unresolved songs remain held."
+  ],
+  "limits_hit": {},
+  "notes": "Applied additional cassette writer evidence to one previously unresolved row. Parent 20261127T160501Z. Decision SHA-256 7942bd5bfe083e3e9fc5a4d42c774c5c265978406dedb9756384a531c04391a9.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "roster_update",
+  "rows_added": 0,
+  "run_id": "20261127T160725Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 1,
+  "songs_attempted": 1,
+  "songs_rejected": {},
+  "source": "lrclib",
+  "started_utc": "2026-11-27T16:07:25Z",
+  "state": "complete"
+}
