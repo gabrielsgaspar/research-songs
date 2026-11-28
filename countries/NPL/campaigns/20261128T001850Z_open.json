@@ -1,0 +1,8 @@
+{
+  "campaign_id": "20261128T001850Z",
+  "goal": "Import the dumps that the source list of 2026-11-27 gives, and run the first dump campaign of the countries that have none",
+  "iso3": "NPL",
+  "opened_utc": "2026-11-28T00:18:50Z",
+  "schema_version": 1,
+  "songs_before": 127
+}

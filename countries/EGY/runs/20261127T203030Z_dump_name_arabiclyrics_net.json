@@ -1,0 +1,39 @@
+{
+  "artist_limit": null,
+  "artists_attempted": 17,
+  "backfilled": false,
+  "bulk_file": "clean/dumps/arabiclyrics_net/20261121/",
+  "campaign_id": "20261127T202523Z",
+  "code_commit": "d739350ce38565aa84ca461db93ea3938277a7be",
+  "deadline_utc": null,
+  "ended_utc": "2026-11-27T20:31:01Z",
+  "iso3": "EGY",
+  "known_gaps": [
+    "close: 1 songs match a Discogs title by close spelling, but the numbers of the titles differ or a person rejected them"
+  ],
+  "limits_hit": {},
+  "notes": "The survey estimates 48 songs to add. 27 songs added for artists whose Discogs id was found by name (their match method ends with _artist_by_name). 45 close matches added: the titles hold the same numbers, or resources/lyrics/reviewed_close_matches.csv accepts them.",
+  "request_delay_seconds": null,
+  "requests_sent": 0,
+  "route": "dump_name",
+  "rows_added": 48,
+  "run_id": "20261127T203030Z",
+  "schema_version": 2,
+  "song_limit": null,
+  "songs_accepted": 48,
+  "songs_attempted": 4094,
+  "songs_rejected": {
+    "already_linked": 32,
+    "close": 1,
+    "held": 44,
+    "held_loose_title": 5,
+    "no_track": 1010,
+    "not_roster": 2448,
+    "out_of_scope": 497,
+    "same_title": 8,
+    "track_taken": 1
+  },
+  "source": "arabiclyrics_net",
+  "started_utc": "2026-11-27T20:30:30Z",
+  "state": "complete"
+}

@@ -1,0 +1,10 @@
+{
+  "campaign_id": "20261127T213841Z",
+  "closed_utc": "2026-11-27T22:54:54Z",
+  "iso3": "USA",
+  "next_time": "The run with the rules of 2026-11-27 added 302,381 songs: lrclib 203,994, genius 98,311, cuspajz 64, pesmarica 12. The imports held back 57,062 text copies. A sample of 60 added songs gave 57 right, 0 wrong and 3 doubtful (1 instrumental tribute act, 2 years that are too late). 12,045 roster artists came from the Discogs home rule. Next: after the change for roster names with a homonym mark is on main, run genius and lrclib again; a survey of genius gave 34,658 more songs for 1,788 such artists. 1,761,010 dump songs of roster artists have no Discogs track of their title.",
+  "outcome": "complete",
+  "reason": "",
+  "schema_version": 1,
+  "songs_after": 1829813
+}
